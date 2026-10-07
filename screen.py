@@ -2,8 +2,8 @@
 """
 screen.py  -  AI Chip Integrity Suite, screener v0.1.0
 
-Runs one fixed matrix multiply many times on a single device and checks every
-result two ways:
+Runs fixed matrix multiplies (several shapes and precisions, including exact
+int8) many times on a single device and checks every result two ways:
 
   1. Reference check. Every output element must sit inside a proven
      rounding-error bound around a float64 answer computed on the CPU
@@ -40,13 +40,15 @@ os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 import torch  # noqa: E402
 import ocptv.output as tv  # noqa: E402
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 DTYPES = {
-    "fp32": (torch.float32, torch.int32, 32, 2.0 ** -24),
-    "fp16": (torch.float16, torch.int16, 16, 2.0 ** -11),
-    "bf16": (torch.bfloat16, torch.int16, 16, 2.0 ** -8),
+    "fp32": (torch.float32, torch.float32, torch.int32, 32, 2.0 ** -24),
+    "fp16": (torch.float16, torch.float16, torch.int16, 16, 2.0 ** -11),
+    "bf16": (torch.bfloat16, torch.bfloat16, torch.int16, 16, 2.0 ** -8),
+    "int8": (torch.int8, torch.int32, torch.int32, 32, None),   # exact: any difference is a fault
 }
+DEFAULT_SHAPES = "1024x1024x1024,4096x4096x4096,32x4096x11008"   # MxKxN; last one is an LLM decode shape
 U_ACC = 2.0 ** -24          # accumulation assumed in FP32 or better (enforced on CUDA below)
 NONDET_SHARE = 0.10         # at least this share of differing runs (and at least NONDET_MIN runs)
 NONDET_MIN = 3              # reads as a non-deterministic kernel rather than a rare fault
@@ -94,19 +96,45 @@ def lock_down_math(dev):
         torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction = False
 
 
-def make_case(n, dtype, seed):
-    """Inputs rounded to the test dtype, plus the float64 reference and its bound."""
+def make_case(m, k, n, dtype, seed):
+    """Inputs rounded to the test dtype, plus the exact (float64 or int64) reference and |A|@|B|."""
     g = torch.Generator().manual_seed(seed)
-    a = (torch.rand(n, n, generator=g, dtype=torch.float64) * 2 - 1).to(dtype)
-    b = (torch.rand(n, n, generator=g, dtype=torch.float64) * 2 - 1).to(dtype)
+    if dtype == torch.int8:
+        a = torch.randint(-16, 16, (m, k), generator=g, dtype=torch.int8)
+        b = torch.randint(-16, 16, (k, n), generator=g, dtype=torch.int8)
+        ref = (a.to(torch.int64) @ b.to(torch.int64)).to(torch.float64)   # exact, |value| < 2^31
+        return a, b, ref, torch.zeros_like(ref)
+    a = (torch.rand(m, k, generator=g, dtype=torch.float64) * 2 - 1).to(dtype)
+    b = (torch.rand(k, n, generator=g, dtype=torch.float64) * 2 - 1).to(dtype)
     a64, b64 = a.to(torch.float64), b.to(torch.float64)
-    ref = a64 @ b64
-    abs_ab = a64.abs() @ b64.abs()
-    return a, b, ref, abs_ab
+    return a, b, a64 @ b64, a64.abs() @ b64.abs()
+
+
+def parse_shapes(text):
+    out = []
+    for item in text.split(","):
+        item = item.strip().lower()
+        if not item:
+            continue
+        parts = item.split("x")
+        if len(parts) == 1:
+            parts = parts * 3
+        if len(parts) != 3 or not all(p.isdigit() and int(p) >= 2 for p in parts):
+            raise ValueError(f"bad shape {item!r}: use MxKxN, e.g. 1024x1024x1024")
+        out.append(tuple(int(p) for p in parts))
+    return out
+
+
+def matmul(a, b):
+    if a.dtype == torch.int8:
+        return torch._int_mm(a, b)
+    return a @ b
 
 
 def error_bound(ref, abs_ab, k, u_out):
-    """|C - R| <= g*|A||B| + u_out*(|R| + g*|A||B|), with g = k*u/(1-k*u)."""
+    """|C - R| <= g*|A||B| + u_out*(|R| + g*|A||B|), with g = k*u/(1-k*u). Integers: exact (zero)."""
+    if u_out is None:
+        return torch.zeros_like(ref)
     g = k * U_ACC / (1 - k * U_ACC)
     acc = g * abs_ab
     return acc + u_out * (ref.abs() + acc)
@@ -122,11 +150,13 @@ def flip_bit(c, int_view, bits, rng):
     return idx, bit
 
 
-def screen_dtype(step, dev, name, n, iters, seed, inject, rng, hw):
-    dtype, int_view, bits, u_out = DTYPES[name]
-    a, b, ref, abs_ab = make_case(n, dtype, seed)
-    bound = error_bound(ref, abs_ab, n, u_out)
+def screen_case(step, dev, name, shape, iters, seed, inject, rng, hw):
+    dtype, out_dtype, int_view, bits, u_out = DTYPES[name]
+    m, k, n = shape
+    a, b, ref, abs_ab = make_case(m, k, n, dtype, seed)
+    bound = error_bound(ref, abs_ab, k, u_out)
     a_dev, b_dev = a.to(dev), b.to(dev)
+    exact = u_out is None
 
     inject_runs = set(rng.sample(range(1, iters), min(inject, iters - 1))) if inject else set()
     first_bits = None
@@ -136,7 +166,9 @@ def screen_dtype(step, dev, name, n, iters, seed, inject, rng, hw):
     t0 = time.time()
 
     for i in range(iters):
-        c = (a_dev @ b_dev).to("cpu").contiguous()
+        c = matmul(a_dev, b_dev).to("cpu").contiguous()
+        if c.dtype != out_dtype:
+            raise RuntimeError(f"device returned {c.dtype}, expected {out_dtype}")
         if _FAULT_HOOK is not None:
             _FAULT_HOOK(i, c)
         if i in inject_runs:
@@ -149,8 +181,9 @@ def screen_dtype(step, dev, name, n, iters, seed, inject, rng, hw):
         nonfinite = int((~finite).sum())
         worst_nonfinite = max(worst_nonfinite, nonfinite)
         if bool(finite.any()):
-            worst_ratio = max(worst_ratio, float((err[finite] / bound[finite]).max()))
             worst_abs = max(worst_abs, float(err[finite].max()))
+            if not exact:
+                worst_ratio = max(worst_ratio, float((err[finite] / bound[finite]).max()))
         ref_fail = nonfinite > 0 or bool((err[finite] > bound[finite]).any())
 
         bits_now = c.view(int_view).clone()
@@ -171,13 +204,15 @@ def screen_dtype(step, dev, name, n, iters, seed, inject, rng, hw):
 
     eq0 = [tv.Validator(type=tv.ValidatorType.EQUAL, value=0)]
     step.add_measurement(name="runs", value=iters, hardware_info=hw)
-    step.add_measurement(name="matrix_size", value=n, hardware_info=hw)
+    step.add_measurement(name="shape_mkn", value=f"{m}x{k}x{n}", hardware_info=hw)
+    step.add_measurement(name="exact_check", value=exact, hardware_info=hw)
     step.add_measurement(name="seconds", value=round(secs, 3), unit="s", hardware_info=hw)
     step.add_measurement(name="reference_check_failed_runs", value=len(ref_bad),
                          validators=None if inject else eq0, hardware_info=hw)
     step.add_measurement(name="repeat_check_failed_runs", value=len(rep_bad),
                          validators=None if inject else eq0, hardware_info=hw)
-    step.add_measurement(name="worst_error_over_bound_ratio", value=worst_ratio, hardware_info=hw)
+    if not exact:
+        step.add_measurement(name="worst_error_over_bound_ratio", value=worst_ratio, hardware_info=hw)
     step.add_measurement(name="worst_abs_error", value=worst_abs, hardware_info=hw)
     step.add_measurement(name="worst_nonfinite_values", value=worst_nonfinite, hardware_info=hw)
 
@@ -191,7 +226,8 @@ def screen_dtype(step, dev, name, n, iters, seed, inject, rng, hw):
         verdict = "injection-self-test-pass" if ok else "injection-self-test-fail"
         msg = f"{caught}/{injected} injected runs detected; {len(clean_bad)} unexpected failing runs"
     elif not ref_bad and not rep_bad:
-        ok, verdict, msg = True, "no-silent-errors", f"{iters} runs, all inside bound and bit-identical"
+        ok, verdict = True, "no-silent-errors"
+        msg = f"{iters} runs, all {'exact' if exact else 'inside bound'} and bit-identical"
     elif rep_bad and not ref_bad and len(rep_bad) >= max(NONDET_MIN, NONDET_SHARE * iters):
         ok, verdict = False, "nondeterministic-kernel"
         msg = f"{len(rep_bad)}/{iters} runs differ but all stay inside bound; repeat check unusable here"
@@ -201,7 +237,8 @@ def screen_dtype(step, dev, name, n, iters, seed, inject, rng, hw):
     else:
         ok, verdict = False, "outside-error-bound"
         msg = (f"all runs agree but {len(ref_bad)} runs sit outside the proven bound "
-               f"(a faulty unit, or the device accumulating below FP32)")
+               + ("(integer result differs from the exact answer)" if exact
+                  else "(a faulty unit, or the device accumulating below FP32)"))
 
     step.add_diagnosis(tv.DiagnosisType.PASS if ok else tv.DiagnosisType.FAIL,
                        verdict=verdict, message=msg, hardware_info=hw)
@@ -211,18 +248,23 @@ def screen_dtype(step, dev, name, n, iters, seed, inject, rng, hw):
 def main(argv=None):
     p = argparse.ArgumentParser(description="AI Chip Integrity Suite screener")
     p.add_argument("--device", default="auto", help="auto, cpu, mps, cuda or cuda:N")
-    p.add_argument("--size", type=int, default=1024, help="square matrix size")
-    p.add_argument("--iters", type=int, default=50, help="runs per dtype")
-    p.add_argument("--dtypes", default="fp32,fp16", help="comma list from fp32,fp16,bf16")
+    p.add_argument("--shapes", default=None, help=f"comma list of MxKxN (default {DEFAULT_SHAPES})")
+    p.add_argument("--size", type=int, default=None, help="shortcut: one square NxNxN shape")
+    p.add_argument("--iters", type=int, default=50, help="runs per shape and precision")
+    p.add_argument("--dtypes", default="fp32,fp16,bf16,int8", help="comma list from fp32,fp16,bf16,int8")
     p.add_argument("--seed", type=int, default=1234)
-    p.add_argument("--inject", type=int, default=0, help="bit flips to inject per dtype (self-test)")
+    p.add_argument("--inject", type=int, default=0, help="bit flips to inject per step (self-test)")
     p.add_argument("--out", default="results.jsonl", help="OCP JSON output file")
     args = p.parse_args(argv)
 
     names = [d.strip() for d in args.dtypes.split(",") if d.strip()]
     bad = [d for d in names if d not in DTYPES]
-    if bad or args.iters < 2 or args.size < 2:
-        p.error(f"check --dtypes {bad}, --iters >= 2, --size >= 2")
+    if bad or args.iters < 2:
+        p.error(f"check --dtypes {bad}, --iters >= 2")
+    try:
+        shapes = parse_shapes(args.shapes or (f"{args.size}" if args.size else DEFAULT_SHAPES))
+    except ValueError as e:
+        p.error(str(e))
 
     dev = pick_device(args.device)
     lock_down_math(dev)
@@ -234,32 +276,35 @@ def main(argv=None):
     run = tv.TestRun(
         name="ai-chip-integrity-screen",
         version=VERSION,
-        parameters={"device": str(dev), "size": args.size, "iters": args.iters,
-                    "dtypes": ",".join(names), "seed": args.seed, "inject": args.inject},
+        parameters={"device": str(dev), "shapes": ",".join("x".join(map(str, sh)) for sh in shapes),
+                    "iters": args.iters, "dtypes": ",".join(names), "seed": args.seed,
+                    "inject": args.inject},
     )
     dut = tv.Dut(id=socket.gethostname())
     hw = dut.add_hardware_info(name=device_label(dev))
     dut.add_software_info(name="torch", version=torch.__version__)
     dut.add_software_info(name="python", version=platform.python_version())
 
-    print(f"Device: {device_label(dev)} ({dev})  size={args.size}  runs={args.iters}  inject={args.inject}")
+    print(f"Device: {device_label(dev)} ({dev})  runs={args.iters}  inject={args.inject}")
     all_ok = True
     run.start(dut=dut)
     try:
-        for name in names:
-            step = run.add_step(f"gemm_{name}")
-            step.start()
-            try:
-                ok, verdict, msg, secs = screen_dtype(step, dev, name, args.size, args.iters,
-                                                     args.seed, args.inject, rng, hw)
-                step.end(status=tv.TestStatus.COMPLETE)
-            except (RuntimeError, TypeError) as e:
-                step.add_error(symptom="dtype-not-supported", message=str(e)[:500])
-                step.end(status=tv.TestStatus.SKIP)
-                print(f"  {name:5s}  SKIPPED  {str(e)[:120]}")
-                continue
-            all_ok &= ok
-            print(f"  {name:5s}  {'PASS' if ok else 'FAIL'}  {verdict}  ({secs:.1f}s)  {msg}")
+        for shape in shapes:
+            label = "x".join(map(str, shape))
+            for name in names:
+                step = run.add_step(f"gemm_{name}_{label}")
+                step.start()
+                try:
+                    ok, verdict, msg, secs = screen_case(step, dev, name, shape, args.iters,
+                                                         args.seed, args.inject, rng, hw)
+                    step.end(status=tv.TestStatus.COMPLETE)
+                except (RuntimeError, TypeError, NotImplementedError) as e:
+                    step.add_error(symptom="not-supported-on-device", message=str(e)[:500])
+                    step.end(status=tv.TestStatus.SKIP)
+                    print(f"  {label:>16s} {name:5s}  SKIPPED  {str(e)[:100]}")
+                    continue
+                all_ok &= ok
+                print(f"  {label:>16s} {name:5s}  {'PASS' if ok else 'FAIL'}  {verdict}  ({secs:.1f}s)  {msg}")
     finally:
         run.end(status=tv.TestStatus.COMPLETE,
                 result=tv.TestResult.PASS if all_ok else tv.TestResult.FAIL)
