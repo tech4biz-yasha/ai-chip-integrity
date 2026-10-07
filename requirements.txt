@@ -1,0 +1,3 @@
+torch>=2.2
+ocptv==0.1.7
+pytest>=8
