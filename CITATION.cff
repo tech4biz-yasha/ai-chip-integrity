@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "ai-chip-integrity: an open tester for silent computation errors in AI chips"
+version: 0.1.0
+date-released: 2026-10-07
+license: MIT
+repository-code: "https://github.com/tech4biz-yasha/ai-chip-integrity"
+authors:
+  - family-names: Khandelwal
+    given-names: Yasha
+    email: yasha.khandelwal@tech4biz.io
+keywords:
+  - silent data corruption
+  - GPU reliability
+  - AI accelerators
+  - OCP Test and Validation
