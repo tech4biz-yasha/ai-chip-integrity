@@ -4,7 +4,7 @@ An open tester for silent computation errors in AI chips.
 
 It runs a fixed calculation on a GPU, NPU or CPU many times and proves, element by element, whether the chip returned the right answer every time. Results come out in the Open Compute Project Test and Validation format, so they drop straight into fleet tooling.
 
-**Status: early.** Two probes so far: `screen.py` v0.2.0 (matrix multiply across several shapes and four precisions) and `memcheck.py` v0.1.0 (a sweep of the whole device memory). One device at a time, two measured chips. Read the limits section before relying on a PASS.
+**Status: early.** Two probes so far: `screen.py` v0.2.0 (matrix multiply across several shapes and four precisions) and `memcheck.py` v0.1.0 (a sweep of the whole device memory). One device at a time, three measured chips. Read the limits section before relying on a PASS.
 
 ## Why this exists
 
@@ -20,6 +20,7 @@ Every row comes from a run of this code with the result files in [`results/`](re
 
 | Device | Date | Tool | Shapes (MxKxN) | Runs per step | fp32 | fp16 | bf16 | int8 | Injected faults caught | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
+| NVIDIA A100-SXM4-80GB, PyTorch 2.8.0+cu128, rented pod | 2026-10-07 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | 60 of 60 | no-silent-errors |
 | NVIDIA H100 80GB HBM3 (SXM), driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-07 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | 60 of 60 | no-silent-errors |
 | Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-07 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | skipped, no int8 matmul on MPS | 45 of 45 | no-silent-errors |
 | Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-07 | v0.1.0 | 1024x1024x1024 | 50 | PASS, 1.6 s | PASS, 1.1 s | not run | not run | 10 of 10 | no-silent-errors |
@@ -28,10 +29,13 @@ Every row comes from a run of this code with the result files in [`results/`](re
 
 | Device | Date | Memory tested | Patterns | Dwell | Bad words | Injected flips located | Verdict |
 |---|---|---|---|---|---|---|---|
+| NVIDIA A100-SXM4-80GB, 79.3 GiB total, rented pod | 2026-10-07 | 63.00 GiB (16,911,433,728 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
 | NVIDIA H100 80GB HBM3 (SXM), 79.2 GiB total, rented pod | 2026-10-07 | 62.75 GiB (16,844,324,864 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
 | Apple GPU via MPS, MacBook Pro (arm64), 11.8 GiB recommended max | 2026-10-07 | 5.50 GiB (1,476,395,008 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
 
-The H100 sweep took 21.6 s both clean and with injection, so about 17 GiB/s of write, read and compare at HBM speed; the Mac sweep took 69 s clean and 85 s with injection. Result files: `results/h100_memcheck.jsonl`, `results/h100_memcheck_inject.jsonl`, `results/mac_memcheck.jsonl` and `results/mac_memcheck_inject.jsonl`.
+The A100 sweep took 28.3 s, the H100 sweep took 21.6 s both clean and with injection, so about 17 GiB/s of write, read and compare at HBM speed; the Mac sweep took 69 s clean and 85 s with injection. Result files: `results/a100_memcheck.jsonl`, `results/a100_memcheck_inject.jsonl`, `results/h100_memcheck.jsonl`, `results/h100_memcheck_inject.jsonl`, `results/mac_memcheck.jsonl` and `results/mac_memcheck_inject.jsonl`.
+
+Notes on the A100 row: all 600 results across 12 steps were bit-for-bit identical to their first run and int8 was exact on every element, the same as the H100. Result files: `results/a100_clean.jsonl` and `results/a100_inject.jsonl`.
 
 Notes on the H100 row: all 600 results across 12 steps were bit-for-bit identical to their first run, with TF32 and reduced-precision reductions disabled and cuBLAS set deterministic. int8 ran through the tensor cores and matched the exact int64 reference on every element. Wall time per step (56 to 59 s at 4096x4096x4096) is dominated by the CPU-side checking of 16.8 million elements per run, not by the GPU. Result files: `results/h100_clean.jsonl` and `results/h100_inject.jsonl`.
 
