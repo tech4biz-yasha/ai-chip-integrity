@@ -16,11 +16,21 @@ Those detectors live inside one company's training stack. This project is the op
 
 Every row comes from a run of this code with the result files in [`results/`](results/). Nothing here is modelled or estimated.
 
+**Compute probe (`screen.py`)**
+
 | Device | Date | Tool | Shapes (MxKxN) | Runs per step | fp32 | fp16 | bf16 | int8 | Injected faults caught | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
 | NVIDIA H100 80GB HBM3 (SXM), driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-07 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | 60 of 60 | no-silent-errors |
 | Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-07 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | skipped, no int8 matmul on MPS | 45 of 45 | no-silent-errors |
 | Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-07 | v0.1.0 | 1024x1024x1024 | 50 | PASS, 1.6 s | PASS, 1.1 s | not run | not run | 10 of 10 | no-silent-errors |
+
+**Memory sweep (`memcheck.py` v0.1.0)**
+
+| Device | Date | Memory tested | Patterns | Dwell | Bad words | Injected flips located | Verdict |
+|---|---|---|---|---|---|---|---|
+| Apple GPU via MPS, MacBook Pro (arm64), 11.8 GiB recommended max | 2026-10-07 | 5.50 GiB (1,476,395,008 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
+
+The sweep took 69 s clean and 85 s with injection. Result files: `results/mac_memcheck.jsonl` and `results/mac_memcheck_inject.jsonl`.
 
 Notes on the H100 row: all 600 results across 12 steps were bit-for-bit identical to their first run, with TF32 and reduced-precision reductions disabled and cuBLAS set deterministic. int8 ran through the tensor cores and matched the exact int64 reference on every element. Wall time per step (56 to 59 s at 4096x4096x4096) is dominated by the CPU-side checking of 16.8 million elements per run, not by the GPU. Result files: `results/h100_clean.jsonl` and `results/h100_inject.jsonl`.
 
