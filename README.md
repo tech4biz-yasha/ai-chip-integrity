@@ -28,9 +28,10 @@ Every row comes from a run of this code with the result files in [`results/`](re
 
 | Device | Date | Memory tested | Patterns | Dwell | Bad words | Injected flips located | Verdict |
 |---|---|---|---|---|---|---|---|
+| NVIDIA H100 80GB HBM3 (SXM), 79.2 GiB total, rented pod | 2026-10-07 | 62.75 GiB (16,844,324,864 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
 | Apple GPU via MPS, MacBook Pro (arm64), 11.8 GiB recommended max | 2026-10-07 | 5.50 GiB (1,476,395,008 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
 
-The sweep took 69 s clean and 85 s with injection. Result files: `results/mac_memcheck.jsonl` and `results/mac_memcheck_inject.jsonl`.
+The H100 sweep took 21.6 s both clean and with injection, so about 17 GiB/s of write, read and compare at HBM speed; the Mac sweep took 69 s clean and 85 s with injection. Result files: `results/h100_memcheck.jsonl`, `results/h100_memcheck_inject.jsonl`, `results/mac_memcheck.jsonl` and `results/mac_memcheck_inject.jsonl`.
 
 Notes on the H100 row: all 600 results across 12 steps were bit-for-bit identical to their first run, with TF32 and reduced-precision reductions disabled and cuBLAS set deterministic. int8 ran through the tensor cores and matched the exact int64 reference on every element. Wall time per step (56 to 59 s at 4096x4096x4096) is dominated by the CPU-side checking of 16.8 million elements per run, not by the GPU. Result files: `results/h100_clean.jsonl` and `results/h100_inject.jsonl`.
 
