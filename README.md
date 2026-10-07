@@ -14,13 +14,14 @@ Those detectors live inside one company's training stack. This project is the op
 
 ## Measured results
 
-Every row comes from a run of this code with the result file attached. Nothing here is modelled or estimated.
+Every row comes from a run of this code with the result files in [`results/`](results/). Nothing here is modelled or estimated.
 
-| Device | Date | Tool | Shapes (MxKxN) | Runs per step | fp32 | fp16 | Injected faults caught | Verdict |
-|---|---|---|---|---|---|---|---|---|
-| Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-07 | v0.1.0 | 1024x1024x1024 | 50 | PASS, 1.6 s | PASS, 1.1 s | 10 of 10 | no-silent-errors |
+| Device | Date | Tool | Shapes (MxKxN) | Runs per step | fp32 | fp16 | bf16 | int8 | Injected faults caught | Verdict |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-07 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | skipped, no int8 matmul on MPS | 45 of 45 | no-silent-errors |
+| Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-07 | v0.1.0 | 1024x1024x1024 | 50 | PASS, 1.6 s | PASS, 1.1 s | not run | not run | 10 of 10 | no-silent-errors |
 
-Notes on the first row: all 100 runs were bit-for-bit identical to the first run, so the matrix multiply on this chip is deterministic, and fp16 stayed inside the FP32-accumulation error bound. The fault column is the self-test described below (software injected, not a property of the chip).
+Notes on the Apple rows: in the v0.2.0 run all 450 results across 9 steps were bit-for-bit identical to their first run, so the matrix multiply on this chip is deterministic, and fp16 and bf16 stayed inside the FP32-accumulation error bound at every shape. The 4096x4096x4096 steps took 23 to 30 s each for 50 runs. The fault column is the self-test described below (software injected, not a property of the chip). Result files: `results/mac_v020.jsonl` and `results/mac_v020_inject.jsonl`.
 
 ## What it measures
 
