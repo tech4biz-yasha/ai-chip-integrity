@@ -4,7 +4,7 @@ An open tester for silent computation errors in AI chips.
 
 It runs a fixed calculation on a GPU, NPU or CPU many times and proves, element by element, whether the chip returned the right answer every time. Results come out in the Open Compute Project Test and Validation format, so they drop straight into fleet tooling.
 
-**Status: v0.2.0, early.** One operation (matrix multiply) across several shapes and four precisions, one device at a time, one measured row. Read the limits section before relying on a PASS.
+**Status: early.** Two probes so far: `screen.py` v0.2.0 (matrix multiply across several shapes and four precisions) and `memcheck.py` v0.1.0 (a sweep of the whole device memory). One device at a time, two measured chips. Read the limits section before relying on a PASS.
 
 ## Why this exists
 
@@ -26,7 +26,7 @@ Notes on the H100 row: all 600 results across 12 steps were bit-for-bit identica
 
 Notes on the Apple rows: in the v0.2.0 run all 450 results across 9 steps were bit-for-bit identical to their first run, so the matrix multiply on this chip is deterministic, and fp16 and bf16 stayed inside the FP32-accumulation error bound at every shape. The 4096x4096x4096 steps took 23 to 30 s each for 50 runs. The fault column is the self-test described below (software injected, not a property of the chip). Result files: `results/mac_v020.jsonl` and `results/mac_v020_inject.jsonl`.
 
-## What it measures
+## Probe 1: compute (`screen.py`)
 
 Matrix multiplies `C = A @ B` with fixed inputs, repeated `--iters` times for every shape and precision. Three shapes run by default: 1024x1024x1024, 4096x4096x4096, and 32x4096x11008, which is the shape of an LLM decode step through a feed-forward layer (M tokens by K hidden by N intermediate). Float inputs are drawn uniformly from [-1, 1) with a fixed seed, then rounded to the test precision, so every precision starts from the same underlying matrices. int8 inputs are integers in [-16, 16).
 
@@ -59,15 +59,48 @@ For int8 the device returns int32 and the reference is computed exactly in int64
 
 **Self-test.** `--inject N` flips one random bit of one random output element in `N` runs (never run 0), after the result has been copied back from the device. It proves the checker catches corruption; it does not stress the chip. The verdict then becomes `injection-self-test-pass` only if every injected run was caught and no uninjected run failed.
 
+## Probe 2: memory (`memcheck.py`)
+
+The matrix multiply touches a few megabytes. The memory sweep fills as much of the device memory as it can (by default 80% of what is free on CUDA, 48% of the recommended maximum on Apple MPS, 2 GiB on CPU, or `--gb` to choose), writes a known value into every 32-bit word, waits a dwell time (default 2 s), reads everything back and counts every word that differs.
+
+Six patterns run in order: all zeros, all ones, `0xAAAAAAAA`, `0x55555555`, an address hash (every word pseudo-random from its own address, so neighbouring cells never hold the same value) and the bitwise inverse of that hash. Together they drive every bit of every word to both 0 and 1 while its neighbours hold the opposite, which is what catches stuck bits, coupled cells and weak rows. The expected value is recomputed on the device at read time, so the comparison runs at device speed. For every failing pattern the first ten byte offsets and the OR of the bad bits are logged, so a stuck bit shows up as a single mask such as `0x00000020`.
+
+**Verdict per pass**
+
+| Verdict | Meaning |
+|---|---|
+| `no-memory-errors` | Every word read back correctly on every pattern |
+| `memory-errors` | At least one word differed; the measurements say which patterns and the log says where |
+
+**Self-test.** `--inject N` flips one random bit in N random words of device memory after each pattern is written. Unlike the compute probe's self-test, this corrupts real device memory, so it also exercises the read-back path. The verdict is `injection-self-test-pass` only when every injected flip is located and no other word fails.
+
 ## Run it
 
 ```
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python screen.py                 # auto picks cuda, then mps, then cpu; 3 shapes x 4 precisions
-python screen.py --inject 5      # self-test
-python -m pytest -q              # 32 tests on CPU; a 33rd validates the output against OCP's schema
+python screen.py                 # compute probe; auto picks cuda, then mps, then cpu; 3 shapes x 4 precisions
+python screen.py --inject 5      # compute self-test
+python memcheck.py               # memory probe; 6 patterns over most of the device memory
+python memcheck.py --inject 5    # memory self-test
+python -m pytest -q              # 39 tests on CPU; 2 more validate the output against OCP's schema
 ```
+
+Options for `memcheck.py`:
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--device` | `auto` | `cpu`, `mps`, `cuda` or `cuda:N` |
+| `--gb` | none | memory to test in GiB; overrides `--fraction` |
+| `--fraction` | `0.8` | fraction of free device memory to test |
+| `--chunk-mb` | `256` | allocation chunk size |
+| `--dwell` | `2.0` | seconds between write and read-back |
+| `--passes` | `1` | repeat the whole pattern set |
+| `--seed` | `1234` | hash pattern seed |
+| `--inject` | `0` | bit flips to inject per pattern (self-test, max 100) |
+| `--out` | `memcheck.jsonl` | OCP output file |
+
+Options for `screen.py`:
 
 | Option | Default | Meaning |
 |---|---|---|
@@ -88,17 +121,19 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 
 ## Output format
 
-`results.jsonl` holds one JSON object per line following the [OCP Test and Validation output spec](https://github.com/opencomputeproject/ocp-diag-core/tree/main/json_spec), version 2.0, written through the official `ocptv` library:
+Both probes write one JSON object per line following the [OCP Test and Validation output spec](https://github.com/opencomputeproject/ocp-diag-core/tree/main/json_spec), version 2.0, written through the official `ocptv` library:
 
 - `testRunStart` with the parameters used, the host name as DUT id, the device as a hardware component, and the `torch` and `python` versions as software components
 - one test step per shape and precision, named `gemm_<precision>_<MxKxN>` (for example `gemm_fp16_4096x4096x4096`), carrying the measurements `runs`, `shape_mkn`, `exact_check`, `seconds`, `reference_check_failed_runs`, `repeat_check_failed_runs`, `worst_error_over_bound_ratio` (float precisions only), `worst_abs_error`, `worst_nonfinite_values`, and in self-test mode `injected_runs` and `injected_runs_detected`, with validators on the counts that must be zero or equal to the injected count
 - a `diagnosis` per step with the verdict above
 - `testRunEnd` with the overall PASS or FAIL
 
+`memcheck.py` writes one step per pass (`memory_sweep_pass1`, ...) with `bytes_tested`, `device_memory_bytes`, `coverage_fraction`, `dwell_seconds`, `seconds`, one `bad_words_<pattern>` per pattern (validated to be zero outside self-test), a warning log line per failing pattern with the first byte offsets and the bad-bit mask, and in self-test mode `injected_<pattern>` and `injected_detected_<pattern>`.
+
 ## Assumptions and limits
 
 1. The bound assumes the device accumulates in FP32 or better. That is enforced on CUDA by the flags above. On other devices a lower accumulation precision would show up as `outside-error-bound` on every run, and the message says so. It was not the case on the Apple GPU measured above.
-2. This is one operation. A PASS means "no silent error in these matrix multiplies, in these runs, on this device today". It is not a certificate of a healthy chip. The OSDI 2026 results above show that defects depend on the data, the kernel, temperature and age; this version sweeps shapes and precisions but not the rest.
+2. These are two probes. A PASS means "no silent error in these matrix multiplies and this memory sweep, in these runs, on this device today". It is not a certificate of a healthy chip. The OSDI 2026 results above show that defects depend on the data, the kernel, temperature and age; this version sweeps shapes, precisions and memory but not the rest.
 3. Runs take seconds, not hours, so thermal and aging effects are not exercised.
 4. One device per run. Multi-device comparison is on the roadmap.
 5. The injected faults are applied to the output on the CPU side. They test the checker, not the chip.
@@ -106,7 +141,7 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 ## Roadmap
 
 1. Real model layers and full inference as workloads, since faults are data dependent.
-2. More input patterns, fp8 where the hardware has it, and a full memory sweep.
+2. More input patterns, and fp8 where the hardware has it.
 3. Long runs under load so temperature and aging are part of the test.
 4. Fault injection inside the computation on the device, so a chip's sensitivity to bit flips can be measured (the basis for a space radiation column).
 5. Side by side runs against vendor diagnostics on the same device.
@@ -114,7 +149,7 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 
 ## Contributing a row
 
-Run `python screen.py` and `python screen.py --inject 5` on your device, then open a pull request with the two `results.jsonl` files, the device name, driver version and PyTorch version. Rows are added only from attached result files.
+Run `python screen.py`, `python screen.py --inject 5`, `python memcheck.py` and `python memcheck.py --inject 5` on your device, then open a pull request with the four result files, the device name, driver version and PyTorch version. Rows are added only from attached result files.
 
 ## Citing
 
