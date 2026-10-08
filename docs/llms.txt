@@ -1,0 +1,19 @@
+# Chip Integrity
+
+> An open, MIT-licensed tester for silent computation errors in AI chips. It runs a compute probe (matrix multiplies at three shapes and four precisions, every output element checked against a float64 reference with Higham's proven rounding bound and against run 0 bit for bit) and a memory probe (six patterns written into every 32-bit word of device memory and read back exactly). Results are written in the Open Compute Project Test and Validation format, and every published row links to its result file. Maintained by Yasha Khandelwal, Bengaluru, India.
+
+Site: https://chipintegrity.org/
+Code: https://github.com/tech4biz-yasha/ai-chip-integrity (MIT)
+Contact: yasha.khandelwal@tech4biz.io
+
+## What it measures
+
+Compute probe (screen.py): C = A @ B, 50 runs per shape and precision. Shapes 1024x1024x1024, 4096x4096x4096 and 32x4096x11008. Precisions fp32, fp16, bf16, int8. Verdicts: no-silent-errors, silent-data-corruption, outside-error-bound, nondeterministic-kernel.
+
+Memory probe (memcheck.py): fills most of the device memory, writes all zeros, all ones, 0xAAAAAAAA, 0x55555555, an address hash and its inverse into every word, waits 2 seconds, reads back and compares exactly. Verdicts: no-memory-errors, memory-errors, with byte offsets and bad-bit masks logged.
+
+Self-test: every row is paired with an injection run that flips random bits and must catch all of them.
+
+## Measured so far (October 2026)
+
+NVIDIA H100 80GB HBM3, NVIDIA A100-SXM4-80GB and an Apple GPU via MPS: all compute runs inside the bound and bit-identical, all memory words read back correctly, every injected fault caught. Clean rows on young rented GPUs are the expected baseline; the research (Zheng et al. and Lei et al., OSDI 2026) says faults concentrate in aged units and under data-dependent, long, hot workloads, which are the next probes.

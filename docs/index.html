@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chip Integrity: an open tester for silent computation errors in AI chips</title>
+<meta name="description" content="A GPU can pass its vendor diagnostics and still return wrong numbers with no error raised. Chip Integrity is an open, vendor-neutral tester that proves whether an AI chip computed correctly, with every result published as an OCP Test and Validation file.">
+<meta name="author" content="Yasha Khandelwal">
+<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
+<link rel="canonical" href="https://chipintegrity.org/">
+<link rel="sitemap" type="application/xml" href="https://chipintegrity.org/sitemap.xml">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Chip Integrity: does this AI chip still give the right answer?">
+<meta property="og:description" content="Open, vendor-neutral tests for silent computation errors in GPUs and NPUs. Every row backed by a result file.">
+<meta property="og:url" content="https://chipintegrity.org/">
+<meta name="twitter:card" content="summary">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://chipintegrity.org/#site",
+      "url": "https://chipintegrity.org/",
+      "name": "Chip Integrity",
+      "description": "An open, vendor-neutral tester for silent computation errors in AI chips, with results in OCP Test and Validation format.",
+      "author": {"@id": "https://chipintegrity.org/#person"}
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "@id": "https://chipintegrity.org/#code",
+      "name": "ai-chip-integrity",
+      "codeRepository": "https://github.com/tech4biz-yasha/ai-chip-integrity",
+      "programmingLanguage": "Python",
+      "license": "https://opensource.org/licenses/MIT",
+      "author": {"@id": "https://chipintegrity.org/#person"},
+      "description": "Two probes for AI accelerators: a compute probe that checks matrix multiplies against a proven float64 error bound and bit-for-bit repeatability, and a memory probe that writes six patterns into every word of device memory and reads them back. Output follows the OCP Test and Validation spec."
+    },
+    {
+      "@type": "Dataset",
+      "@id": "https://chipintegrity.org/#results",
+      "name": "Chip Integrity measured results",
+      "description": "Silent computation error measurements for AI chips (NVIDIA H100, NVIDIA A100, Apple GPU) from the compute and memory probes, each row backed by an OCP Test and Validation result file.",
+      "url": "https://chipintegrity.org/#results",
+      "license": "https://opensource.org/licenses/MIT",
+      "creator": {"@id": "https://chipintegrity.org/#person"},
+      "isBasedOn": "https://github.com/tech4biz-yasha/ai-chip-integrity",
+      "keywords": ["silent data corruption", "GPU reliability", "AI accelerator testing", "silent errors", "OCP Test and Validation", "GPU health check", "H100", "A100"],
+      "measurementTechnique": "Matrix multiply against a float64 reference with Higham's componentwise rounding bound and bit-for-bit repeat comparison; whole-memory pattern sweep with exact read-back; software fault injection self-test on every row"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://chipintegrity.org/#person",
+      "name": "Yasha Khandelwal",
+      "email": "mailto:yasha.khandelwal@tech4biz.io",
+      "url": "https://yashakhandelwal.com/"
+    }
+  ]
+}
+</script>
+<style>
+:root{
+  --bg:#080D18;--bg2:#0D1424;--bg3:#111A2E;--line:#1A2540;--line2:#2B3B5E;
+  --text:#E8ECF4;--muted:#93A0BA;--dim:#5E6B86;
+  --blue:#39B9EE;--teal:#2BD7B3;--red:#F26D6D;--amber:#F2C66D;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:"IBM Plex Sans",-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+  --rail:220px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17px;line-height:1.65;
+  background-image:radial-gradient(rgba(57,185,238,.13) 1px,transparent 1px);background-size:26px 26px}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+a:focus-visible,button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.layout{display:grid;grid-template-columns:var(--rail) 1fr;min-height:100vh}
+.rail{position:sticky;top:0;height:100vh;border-right:1px solid var(--line);padding:28px 22px;background:rgba(8,13,24,.9);overflow:auto}
+.rail .brand{font-family:var(--mono);font-size:15px;letter-spacing:.06em;color:var(--text);display:block;margin-bottom:6px}
+.rail .brand b{color:var(--blue);font-weight:500}
+.rail .tag{font-size:12.5px;color:var(--dim);line-height:1.4;margin-bottom:26px}
+.rail a.n{display:block;font-size:14px;color:var(--muted);padding:6px 0;border-left:2px solid transparent;padding-left:12px;margin-left:-14px}
+.rail a.n:hover{color:var(--text);text-decoration:none}
+.rail a.n.on{color:var(--text);border-left-color:var(--blue)}
+.rail .grp{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--dim);margin:22px 0 6px}
+main{min-width:0}
+.wrap{max-width:980px;padding:0 48px}
+section{padding:72px 0;border-top:1px solid var(--line)}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.16em;color:var(--blue);margin-bottom:10px}
+h1{font-size:46px;line-height:1.1;font-weight:600;letter-spacing:-.015em;margin:0 0 20px;max-width:820px}
+h2{font-size:30px;line-height:1.2;font-weight:600;letter-spacing:-.01em;margin:0 0 16px}
+h3{font-size:19px;font-weight:600;margin:28px 0 8px}
+p{margin:0 0 16px;max-width:720px}
+p.lede{font-size:19px;color:var(--muted)}
+.hero{padding:76px 0 56px}
+.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:40px;align-items:center}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);border:1px solid var(--line);background:var(--line);gap:1px;margin-top:36px}
+.stat{background:var(--bg2);padding:18px 16px}
+.stat .n{font-family:var(--mono);font-size:22px;line-height:1.1}
+.stat .l{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.3}
+.panel{position:relative;background:var(--bg2);border:1px solid var(--line);padding:26px 28px;margin:22px 0}
+.panel:before,.panel:after{content:"";position:absolute;width:14px;height:14px;border-color:var(--blue);border-style:solid}
+.panel:before{top:-1px;left:-1px;border-width:1px 0 0 1px}
+.panel:after{bottom:-1px;right:-1px;border-width:0 1px 1px 0}
+.panel h3{margin-top:0}
+.panel p{color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:22px}
+.grid2 .panel,.grid3 .panel{margin:0}
+.fig{background:#060A13;border:1px solid var(--line);margin:22px 0}
+.fig svg{display:block;width:100%;height:auto}
+.fig .cap{font-size:13.5px;color:var(--muted);padding:12px 16px;border-top:1px solid var(--line)}
+code{font-family:var(--mono);font-size:.92em;background:var(--bg3);padding:1px 6px;border-radius:2px}
+pre{font-family:var(--mono);font-size:13.5px;background:#060A13;border:1px solid var(--line);padding:18px 20px;overflow-x:auto;line-height:1.7;margin:16px 0;color:var(--text)}
+pre .c{color:var(--dim)}
+.formula{white-space:nowrap;font-family:var(--mono);font-size:13.5px;background:#060A13;border:1px solid var(--line);padding:16px 20px;color:var(--teal);line-height:1.9;margin:14px 0;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14.5px;margin:16px 0}
+th{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;color:var(--muted);text-align:left;padding:10px 12px;border-bottom:1px solid var(--line2);font-weight:500;white-space:nowrap}
+td{padding:13px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+td .sub{display:block;font-family:var(--mono);font-size:11.5px;color:var(--dim);margin-top:4px}
+td.ok{color:var(--teal);font-family:var(--mono);font-size:13px;white-space:nowrap}
+td.bad{color:var(--red);font-family:var(--mono);font-size:13px;white-space:nowrap}
+td.date{white-space:nowrap}
+.tablewrap{overflow-x:auto}
+.pats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.pats div{border:1px solid var(--line);padding:10px 12px}
+.pats b{display:block;font-family:var(--mono);font-size:13px;font-weight:500}
+.pats span{display:block;font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:4px}
+@media (max-width:980px){.pats{grid-template-columns:repeat(2,1fr)}}
+.gl dt{font-family:var(--mono);font-size:14px;color:var(--teal);margin-top:14px}
+.gl dd{margin:4px 0 0;color:var(--muted);max-width:720px}
+.verdict{display:grid;grid-template-columns:220px 1fr;gap:10px 18px;align-items:baseline;margin:14px 0}
+.verdict .v{font-family:var(--mono);font-size:13.5px;color:var(--teal)}
+.verdict .v.bad{color:var(--red)}.verdict .v.warn{color:var(--amber)}
+.verdict div:nth-child(even){color:var(--muted)}
+ol.steps{padding-left:22px;color:var(--muted)}ol.steps li{margin:8px 0}ol.steps b{color:var(--text);font-weight:500}
+ul.plain{padding-left:20px;color:var(--muted)}ul.plain li{margin:8px 0}ul.plain b{color:var(--text);font-weight:500}
+.note{color:var(--muted);font-size:14.5px}
+.road{border-left:1px solid var(--line2);margin:20px 0 0 8px;padding-left:24px}
+.road .r{position:relative;margin-bottom:22px}
+.road .r:before{content:"";position:absolute;left:-29px;top:9px;width:9px;height:9px;background:var(--bg);border:1px solid var(--line2)}
+.road .r.done:before{background:var(--teal);border-color:var(--teal)}
+.road .r.now:before{background:var(--blue);border-color:var(--blue)}
+.road .r b{display:block;font-weight:500}
+.road .r span{color:var(--muted);font-size:15px}
+footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);font-size:14.5px}
+.die{width:100%;height:auto}
+.scan{animation:scan 6s linear infinite}
+@keyframes scan{0%{transform:translateX(0)}100%{transform:translateX(364px)}}
+.cell-bad{animation:badcell 6s linear infinite}
+@keyframes badcell{0%,56%{fill:#15213A}60%,100%{fill:#F26D6D}}
+.flag{opacity:0;animation:flag 6s linear infinite}
+@keyframes flag{0%,62%{opacity:0}66%,100%{opacity:1}}
+.pulse{stroke-dasharray:6 10;animation:dash 1.6s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-32}}
+.fill{animation:fill 5s ease-in-out infinite}
+@keyframes fill{0%{width:0}45%{width:100%}60%{width:100%}100%{width:0}}
+@media (prefers-reduced-motion:reduce){.scan,.cell-bad,.flag,.pulse,.fill{animation:none}.cell-bad{fill:#F26D6D}.flag{opacity:1}.fill{width:100%}}
+@media (max-width:980px){.layout{grid-template-columns:1fr}.rail{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}.rail a.n,.rail .grp{display:inline-block;margin:4px 10px 4px 0;border:0;padding:0}.wrap{padding:0 22px}.hero-grid,.grid2,.grid3{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}h1{font-size:34px}.verdict{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="rail" aria-label="Sections">
+<a class="brand" href="#top">chip<b>integrity</b>.org</a>
+<div class="tag">Open tests for silent computation errors in AI chips</div>
+<div class="grp">LEARN</div>
+<a class="n" href="#silent">What a silent error is</a>
+<a class="n" href="#why">Why it matters</a>
+<a class="n" href="#method">How a chip is tested here</a>
+<a class="n" href="#verdicts">Reading a verdict</a>
+<a class="n" href="#glossary">Glossary</a>
+<div class="grp">EVIDENCE</div>
+<a class="n" href="#results">Measured results</a>
+<a class="n" href="#selftest">The self-test</a>
+<a class="n" href="#limits">What a PASS means</a>
+<div class="grp">TAKE PART</div>
+<a class="n" href="#run">Run it on your chip</a>
+<a class="n" href="#roadmap">Roadmap</a>
+<a class="n" href="#research">Research and standards</a>
+<a class="n" href="#about">About and cite</a>
+<a class="n" href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>
+</nav>
+
+<main id="top">
+<div class="wrap">
+
+<div class="hero">
+<div class="hero-grid">
+<div>
+<div class="kicker">OPEN SOURCE, MIT, OCP TEST AND VALIDATION OUTPUT</div>
+<h1>Does this AI chip still give the right answer?</h1>
+<p class="lede">A GPU can pass every vendor diagnostic and still return wrong numbers with no error raised. This is an open, vendor-neutral tester that proves whether a chip computed correctly, and publishes the evidence as a file anyone can check.</p>
+<p><a href="#silent">Start with what a silent error is</a>, or <a href="#results">go straight to the measured results</a>.</p>
+</div>
+<div class="fig" aria-hidden="true">
+<svg class="die" viewBox="0 0 440 300" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, ui-monospace, Menlo, monospace">
+<defs>
+<clipPath id="dieclip"><rect x="40" y="36" width="360" height="200"/></clipPath>
+<linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#39B9EE" stop-opacity="0"/><stop offset="1" stop-color="#39B9EE" stop-opacity=".25"/></linearGradient>
+</defs>
+<text x="40" y="24" fill="#5E6B86" font-size="11" letter-spacing="2">COMPUTE UNITS UNDER TEST</text>
+<g fill="#15213A" stroke="#1A2540">
+<rect x="40" y="36" width="36" height="36"/><rect x="80" y="36" width="36" height="36"/><rect x="120" y="36" width="36" height="36"/><rect x="160" y="36" width="36" height="36"/><rect x="200" y="36" width="36" height="36"/><rect x="240" y="36" width="36" height="36"/><rect x="280" y="36" width="36" height="36"/><rect x="320" y="36" width="36" height="36"/><rect x="360" y="36" width="36" height="36"/>
+<rect x="40" y="76" width="36" height="36"/><rect x="80" y="76" width="36" height="36"/><rect x="120" y="76" width="36" height="36"/><rect x="160" y="76" width="36" height="36"/><rect x="200" y="76" width="36" height="36"/><rect x="240" y="76" width="36" height="36"/><rect x="280" y="76" width="36" height="36"/><rect x="320" y="76" width="36" height="36"/><rect x="360" y="76" width="36" height="36"/>
+<rect x="40" y="116" width="36" height="36"/><rect x="80" y="116" width="36" height="36"/><rect x="120" y="116" width="36" height="36"/><rect x="160" y="116" width="36" height="36"/><rect x="200" y="116" width="36" height="36"/><rect class="cell-bad" x="240" y="116" width="36" height="36"/><rect x="280" y="116" width="36" height="36"/><rect x="320" y="116" width="36" height="36"/><rect x="360" y="116" width="36" height="36"/>
+<rect x="40" y="156" width="36" height="36"/><rect x="80" y="156" width="36" height="36"/><rect x="120" y="156" width="36" height="36"/><rect x="160" y="156" width="36" height="36"/><rect x="200" y="156" width="36" height="36"/><rect x="240" y="156" width="36" height="36"/><rect x="280" y="156" width="36" height="36"/><rect x="320" y="156" width="36" height="36"/><rect x="360" y="156" width="36" height="36"/>
+<rect x="40" y="196" width="36" height="36"/><rect x="80" y="196" width="36" height="36"/><rect x="120" y="196" width="36" height="36"/><rect x="160" y="196" width="36" height="36"/><rect x="200" y="196" width="36" height="36"/><rect x="240" y="196" width="36" height="36"/><rect x="280" y="196" width="36" height="36"/><rect x="320" y="196" width="36" height="36"/><rect x="360" y="196" width="36" height="36"/>
+</g>
+<g clip-path="url(#dieclip)"><rect class="scan" x="-24" y="36" width="60" height="200" fill="url(#g)"/><rect class="scan" x="36" y="36" width="3" height="200" fill="#39B9EE"/></g>
+<g class="flag"><rect x="240" y="116" width="36" height="36" fill="none" stroke="#F26D6D" stroke-width="2"/><line x1="276" y1="152" x2="300" y2="262" stroke="#F26D6D"/><text x="140" y="280" fill="#F26D6D" font-size="12">one unit, one wrong answer, no error raised</text></g>
+<text x="40" y="256" fill="#2BD7B3" font-size="12">every output checked against a proven reference</text>
+</svg>
+</div>
+</div>
+<div class="stats">
+<div class="stat"><div class="n">4</div><div class="l">chips measured</div></div>
+<div class="stat"><div class="n">2,250</div><div class="l">compute runs checked element by element</div></div>
+<div class="stat"><div class="n">65.1 billion</div><div class="l">memory words written and read back</div></div>
+<div class="stat"><div class="n">0</div><div class="l">silent faults found so far</div></div>
+<div class="stat"><div class="n">345 of 345</div><div class="l">injected faults caught in self-tests</div></div>
+</div>
+</div>
+
+<section id="silent">
+<div class="kicker">LEARN, PART 1 OF 5</div>
+<h2>What a silent error is</h2>
+<p class="lede">When a chip fails, there are three ways it can tell you. Only two of them are loud.</p>
+<div class="grid3">
+<div class="panel"><h3>It crashes</h3><p>The job stops. Annoying, but you know. Nothing is quietly wrong.</p></div>
+<div class="panel"><h3>It raises an error</h3><p>Memory with ECC, for example, notices a flipped bit, corrects it or reports it. Monitoring sees a counter go up.</p></div>
+<div class="panel"><h3>It gives a wrong number</h3><p>The job finishes. Every status light is green. One number in the output is wrong, and nothing on the chip knows. That is a silent error.</p></div>
+</div>
+<h3>Where silent errors come from</h3>
+<p>A modern AI chip has tens of thousands of arithmetic units and billions of memory cells, made on a process so fine that a few atoms decide whether a transistor switches on time. Most units are perfect. A few are marginal: they work at one temperature and fail at another, work on most inputs and fail on a specific bit pattern, or degrade as the chip ages. When a marginal unit produces the wrong bit during a multiply, nothing compares the answer to the truth, so the wrong number simply flows onward.</p>
+<div class="fig">
+<svg viewBox="0 0 900 190" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, ui-monospace, Menlo, monospace" font-size="12">
+<rect x="20" y="40" width="190" height="60" fill="none" stroke="#2B3B5E"/><text x="34" y="66" fill="#E8ECF4">input numbers</text><text x="34" y="86" fill="#93A0BA">2.0 and 3.0</text>
+<line class="pulse" x1="210" y1="70" x2="300" y2="70" stroke="#39B9EE" stroke-width="2"/>
+<rect x="300" y="24" width="220" height="92" fill="none" stroke="#2B3B5E"/><text x="316" y="50" fill="#E8ECF4">multiply unit</text><text x="316" y="72" fill="#93A0BA">healthy: 6.0</text><text x="316" y="94" fill="#F26D6D">marginal: 6.0000076</text>
+<line class="pulse" x1="520" y1="70" x2="610" y2="70" stroke="#39B9EE" stroke-width="2"/>
+<rect x="610" y="40" width="270" height="60" fill="none" stroke="#2B3B5E"/><text x="626" y="66" fill="#E8ECF4">next layer uses the number</text><text x="626" y="86" fill="#93A0BA">no error, no log line, no crash</text>
+<text x="20" y="160" fill="#5E6B86">A single mantissa bit flipped inside one multiply. The chip does not compare 6.0000076 with anything, so it never knows.</text>
+</svg>
+<div class="cap">The difference between a healthy and a marginal unit can be one bit: far below what anyone notices in a single number, and enough to change a model's output after a billion more multiplies.</div>
+</div>
+<h3>Why the usual tests miss them</h3>
+<p>Vendor diagnostics run a fixed stress pattern for a short time and look for crashes and error counters. The research on real fleets says that is not enough. ByteDance's team reported that screening GPUs with synthetic microbenchmarks missed over 60 percent of the units that later corrupted real training runs, because the faults depend on the data being processed, show up with age, and are specific to individual units. A test that exercises one pattern for a few seconds can pass a chip that fails on the next pattern an hour later.</p>
+</section>
+
+<section id="why">
+<div class="kicker">LEARN, PART 2 OF 5</div>
+<h2>Why it matters</h2>
+<p class="lede">One wrong number is harmless. The problem is scale: thousands of chips, billions of operations a second, and nothing that checks the answers.</p>
+<div class="grid2">
+<div class="panel"><h3>Training runs go quietly wrong</h3><p>In large language model training, a corrupted gradient from one faulty GPU spreads to every other GPU at the next synchronisation. The loss curve wobbles, days of compute are lost, and the cause stays invisible until someone finds the one unit. The second OSDI 2026 study below counted 18 such incidents and 13 faulty GPUs across 35 million GPU hours.</p></div>
+<div class="panel"><h3>Inference answers drift</h3><p>A serving fleet with one marginal chip produces slightly different answers from that chip, forever. No crash, no alert, just a share of users getting worse results.</p></div>
+<div class="panel"><h3>The used GPU market has no condition test</h3><p>Second-hand accelerators are bought and sold on model name and hours of use. Age is the biggest risk factor for silent faults, and there is no open, shared way to test a used card before paying for it.</p></div>
+<div class="panel"><h3>Lenders cannot inspect the collateral</h3><p>Loans are secured against GPUs. A jet has maintenance records and an inspection standard; a GPU has a serial number. An open integrity test is the first step towards a condition grade anyone can verify.</p></div>
+</div>
+</section>
+
+<section id="method">
+<div class="kicker">LEARN, PART 3 OF 5</div>
+<h2>How a chip is tested here</h2>
+<p class="lede">Two probes. The first makes the chip do arithmetic and judges every output element. The second fills the chip's memory with known values and reads every one back. Each probe has two independent checks, so a fault has to hide from both.</p>
+
+<h3>Probe 1: compute</h3>
+<p>The chip multiplies two fixed matrices, A and B, fifty times at each of three shapes and four precisions. Two checks run on every output.</p>
+<div class="fig">
+<svg viewBox="0 0 1000 250" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, ui-monospace, Menlo, monospace" font-size="12">
+<rect x="20" y="88" width="170" height="64" fill="none" stroke="#2B3B5E"/><text x="36" y="114" fill="#E8ECF4">fixed inputs A, B</text><text x="36" y="134" fill="#93A0BA">seeded, rounded</text>
+<line class="pulse" x1="190" y1="120" x2="250" y2="120" stroke="#39B9EE" stroke-width="2"/>
+<rect x="250" y="88" width="170" height="64" fill="none" stroke="#2B3B5E"/><text x="266" y="114" fill="#E8ECF4">chip computes</text><text x="266" y="134" fill="#93A0BA">C = A @ B, 50 times</text>
+<line class="pulse" x1="420" y1="108" x2="490" y2="68" stroke="#39B9EE" stroke-width="2"/>
+<line class="pulse" x1="420" y1="132" x2="490" y2="172" stroke="#39B9EE" stroke-width="2"/>
+<rect x="490" y="36" width="270" height="64" fill="none" stroke="#2B3B5E"/><text x="506" y="62" fill="#E8ECF4">reference check</text><text x="506" y="82" fill="#93A0BA">every element inside the bound?</text>
+<rect x="490" y="140" width="270" height="64" fill="none" stroke="#2B3B5E"/><text x="506" y="166" fill="#E8ECF4">repeat check</text><text x="506" y="186" fill="#93A0BA">every run bit-identical to run 0?</text>
+<line class="pulse" x1="760" y1="68" x2="820" y2="108" stroke="#39B9EE" stroke-width="2"/>
+<line class="pulse" x1="760" y1="172" x2="820" y2="132" stroke="#39B9EE" stroke-width="2"/>
+<rect x="820" y="88" width="160" height="64" fill="none" stroke="#2BD7B3"/><text x="836" y="114" fill="#2BD7B3">verdict</text><text x="836" y="134" fill="#93A0BA">per shape, precision</text>
+<text x="20" y="230" fill="#5E6B86">The CPU computes the same product in float64 as the reference. The chip never sees it.</text>
+</svg>
+<div class="cap">The checks are independent. A large error fails the reference check. A tiny one, even a single bit, fails the repeat check because the first run and the later run no longer match.</div>
+</div>
+<div class="grid2">
+<div class="panel">
+<h3>The reference check, in plain words</h3>
+<p>Floating point arithmetic rounds at every step, so two correct computers can legitimately differ in the last digit. The question is how different they are allowed to be. Numerical analysis has a proven answer: for a dot product of length K, the rounding error can never exceed a bound that depends only on K and the precision. Every element of the chip's result is compared with a float64 reference and must sit inside that bound. For int8 the arithmetic is exact, so the bound is zero.</p>
+<div class="formula">|C − R| ≤ g·(|A|@|B|) + u_out·(|R| + g·(|A|@|B|))<br>g = K·u / (1 − K·u)    u = 2⁻²⁴ (FP32 accumulation)<br>u_out = 2⁻²⁴ fp32    2⁻¹¹ fp16    2⁻⁸ bf16    0 int8</div>
+<p>An element outside the bound is a wrong answer, not a difference of opinion about tolerance.</p>
+</div>
+<div class="panel">
+<h3>The repeat check, in plain words</h3>
+<p>The same inputs through the same chip should give the same bits every time. Run 0 is kept, and every later run is compared bit for bit. This catches an intermittent fault far too small to leave the bound, because the two runs simply no longer match. On the chips measured so far every run matched, which is itself a useful fact: the matrix kernels on these chips are deterministic.</p>
+</div>
+</div>
+
+<h3>Probe 2: memory</h3>
+<p>The matrix multiply touches a few megabytes. Most of an 80 GB chip is memory, and a bad row or a stuck bit there corrupts whatever lands on it. The memory probe fills most of the device memory, writes a known value into every 32-bit word, waits, and reads every word back.</p>
+<div class="fig">
+<div style="padding:22px 24px 10px">
+<div style="font-family:var(--mono);font-size:12px;color:var(--dim);margin-bottom:10px">DEVICE MEMORY, ONE PATTERN PASS</div>
+<div style="height:18px;background:#15213A;border:1px solid var(--line2);position:relative;overflow:hidden"><div class="fill" style="height:100%;background:linear-gradient(90deg,#1E6F94,#39B9EE);width:0"></div></div>
+<div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:8px"><span>write the pattern into every word</span><span>dwell 2 s</span><span>read back, compare exactly</span></div>
+</div>
+<div style="padding:4px 24px 18px">
+<div style="font-family:var(--mono);font-size:12px;color:var(--dim);margin:14px 0 10px">SIX PATTERNS, IN ORDER</div>
+<div class="pats">
+<div><b>all zeros</b><span>every bit 0</span></div>
+<div><b>all ones</b><span>every bit 1</span></div>
+<div><b>0xAAAAAAAA</b><span>1010 1010 ...</span></div>
+<div><b>0x55555555</b><span>0101 0101 ...</span></div>
+<div><b>address hash</b><span>each word unique</span></div>
+<div><b>inverse hash</b><span>each bit flipped</span></div>
+</div>
+<div style="font-size:13.5px;color:var(--dim);margin-top:14px">Together they drive every bit to 0 and to 1 while its neighbours hold the opposite, which is what exposes stuck bits, coupled cells and weak rows.</div>
+</div>
+<div class="cap">For each failing word the probe records the byte offset and the bits that differed, so a stuck bit shows as a single mask such as 0x00000020 at a known address.</div>
+</div>
+</section>
+
+<section id="verdicts">
+<div class="kicker">LEARN, PART 4 OF 5</div>
+<h2>Reading a verdict</h2>
+<p class="lede">Every step ends in one of these words. They are chosen so a reader can tell a chip fault from a software quirk without opening the file.</p>
+<h3>Compute probe</h3>
+<div class="verdict">
+<div class="v">no-silent-errors</div><div>Every run inside the bound and bit-identical to run 0. The baseline.</div>
+<div class="v bad">silent-data-corruption</div><div>Some runs differ from run 0. An intermittent fault, the kind a fleet scanner exists to find.</div>
+<div class="v bad">outside-error-bound</div><div>All runs agree with each other but sit outside the proven bound. A faulty unit, or a device accumulating below FP32.</div>
+<div class="v warn">nondeterministic-kernel</div><div>Many runs differ, yet all stay inside the bound. The kernel is not repeatable on that device and precision, so the repeat check cannot be used there. Reported as a finding, not a fault.</div>
+</div>
+<h3>Memory probe</h3>
+<div class="verdict">
+<div class="v">no-memory-errors</div><div>Every word read back correctly on every pattern.</div>
+<div class="v bad">memory-errors</div><div>At least one word differed. The measurements say which patterns and the log says where.</div>
+</div>
+<h3>Self-test</h3>
+<div class="verdict">
+<div class="v">injection-self-test-pass</div><div>Every injected fault was caught and nothing else fired. A row is only published alongside one of these.</div>
+<div class="v bad">injection-self-test-fail</div><div>The tester missed something it planted. The row is not publishable until that is understood.</div>
+</div>
+</section>
+
+<section id="glossary">
+<div class="kicker">LEARN, PART 5 OF 5</div>
+<h2>Glossary</h2>
+<dl class="gl">
+<dt>silent error, silent data corruption, SDC</dt><dd>A wrong result from a chip with no crash, no error flag and no log entry. The chip does not know it happened.</dd>
+<dt>bit flip</dt><dd>One binary digit changing value. In a floating point number a flipped high bit can change the value by orders of magnitude; a flipped low bit changes it by less than one part in a million.</dd>
+<dt>ECC</dt><dd>Error-correcting code. Extra bits stored with memory that let the hardware detect and usually correct a single flipped bit. ECC covers memory, not the arithmetic units, and not every chip has it on all memory.</dd>
+<dt>HBM</dt><dd>High bandwidth memory, the stacked memory next to a data centre GPU die. An H100 has 80 GB of it.</dd>
+<dt>tensor core</dt><dd>A unit on NVIDIA GPUs that multiplies small matrices in one step. fp16, bf16 and int8 matrix multiplies run through tensor cores; fp32 runs through the regular floating point units.</dd>
+<dt>fp32, fp16, bf16, int8</dt><dd>Number formats. fp32 keeps 24 bits of precision, fp16 keeps 11, bf16 keeps 8 with a wider range, int8 is an exact integer. Models are served in the smaller formats because they are faster, which is why the tester checks all four.</dd>
+<dt>accumulation</dt><dd>The running sum inside a dot product. Even when the inputs are fp16, the sum is normally kept in fp32, which is what the reference bound assumes and what the tester enforces on CUDA.</dd>
+<dt>deterministic kernel</dt><dd>A GPU routine that gives bit-identical output every time for the same input. Not all do, which is why non-determinism is reported as its own verdict instead of as a fault.</dd>
+<dt>reference bound</dt><dd>The largest error that correct rounding can produce for a given computation and precision. Anything larger is a wrong answer. The bound used here is the standard componentwise bound for inner products from Higham.</dd>
+<dt>fault injection</dt><dd>Deliberately corrupting a value to confirm the checks notice. Used here as a self-test on every published row.</dd>
+<dt>dwell</dt><dd>The pause between writing memory and reading it back. Weak cells lose their value over time, so a longer dwell catches more of them.</dd>
+<dt>OCP Test and Validation</dt><dd>The Open Compute Project's open format for hardware diagnostic output, used by cloud operators so that any test's results can be read by any fleet tool. Both probes write it.</dd>
+</dl>
+</section>
+
+<section id="results">
+<div class="kicker">EVIDENCE</div>
+<h2>Measured results</h2>
+<p class="lede">Every row comes from a result file in the repository, and the tables are generated from those files. Nothing here is modelled or estimated.</p>
+<h3>Compute probe</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Device</th><th>Date</th><th>Shapes (M×K×N)</th><th>Precisions</th><th>Runs</th><th>Silent faults</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
+<tbody><tr>
+<td>NVIDIA H100 80GB HBM3<span class="sub">PyTorch 2.8.0+cu128 · tool v0.2.0</span></td>
+<td class="date">2026-10-07</td>
+<td>1024x1024x1024<br>4096x4096x4096<br>32x4096x11008</td>
+<td>fp32, fp16, bf16, int8</td>
+<td>600</td>
+<td>0</td>
+<td>60 of 60</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_clean.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA A100-SXM4-80GB<span class="sub">PyTorch 2.8.0+cu128 · tool v0.2.0</span></td>
+<td class="date">2026-10-07</td>
+<td>1024x1024x1024<br>4096x4096x4096<br>32x4096x11008</td>
+<td>fp32, fp16, bf16, int8</td>
+<td>600</td>
+<td>0</td>
+<td>60 of 60</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/a100_clean.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/a100_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA H200<span class="sub">PyTorch 2.8.0+cu128 · tool v0.2.0</span></td>
+<td class="date">2026-10-08</td>
+<td>1024x1024x1024<br>4096x4096x4096<br>32x4096x11008</td>
+<td>fp32, fp16, bf16, int8</td>
+<td>600</td>
+<td>0</td>
+<td>60 of 60</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h200_clean.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h200_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>Apple GPU (MPS) arm64<span class="sub">PyTorch 2.14.1 · tool v0.2.0</span></td>
+<td class="date">2026-10-07</td>
+<td>1024x1024x1024<br>4096x4096x4096<br>32x4096x11008</td>
+<td>fp32, fp16, bf16 (3 skipped)</td>
+<td>450</td>
+<td>0</td>
+<td>45 of 45</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/mac_v020.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/mac_v020_inject.jsonl">self-test</a></td>
+</tr></tbody>
+</table></div>
+<h3>Memory probe</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Device</th><th>Date</th><th>Memory tested</th><th>Patterns</th><th>Dwell</th><th>Bad words</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
+<tbody><tr>
+<td>NVIDIA H100 80GB HBM3<span class="sub">tool v0.1.0</span></td>
+<td class="date">2026-10-07</td>
+<td>62.75 GiB of 79.18 GiB<span class="sub">16,844,324,864 words</span></td>
+<td>6</td>
+<td>2.0 s</td>
+<td>0</td>
+<td>30 of 30</td>
+<td class="ok">no-memory-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_memcheck.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_memcheck_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA A100-SXM4-80GB<span class="sub">tool v0.1.0</span></td>
+<td class="date">2026-10-07</td>
+<td>63.00 GiB of 79.25 GiB<span class="sub">16,911,433,728 words</span></td>
+<td>6</td>
+<td>2.0 s</td>
+<td>0</td>
+<td>30 of 30</td>
+<td class="ok">no-memory-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/a100_memcheck.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/a100_memcheck_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA H200<span class="sub">tool v0.1.0</span></td>
+<td class="date">2026-10-08</td>
+<td>111.25 GiB of 139.81 GiB<span class="sub">29,863,444,480 words</span></td>
+<td>6</td>
+<td>2.0 s</td>
+<td>0</td>
+<td>30 of 30</td>
+<td class="ok">no-memory-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h200_memcheck.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h200_memcheck_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>Apple GPU (MPS) arm64<span class="sub">tool v0.1.0</span></td>
+<td class="date">2026-10-07</td>
+<td>5.50 GiB of 11.84 GiB<span class="sub">1,476,395,008 words</span></td>
+<td>6</td>
+<td>2.0 s</td>
+<td>0</td>
+<td>30 of 30</td>
+<td class="ok">no-memory-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/mac_memcheck.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/mac_memcheck_inject.jsonl">self-test</a></td>
+</tr></tbody>
+</table></div>
+<p class="note">Rented data centre GPUs are young, monitored and already screened, so clean rows are the expected result there. The research says faults concentrate in aged units and appear under data-dependent, long, hot workloads. Those are the next probes on the roadmap, and where the first real findings are expected.</p>
+</section>
+
+<section id="selftest">
+<div class="kicker">EVIDENCE</div>
+<h2>The self-test</h2>
+<p class="lede">A clean table is only worth something if the tester can show it would have seen a fault. So every row is paired with an injection run.</p>
+<div class="grid2">
+<div class="panel"><h3>Compute self-test</h3><p>In five of the fifty runs, one random bit of one random output element is flipped before the checks run. The bit can be anywhere: sign, exponent or the lowest mantissa bit. All five must be caught. On the chips measured so far, the reference check alone caught 46 of every 60 flips and the repeat check caught all 60. That is why there are two checks.</p></div>
+<div class="panel"><h3>Memory self-test</h3><p>After each pattern is written, five random bits in five random words of real device memory are flipped. The sweep must locate all of them by address. Because the flips happen in device memory, this exercises the actual read-back path, not only the comparison code.</p></div>
+</div>
+</section>
+
+<section id="limits">
+<div class="kicker">EVIDENCE</div>
+<h2>What a PASS means, and does not</h2>
+<ul class="plain">
+<li><b>It means:</b> no silent error appeared in these matrix multiplies and this memory sweep, in these runs, on this device, on this day.</li>
+<li><b>It does not mean:</b> the chip is healthy. Faults that depend on specific data, on heat, or on hours of load are not yet exercised. The next probes add them.</li>
+<li><b>Accumulation:</b> the compute bound assumes FP32 or better accumulation. That is enforced on CUDA. Elsewhere a lower precision would show as outside-error-bound on every run, and the message says so.</li>
+<li><b>One device per run:</b> links between chips are not yet tested.</li>
+<li><b>Self-test scope:</b> the compute injection corrupts the output after it leaves the device, so it proves the checker, not the chip. The memory injection corrupts device memory itself.</li>
+</ul>
+</section>
+
+<section id="run">
+<div class="kicker">TAKE PART</div>
+<h2>Run it on your chip</h2>
+<p class="lede">Four commands, four result files, one pull request. Works on CUDA, Apple MPS and CPU today.</p>
+<pre><span class="c"># once</span>
+git clone https://github.com/tech4biz-yasha/ai-chip-integrity.git &amp;&amp; cd ai-chip-integrity
+pip install -r requirements.txt
+
+<span class="c"># compute probe and its self-test</span>
+python screen.py --out NAME_clean.jsonl
+python screen.py --inject 5 --out NAME_inject.jsonl
+
+<span class="c"># memory probe and its self-test</span>
+python memcheck.py --out NAME_memcheck.jsonl
+python memcheck.py --inject 5 --out NAME_memcheck_inject.jsonl</pre>
+<ol class="steps">
+<li><b>Open a pull request</b> with the four files, the device name, driver version and PyTorch version.</li>
+<li><b>Rows are added only from attached files.</b> The table is regenerated from them, so a row cannot say more than its file does.</li>
+<li><b>Found a fault?</b> Open an issue with the file. A real finding on real hardware is the most useful thing anyone can contribute.</li>
+</ol>
+<p class="note">The output follows the OCP Test and Validation spec v2.0 through the official <code>ocptv</code> library, and the test suite validates it against the published schema.</p>
+</section>
+
+<section id="roadmap">
+<div class="kicker">TAKE PART</div>
+<h2>Roadmap</h2>
+<p class="lede">Each probe targets one part of the chip. The order follows where the research says faults hide.</p>
+<div class="road">
+<div class="r done"><b>Compute probe, three shapes, four precisions</b><span>Matrix multiply with proven bound and bit-exact repeat. Done.</span></div>
+<div class="r done"><b>Memory probe, whole device</b><span>Six patterns, exact read-back, address and bit mask on every miss. Done.</span></div>
+<div class="r now"><b>Real model kernels</b><span>Attention, softmax, layer norm and a full small-LLM forward pass against a float64 reference. The data-dependent probe.</span></div>
+<div class="r"><b>Hours under load</b><span>The same probes for hours at full power with temperature logged next to every result.</span></div>
+<div class="r"><b>Fleet mode</b><span>Run every probe across many devices automatically and collect the files. Fault rates are per thousand units, so volume is how they get found.</span></div>
+<div class="r"><b>Fault injection inside the computation</b><span>Flip bits during the multiply on the device, to measure how sensitive each chip and precision is. Also the basis for a space radiation column.</span></div>
+<div class="r"><b>Between devices</b><span>All-reduce over NVLink and PCIe with checksums.</span></div>
+<div class="r"><b>Vendor comparison</b><span>Run NVIDIA DCGM and AMD AGFHC on the same device and record what each catches.</span></div>
+</div>
+</section>
+
+<section id="research">
+<div class="kicker">TAKE PART</div>
+<h2>Research and standards this builds on</h2>
+<ul class="plain">
+<li><b>Zheng et al., OSDI 2026.</b> SDCs in the Wild: characterising and diagnosing SDC-defective GPUs in production LLM training. The source of the finding that microbenchmark screening misses most faulty units. <a href="https://www.usenix.org/conference/osdi26/presentation/zheng">usenix.org</a></li>
+<li><b>Lei et al., OSDI 2026.</b> Safeguarding LLM Training at Scale: online SDC detection and insights from 35 million GPU hours. <a href="https://www.usenix.org/conference/osdi26/presentation/lei">usenix.org</a></li>
+<li><b>Higham, Accuracy and Stability of Numerical Algorithms.</b> The componentwise rounding error bound for inner products used by the reference check.</li>
+<li><b>Huang and Abraham, 1984.</b> Algorithm-based fault tolerance for matrix operations. The original idea of checking a matrix result against a cheap independent computation.</li>
+<li><b>OCP Test and Validation.</b> The open diagnostic output format and reference implementation both probes write to. <a href="https://github.com/opencomputeproject/ocp-diag-core">ocp-diag-core</a></li>
+</ul>
+</section>
+
+<section id="about">
+<div class="kicker">TAKE PART</div>
+<h2>About and cite</h2>
+<p>Chip Integrity is maintained by Yasha Khandelwal, Bengaluru. The code is MIT licensed. The project stays vendor neutral: the same tests run on every chip, and a row is published only with its result file.</p>
+<pre>Yasha Khandelwal. ai-chip-integrity: an open tester for silent computation errors in AI chips.
+Version 0.2.0, 2026. https://github.com/tech4biz-yasha/ai-chip-integrity</pre>
+<p>Questions, rows and findings: <a href="mailto:yasha.khandelwal@tech4biz.io">yasha.khandelwal@tech4biz.io</a> or an issue on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</p>
+</section>
+
+<footer>Page generated from the result files on 2026-10-08. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</footer>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var links=[].slice.call(document.querySelectorAll('.rail a.n[href^="#"]'));
+  var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'))}).filter(Boolean);
+  function on(){var y=window.scrollY+120,cur=null;secs.forEach(function(s){if(s.offsetTop<=y)cur=s});links.forEach(function(a){a.classList.toggle('on',!!cur&&a.getAttribute('href')==='#'+cur.id)})}
+  window.addEventListener('scroll',on,{passive:true});on();
+})();
+</script>
+</body>
+</html>
