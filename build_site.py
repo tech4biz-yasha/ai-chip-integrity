@@ -10,6 +10,7 @@ after adding result files, then commit docs/.
 
 import glob
 import json
+import math
 import os
 import re
 from collections import defaultdict
@@ -59,7 +60,7 @@ def parse(path):
 
 def summarise(runs):
     """Group runs by device and probe into table rows."""
-    compute, memory = {}, {}
+    compute, memory, kernel = {}, {}, {}
     for r in runs:
         inject = int(r["params"].get("inject", 0)) > 0
         key = r["device"]
@@ -82,6 +83,27 @@ def summarise(runs):
                 row["rep_fail"] = sum(s.get("repeat_check_failed_runs", 0) for s in live)
                 row["verdicts"] = sorted({s["_verdict"] for s in live})
                 row["clean_file"] = r["file"]
+        elif r["run"] == "ai-chip-integrity-kernels":
+            row = kernel.setdefault(key, {"device": key, "torch": r["torch"], "dates": set(), "version": r["version"]})
+            row["dates"].add(r["date"])
+            if inject:
+                row["injected"] = sum(s.get("injected_runs", 0) for s in r["steps"].values())
+                row["caught"] = sum(s.get("injected_runs_detected", 0) for s in r["steps"].values())
+                row["inject_file"] = r["file"]
+            else:
+                live = [s for s in r["steps"].values() if "_skipped" not in s]
+                row["runs"] = sum(s.get("runs", 0) for s in live)
+                row["skipped"] = sum(1 for s in r["steps"].values() if "_skipped" in s)
+                row["kernels"] = sorted({n.split("_")[0] for n, s in r["steps"].items() if "_skipped" not in s},
+                                        key=["softmax", "layernorm", "gelu", "attention"].index)
+                row["precisions"] = sorted({n.split("_")[1] for n, s in r["steps"].items() if "_skipped" not in s},
+                                           key=["fp32", "fp16", "bf16"].index)
+                row["size"] = r["params"].get("size", "")
+                row["ratio"] = max(s.get("worst_error_over_bound_ratio", 0) for s in live)
+                row["ref_fail"] = sum(s.get("reference_check_failed_runs", 0) for s in live)
+                row["rep_fail"] = sum(s.get("repeat_check_failed_runs", 0) for s in live)
+                row["verdicts"] = sorted({s["_verdict"] for s in live})
+                row["clean_file"] = r["file"]
         elif r["run"] == "ai-chip-integrity-memcheck":
             row = memory.setdefault(key, {"device": key, "dates": set(), "version": r["version"]})
             row["dates"].add(r["date"])
@@ -100,7 +122,8 @@ def summarise(runs):
                 row["verdict"] = s["_verdict"]
                 row["clean_file"] = r["file"]
     order = lambda d: (0 if "H100" in d else 1 if "A100" in d else 2 if "NVIDIA" in d else 3, d)
-    return ([compute[k] for k in sorted(compute, key=order)], [memory[k] for k in sorted(memory, key=order)])
+    return ([compute[k] for k in sorted(compute, key=order)], [memory[k] for k in sorted(memory, key=order)],
+            [kernel[k] for k in sorted(kernel, key=order)])
 
 
 def esc(s):
@@ -137,6 +160,33 @@ def compute_rows(rows):
     return "\n".join(out)
 
 
+def kernel_rows(rows):
+    out = []
+    for r in rows:
+        if "runs" not in r:
+            continue
+        verdict = ", ".join(r["verdicts"])
+        ok = r["verdicts"] == ["no-silent-errors"]
+        caught = f'{r.get("caught", 0)} of {r.get("injected", 0)}' if "injected" in r else "not run"
+        prec = ", ".join(r["precisions"]) + (f' ({r["skipped"]} skipped)' if r["skipped"] else "")
+        files = f'<a href="{REPO}/blob/main/{r["clean_file"]}">clean</a>'
+        if "inject_file" in r:
+            files += f' · <a href="{REPO}/blob/main/{r["inject_file"]}">self-test</a>'
+        out.append(f"""<tr>
+<td>{esc(r['device'])}<span class="sub">PyTorch {esc(r['torch'])} · tool v{esc(r['version'])}</span></td>
+<td class="date">{esc(min(r['dates']))}</td>
+<td>{esc(", ".join(r['kernels']))}<span class="sub">{r['size']}×{r['size']}; attention 8×{int(r['size']) // 4}×128</span></td>
+<td>{esc(prec)}</td>
+<td>{r['runs']:,}</td>
+<td>{math.floor(r['ratio'] * 1000) / 1000:.3f}</td>
+<td>{r['ref_fail'] + r['rep_fail']}</td>
+<td>{caught}</td>
+<td class="{'ok' if ok else 'bad'}">{esc(verdict)}</td>
+<td>{files}</td>
+</tr>""")
+    return "\n".join(out)
+
+
 def memory_rows(rows):
     out = []
     for r in rows:
@@ -164,13 +214,14 @@ def memory_rows(rows):
 
 def main():
     runs = [parse(p) for p in sorted(glob.glob(os.path.join(RESULTS, "*.jsonl")))]
-    compute, memory = summarise(runs)
+    compute, memory, kernel = summarise(runs)
     chips = sorted({r["device"] for r in runs})
-    total_runs = sum(r.get("runs", 0) for r in compute)
-    total_caught = sum(r.get("caught", 0) for r in compute) + sum(r.get("caught", 0) for r in memory)
-    total_injected = sum(r.get("injected", 0) for r in compute) + sum(r.get("injected", 0) for r in memory)
+    total_runs = sum(r.get("runs", 0) for r in compute + kernel)
+    total_caught = sum(r.get("caught", 0) for r in compute + kernel + memory)
+    total_injected = sum(r.get("injected", 0) for r in compute + kernel + memory)
     total_words = sum(r.get("bytes", 0) for r in memory) // 4
-    faults = sum(r.get("ref_fail", 0) + r.get("rep_fail", 0) for r in compute) + sum(r.get("bad", 0) for r in memory)
+    faults = (sum(r.get("ref_fail", 0) + r.get("rep_fail", 0) for r in compute + kernel)
+              + sum(r.get("bad", 0) for r in memory))
     built = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     with open(os.path.join(ROOT, "docs", "template.html"), encoding="utf-8") as f:
@@ -182,6 +233,7 @@ def main():
                 .replace("{{CAUGHT}}", f"{total_caught} of {total_injected}")
                 .replace("{{COMPUTE_ROWS}}", compute_rows(compute))
                 .replace("{{MEMORY_ROWS}}", memory_rows(memory))
+                .replace("{{KERNEL_ROWS}}", kernel_rows(kernel) or '<tr><td colspan="10">No rows yet. The kernel probe was added after the first four chips were measured; rows are added as the files come in.</td></tr>')
                 .replace("{{BUILT}}", built))
     assert not re.search(r"{{[A-Z_]+}}", html), "unfilled placeholder"
     with open(OUT, "w", encoding="utf-8") as f:

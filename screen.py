@@ -40,7 +40,9 @@ os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 import torch  # noqa: E402
 import ocptv.output as tv  # noqa: E402
 
-VERSION = "0.2.0"
+import arith  # noqa: E402
+
+VERSION = "0.2.1"
 
 DTYPES = {
     "fp32": (torch.float32, torch.float32, torch.int32, 32, 2.0 ** -24),
@@ -49,7 +51,6 @@ DTYPES = {
     "int8": (torch.int8, torch.int32, torch.int32, 32, None),   # exact: any difference is a fault
 }
 DEFAULT_SHAPES = "1024x1024x1024,4096x4096x4096,32x4096x11008"   # MxKxN; last one is an LLM decode shape
-U_ACC = 2.0 ** -24          # accumulation assumed in FP32 or better (enforced on CUDA below)
 NONDET_SHARE = 0.10         # at least this share of differing runs (and at least NONDET_MIN runs)
 NONDET_MIN = 3              # reads as a non-deterministic kernel rather than a rare fault
 _FAULT_HOOK = None          # tests only: callable(run_index, cpu_tensor) that corrupts an output in place
@@ -110,6 +111,12 @@ def make_case(m, k, n, dtype, seed):
     return a, b, a64 @ b64, a64.abs() @ b64.abs()
 
 
+def flush_products(a, b):
+    """sum_k |a_ik b_kj| over products with a subnormal input: the most a flushing device can lose."""
+    a64, b64 = a.to(torch.float64), b.to(torch.float64)
+    return arith.flush_term(a64, a.dtype) @ b64.abs() + a64.abs() @ arith.flush_term(b64, b.dtype)
+
+
 def parse_shapes(text):
     out = []
     for item in text.split(","):
@@ -131,13 +138,28 @@ def matmul(a, b):
     return a @ b
 
 
-def error_bound(ref, abs_ab, k, u_out):
-    """|C - R| <= g*|A||B| + u_out*(|R| + g*|A||B|), with g = k*u/(1-k*u). Integers: exact (zero)."""
+def accumulation_factor(name, k, dev_type):
+    """g in the bound below, from the arithmetic model in arith.py.
+
+    fp32 on CUDA (TF32 off) and on CPU runs on IEEE FP32 fused multiply-add: gamma(k, 2^-24).
+    Everything else may run on matrix units, which can truncate and add in blocks: gamma(2k, 2^-23),
+    plus the product allowance for FP32 inputs on devices where we cannot rule out emulation."""
+    if name == "fp32" and dev_type in ("cuda", "cpu"):
+        return arith.ieee_dot(k)
+    return arith.matrix_dot(k, fp32_inputs=(name == "fp32"))
+
+
+def error_bound(ref, abs_ab, k, u_out, g=None, flush_ab=None, out_floor=0.0):
+    """|C - R| <= acc + u_out*(|R| + acc) + floor, acc = g*|A||B| (+ products with a subnormal input).
+    Integers: exact (zero)."""
     if u_out is None:
         return torch.zeros_like(ref)
-    g = k * U_ACC / (1 - k * U_ACC)
+    if g is None:
+        g = arith.ieee_dot(k)
     acc = g * abs_ab
-    return acc + u_out * (ref.abs() + acc)
+    if flush_ab is not None:
+        acc = acc + flush_ab
+    return acc + u_out * (ref.abs() + acc) + out_floor
 
 
 def flip_bit(c, int_view, bits, rng):
@@ -154,9 +176,12 @@ def screen_case(step, dev, name, shape, iters, seed, inject, rng, hw):
     dtype, out_dtype, int_view, bits, u_out = DTYPES[name]
     m, k, n = shape
     a, b, ref, abs_ab = make_case(m, k, n, dtype, seed)
-    bound = error_bound(ref, abs_ab, k, u_out)
-    a_dev, b_dev = a.to(dev), b.to(dev)
     exact = u_out is None
+    g = None if exact else accumulation_factor(name, k, dev.type)
+    bound = error_bound(ref, abs_ab, k, u_out, g=g,
+                        flush_ab=None if exact else flush_products(a, b),
+                        out_floor=0.0 if exact else arith.subnormal_floor(out_dtype))
+    a_dev, b_dev = a.to(dev), b.to(dev)
 
     inject_runs = set(rng.sample(range(1, iters), min(inject, iters - 1))) if inject else set()
     first_bits = None
@@ -206,6 +231,8 @@ def screen_case(step, dev, name, shape, iters, seed, inject, rng, hw):
     step.add_measurement(name="runs", value=iters, hardware_info=hw)
     step.add_measurement(name="shape_mkn", value=f"{m}x{k}x{n}", hardware_info=hw)
     step.add_measurement(name="exact_check", value=exact, hardware_info=hw)
+    if not exact:
+        step.add_measurement(name="accumulation_factor", value=g, hardware_info=hw)
     step.add_measurement(name="seconds", value=round(secs, 3), unit="s", hardware_info=hw)
     step.add_measurement(name="reference_check_failed_runs", value=len(ref_bad),
                          validators=None if inject else eq0, hardware_info=hw)
@@ -238,7 +265,7 @@ def screen_case(step, dev, name, shape, iters, seed, inject, rng, hw):
         ok, verdict = False, "outside-error-bound"
         msg = (f"all runs agree but {len(ref_bad)} runs sit outside the proven bound "
                + ("(integer result differs from the exact answer)" if exact
-                  else "(a faulty unit, or the device accumulating below FP32)"))
+                  else "(a faulty unit, the device accumulating below FP32, or TF32 used for fp32)"))
 
     step.add_diagnosis(tv.DiagnosisType.PASS if ok else tv.DiagnosisType.FAIL,
                        verdict=verdict, message=msg, hardware_info=hw)
@@ -278,7 +305,7 @@ def main(argv=None):
         version=VERSION,
         parameters={"device": str(dev), "shapes": ",".join("x".join(map(str, sh)) for sh in shapes),
                     "iters": args.iters, "dtypes": ",".join(names), "seed": args.seed,
-                    "inject": args.inject},
+                    "inject": args.inject, "bound_model": arith.MODEL_ID},
     )
     dut = tv.Dut(id=socket.gethostname())
     hw = dut.add_hardware_info(name=device_label(dev))

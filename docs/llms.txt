@@ -1,6 +1,6 @@
 # Chip Integrity
 
-> An open, MIT-licensed tester for silent computation errors in AI chips. It runs a compute probe (matrix multiplies at three shapes and four precisions, every output element checked against a float64 reference with Higham's proven rounding bound and against run 0 bit for bit) and a memory probe (six patterns written into every 32-bit word of device memory and read back exactly). Results are written in the Open Compute Project Test and Validation format, and every published row links to its result file. Maintained by Yasha Khandelwal, Bengaluru, India.
+> An open, MIT-licensed tester for silent computation errors in AI chips. It runs a compute probe (matrix multiplies at three shapes and four precisions, every output element checked against a float64 reference with Higham's rounding bound, widened for tensor-core truncation at fp16 and bf16, and against run 0 bit for bit) a kernel probe (softmax, layer norm, GELU and fused attention, checked the same two ways against derived bounds) and a memory probe (six patterns written into every 32-bit word of device memory and read back exactly). Results are written in the Open Compute Project Test and Validation format, and every published row links to its result file. Maintained by Yasha Khandelwal, Bengaluru, India.
 
 Site: https://chipintegrity.org/
 Code: https://github.com/tech4biz-yasha/ai-chip-integrity (MIT)
@@ -12,8 +12,10 @@ Compute probe (screen.py): C = A @ B, 50 runs per shape and precision. Shapes 10
 
 Memory probe (memcheck.py): fills most of the device memory, writes all zeros, all ones, 0xAAAAAAAA, 0x55555555, an address hash and its inverse into every word, waits 2 seconds, reads back and compares exactly. Verdicts: no-memory-errors, memory-errors, with byte offsets and bad-bit masks logged.
 
+Kernel probe (kernels.py): softmax, layer norm, GELU (erf form) and scaled dot product attention through the device's own kernels, 25 runs per kernel and precision, fp32, fp16 and bf16. Bounds derived by rounding-error analysis under one written arithmetic model (arith.py): FP32 rounds to nearest, tensor cores accumulate faithfully in FP32 with truncation allowed, exp, divide and square roots stay within eight ulps, and erf within 2^-20 absolute. The model id is recorded in every result file. Same verdicts as the compute probe.
+
 Self-test: every row is paired with an injection run that flips random bits and must catch all of them.
 
 ## Measured so far (October 2026)
 
-NVIDIA H100 80GB HBM3, NVIDIA A100-SXM4-80GB and an Apple GPU via MPS: all compute runs inside the bound and bit-identical, all memory words read back correctly, every injected fault caught. Clean rows on young rented GPUs are the expected baseline; the research (Zheng et al. and Lei et al., OSDI 2026) says faults concentrate in aged units and under data-dependent, long, hot workloads, which are the next probes.
+NVIDIA H200, NVIDIA H100 80GB HBM3, NVIDIA A100-SXM4-80GB and an Apple GPU via MPS: all compute runs inside the bound and bit-identical, all memory words read back correctly, every injected fault caught. Kernel probe on the Apple GPU: all 300 runs inside the bound and bit-identical at fp32, fp16 and bf16, and 36 of 36 injected faults caught. Clean rows on young rented GPUs are the expected baseline; the research (Zheng et al. and Lei et al., OSDI 2026) says faults concentrate in aged units and under data-dependent, long, hot workloads, which are the next probes.

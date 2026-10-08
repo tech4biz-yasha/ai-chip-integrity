@@ -5,7 +5,7 @@ memcheck.py  -  AI Chip Integrity Suite, memory sweep v0.1.0
 Fills as much of the device memory as it can, writes known patterns into every
 32-bit word, waits a dwell time, reads everything back and counts every word
 that does not match. A matrix multiply touches a few megabytes; this touches
-the whole memory, so a bad row, a stuck bit or a weak cell shows up here.
+most of the device memory, so a bad row, a stuck bit or a weak cell there shows up.
 
 Patterns, in order: all zeros, all ones, 0xAAAAAAAA, 0x55555555, an
 address-hash (every word different, pseudo-random from its own address) and

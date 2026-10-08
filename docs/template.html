@@ -36,19 +36,19 @@
       "programmingLanguage": "Python",
       "license": "https://opensource.org/licenses/MIT",
       "author": {"@id": "https://chipintegrity.org/#person"},
-      "description": "Two probes for AI accelerators: a compute probe that checks matrix multiplies against a proven float64 error bound and bit-for-bit repeatability, and a memory probe that writes six patterns into every word of device memory and reads them back. Output follows the OCP Test and Validation spec."
+      "description": "Three probes for AI accelerators: a compute probe that checks matrix multiplies against a proven float64 error bound and bit-for-bit repeatability, a kernel probe that does the same for softmax, layer norm, GELU and attention, and a memory probe that writes six patterns into every word of device memory and reads them back. Output follows the OCP Test and Validation spec."
     },
     {
       "@type": "Dataset",
       "@id": "https://chipintegrity.org/#results",
       "name": "Chip Integrity measured results",
-      "description": "Silent computation error measurements for AI chips (NVIDIA H100, NVIDIA A100, Apple GPU) from the compute and memory probes, each row backed by an OCP Test and Validation result file.",
+      "description": "Silent computation error measurements for AI chips (NVIDIA H200, NVIDIA H100, NVIDIA A100, Apple GPU) from the compute, kernel and memory probes, each row backed by an OCP Test and Validation result file.",
       "url": "https://chipintegrity.org/#results",
       "license": "https://opensource.org/licenses/MIT",
       "creator": {"@id": "https://chipintegrity.org/#person"},
       "isBasedOn": "https://github.com/tech4biz-yasha/ai-chip-integrity",
       "keywords": ["silent data corruption", "GPU reliability", "AI accelerator testing", "silent errors", "OCP Test and Validation", "GPU health check", "H100", "A100"],
-      "measurementTechnique": "Matrix multiply against a float64 reference with Higham's componentwise rounding bound and bit-for-bit repeat comparison; whole-memory pattern sweep with exact read-back; software fault injection self-test on every row"
+      "measurementTechnique": "Matrix multiply and transformer kernels against a float64 reference with derived componentwise rounding bounds and bit-for-bit repeat comparison; pattern sweep over most of the device memory with exact read-back; software fault injection self-test on every row"
     },
     {
       "@type": "Person",
@@ -108,6 +108,7 @@ p.lede{font-size:19px;color:var(--muted)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:22px}
 .grid2 .panel,.grid3 .panel{margin:0}
+.grid2>*,.grid3>*{min-width:0}
 .fig{background:#060A13;border:1px solid var(--line);margin:22px 0}
 .fig svg{display:block;width:100%;height:auto}
 .fig .cap{font-size:13.5px;color:var(--muted);padding:12px 16px;border-top:1px solid var(--line)}
@@ -264,7 +265,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <section id="method">
 <div class="kicker">LEARN, PART 3 OF 5</div>
 <h2>How a chip is tested here</h2>
-<p class="lede">Two probes. The first makes the chip do arithmetic and judges every output element. The second fills the chip's memory with known values and reads every one back. Each probe has two independent checks, so a fault has to hide from both.</p>
+<p class="lede">Three probes. The first makes the chip multiply matrices and judges every output element. The second does the same for the other kernels inside a transformer. The third fills the chip's memory with known values and reads every one back. Each probe has two independent checks, so a fault has to hide from both.</p>
 
 <h3>Probe 1: compute</h3>
 <p>The chip multiplies two fixed matrices, A and B, fifty times at each of three shapes and four precisions. Two checks run on every output.</p>
@@ -279,7 +280,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <rect x="490" y="140" width="270" height="64" fill="none" stroke="#2B3B5E"/><text x="506" y="166" fill="#E8ECF4">repeat check</text><text x="506" y="186" fill="#93A0BA">every run bit-identical to run 0?</text>
 <line class="pulse" x1="760" y1="68" x2="820" y2="108" stroke="#39B9EE" stroke-width="2"/>
 <line class="pulse" x1="760" y1="172" x2="820" y2="132" stroke="#39B9EE" stroke-width="2"/>
-<rect x="820" y="88" width="160" height="64" fill="none" stroke="#2BD7B3"/><text x="836" y="114" fill="#2BD7B3">verdict</text><text x="836" y="134" fill="#93A0BA">per shape, precision</text>
+<rect x="820" y="88" width="160" height="64" fill="none" stroke="#2BD7B3"/><text x="836" y="114" fill="#2BD7B3">verdict</text><text x="836" y="134" fill="#93A0BA">one per step</text>
 <text x="20" y="230" fill="#5E6B86">The CPU computes the same product in float64 as the reference. The chip never sees it.</text>
 </svg>
 <div class="cap">The checks are independent. A large error fails the reference check. A tiny one, even a single bit, fails the repeat check because the first run and the later run no longer match.</div>
@@ -287,9 +288,9 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <div class="grid2">
 <div class="panel">
 <h3>The reference check, in plain words</h3>
-<p>Floating point arithmetic rounds at every step, so two correct computers can legitimately differ in the last digit. The question is how different they are allowed to be. Numerical analysis has a proven answer: for a dot product of length K, the rounding error can never exceed a bound that depends only on K and the precision. Every element of the chip's result is compared with a float64 reference and must sit inside that bound. For int8 the arithmetic is exact, so the bound is zero.</p>
-<div class="formula">|C − R| ≤ g·(|A|@|B|) + u_out·(|R| + g·(|A|@|B|))<br>g = K·u / (1 − K·u)    u = 2⁻²⁴ (FP32 accumulation)<br>u_out = 2⁻²⁴ fp32    2⁻¹¹ fp16    2⁻⁸ bf16    0 int8</div>
-<p>An element outside the bound is a wrong answer, not a difference of opinion about tolerance.</p>
+<p>Floating point arithmetic rounds at every step, so two correct computers can legitimately differ in the last digit. The question is how different they are allowed to be. Numerical analysis has a proven answer: for a dot product of length K, the rounding error can never exceed a bound that depends only on K, the precision and how the hardware rounds. Every element of the chip's result is compared with a float64 reference and must sit inside that bound. For int8 the arithmetic is exact, so the bound is zero.</p>
+<div class="formula">|C − R| ≤ acc + u_out·(|R| + acc)<br>acc = g·(|A|@|B|)<br>g = n·u / (1 − n·u)<br>fp32: n = K, u = 2⁻²⁴<br>fp16, bf16: n = 2K, u = 2⁻²³<br>u_out: 2⁻²⁴ fp32, 2⁻¹¹ fp16, 2⁻⁸ bf16<br>int8: exact, bound 0</div>
+<p>fp32 runs on the FP32 fused multiply-add units with TF32 off. fp16 and bf16 run on tensor cores, which round by truncation rather than to nearest and add in blocks, as Fasi, Higham, Mikaitis and Pranesh measured, so they get the wider allowance. Every fp16 and bf16 row published so far passed a bound four times tighter than this one. An element outside the bound is a wrong answer, not a difference of opinion about tolerance.</p>
 </div>
 <div class="panel">
 <h3>The repeat check, in plain words</h3>
@@ -297,7 +298,16 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 </div>
 </div>
 
-<h3>Probe 2: memory</h3>
+<h3>Probe 2: transformer kernels</h3>
+<p>Matrix multiply uses the multiply-accumulate units. A transformer block also runs exponentials, divisions, square roots and error functions, which live on different silicon, and the research says faults are data-dependent: a unit that multiplies correctly can still get a softmax wrong. The kernel probe runs four of them with the device's own fused kernels, including its attention kernel, and judges every output element the same two ways.</p>
+<div class="grid2">
+<div class="panel"><h3>Softmax</h3><p>Rows of logits. Exercises exp, a sum reduction and a divide. The bound follows the error of each exponential through the sum and the quotient.</p></div>
+<div class="panel"><h3>Layer norm</h3><p>Mean, variance, reciprocal square root, scale and shift. The variance allowance is sized for the two-pass, Welford and E[x²]&minus;&mu;² methods, so a correct implementation of any of them passes.</p></div>
+<div class="panel"><h3>GELU</h3><p>The erf form, elementwise. The bound comes from the argument scaling, the erf itself and three roundings.</p></div>
+<div class="panel"><h3>Attention</h3><p>softmax(QK<sup>T</sup>/&radic;d)V through the device's fused attention kernel. The bound carries the tensor-core error of QK<sup>T</sup> through the softmax, allows for the running rescale fused kernels apply block by block, and for P being held in fp16 or bf16. That is why it is the widest.</p></div>
+</div>
+<p>Every bound on this site follows from one written arithmetic model, recorded in every result file: FP32 arithmetic rounds to nearest, tensor cores accumulate faithfully in FP32, exp, divide and square roots stay within eight ulps, and erf within 2<sup>&minus;20</sup> absolute, which admits the shortcut erf that PyTorch uses on ARM processors. CUDA's own math library documents errors well inside that. A device that breaks the model, or that substitutes an approximate GELU, shows as outside-error-bound on every run, and the message says so. Below the smallest normal value of the output type the bound becomes an absolute floor, because fp16 cannot represent a probability of 10<sup>&minus;8</sup> and no chip should be blamed for that.</p>
+<h3>Probe 3: memory</h3>
 <p>The matrix multiply touches a few megabytes. Most of an 80 GB chip is memory, and a bad row or a stuck bit there corrupts whatever lands on it. The memory probe fills most of the device memory, writes a known value into every 32-bit word, waits, and reads every word back.</p>
 <div class="fig">
 <div style="padding:22px 24px 10px">
@@ -325,11 +335,11 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <div class="kicker">LEARN, PART 4 OF 5</div>
 <h2>Reading a verdict</h2>
 <p class="lede">Every step ends in one of these words. They are chosen so a reader can tell a chip fault from a software quirk without opening the file.</p>
-<h3>Compute probe</h3>
+<h3>Compute and kernel probes</h3>
 <div class="verdict">
 <div class="v">no-silent-errors</div><div>Every run inside the bound and bit-identical to run 0. The baseline.</div>
 <div class="v bad">silent-data-corruption</div><div>Some runs differ from run 0. An intermittent fault, the kind a fleet scanner exists to find.</div>
-<div class="v bad">outside-error-bound</div><div>All runs agree with each other but sit outside the proven bound. A faulty unit, or a device accumulating below FP32.</div>
+<div class="v bad">outside-error-bound</div><div>All runs agree with each other but sit outside the proven bound. A faulty unit, a device accumulating below FP32, or for the kernel probe an exp, erf or GELU that is less accurate than assumed.</div>
 <div class="v warn">nondeterministic-kernel</div><div>Many runs differ, yet all stay inside the bound. The kernel is not repeatable on that device and precision, so the repeat check cannot be used there. Reported as a finding, not a fault.</div>
 </div>
 <h3>Memory probe</h3>
@@ -359,7 +369,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <dt>reference bound</dt><dd>The largest error that correct rounding can produce for a given computation and precision. Anything larger is a wrong answer. The bound used here is the standard componentwise bound for inner products from Higham.</dd>
 <dt>fault injection</dt><dd>Deliberately corrupting a value to confirm the checks notice. Used here as a self-test on every published row.</dd>
 <dt>dwell</dt><dd>The pause between writing memory and reading it back. Weak cells lose their value over time, so a longer dwell catches more of them.</dd>
-<dt>OCP Test and Validation</dt><dd>The Open Compute Project's open format for hardware diagnostic output, used by cloud operators so that any test's results can be read by any fleet tool. Both probes write it.</dd>
+<dt>OCP Test and Validation</dt><dd>The Open Compute Project's open format for hardware diagnostic output, used by cloud operators so that any test's results can be read by any fleet tool. All three probes write it.</dd>
 </dl>
 </section>
 
@@ -372,6 +382,12 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <thead><tr><th>Device</th><th>Date</th><th>Shapes (M×K×N)</th><th>Precisions</th><th>Runs</th><th>Silent faults</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
 <tbody>{{COMPUTE_ROWS}}</tbody>
 </table></div>
+<h3>Kernel probe</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Device</th><th>Date</th><th>Kernels</th><th>Precisions</th><th>Runs</th><th>Worst error / bound</th><th>Silent faults</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
+<tbody>{{KERNEL_ROWS}}</tbody>
+</table></div>
+<p class="note">Worst error over bound is the largest measured error on the device divided by the bound at that element, across every kernel and precision. Values near 1 at fp16 and bf16 are expected: there the bound is dominated by the single rounding of the output, so there is almost nothing to spare. A value above 1 is a failed run.</p>
 <h3>Memory probe</h3>
 <div class="tablewrap"><table>
 <thead><tr><th>Device</th><th>Date</th><th>Memory tested</th><th>Patterns</th><th>Dwell</th><th>Bad words</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
@@ -385,7 +401,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <h2>The self-test</h2>
 <p class="lede">A clean table is only worth something if the tester can show it would have seen a fault. So every row is paired with an injection run.</p>
 <div class="grid2">
-<div class="panel"><h3>Compute self-test</h3><p>In five of the fifty runs, one random bit of one random output element is flipped before the checks run. The bit can be anywhere: sign, exponent or the lowest mantissa bit. All five must be caught. On the chips measured so far, the reference check alone caught 46 of every 60 flips and the repeat check caught all 60. That is why there are two checks.</p></div>
+<div class="panel"><h3>Compute self-test</h3><p>In five of the fifty runs, one random bit of one random output element is flipped before the checks run. The bit can be anywhere: sign, exponent or the lowest mantissa bit. All five must be caught. On the chips measured so far, with the v0.2.0 bound, the reference check alone caught 46 of every 60 flips and the repeat check caught all 60. That is why there are two checks.</p></div>
 <div class="panel"><h3>Memory self-test</h3><p>After each pattern is written, five random bits in five random words of real device memory are flipped. The sweep must locate all of them by address. Because the flips happen in device memory, this exercises the actual read-back path, not only the comparison code.</p></div>
 </div>
 </section>
@@ -394,9 +410,9 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <div class="kicker">EVIDENCE</div>
 <h2>What a PASS means, and does not</h2>
 <ul class="plain">
-<li><b>It means:</b> no silent error appeared in these matrix multiplies and this memory sweep, in these runs, on this device, on this day.</li>
+<li><b>It means:</b> no silent error appeared in these matrix multiplies, these transformer kernels and this memory sweep, in these runs, on this device, on this day.</li>
 <li><b>It does not mean:</b> the chip is healthy. Faults that depend on specific data, on heat, or on hours of load are not yet exercised. The next probes add them.</li>
-<li><b>Accumulation:</b> the compute bound assumes FP32 or better accumulation. That is enforced on CUDA. Elsewhere a lower precision would show as outside-error-bound on every run, and the message says so.</li>
+<li><b>Arithmetic model:</b> every bound assumes FP32 arithmetic that rounds to nearest, tensor cores that accumulate faithfully in FP32, exp, divide and square roots within eight ulps, and erf within 2<sup>&minus;20</sup> absolute. A device that breaks the model shows as outside-error-bound on every run, and the message says so.</li>
 <li><b>One device per run:</b> links between chips are not yet tested.</li>
 <li><b>Self-test scope:</b> the compute injection corrupts the output after it leaves the device, so it proves the checker, not the chip. The memory injection corrupts device memory itself.</li>
 </ul>
@@ -405,7 +421,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <section id="run">
 <div class="kicker">TAKE PART</div>
 <h2>Run it on your chip</h2>
-<p class="lede">Four commands, four result files, one pull request. Works on CUDA, Apple MPS and CPU today.</p>
+<p class="lede">Six commands, six result files, one pull request. Works on CUDA, Apple MPS and CPU today.</p>
 <pre><span class="c"># once</span>
 git clone https://github.com/tech4biz-yasha/ai-chip-integrity.git &amp;&amp; cd ai-chip-integrity
 pip install -r requirements.txt
@@ -414,11 +430,15 @@ pip install -r requirements.txt
 python screen.py --out NAME_clean.jsonl
 python screen.py --inject 5 --out NAME_inject.jsonl
 
+<span class="c"># kernel probe and its self-test</span>
+python kernels.py --out NAME_kernels.jsonl
+python kernels.py --inject 3 --out NAME_kernels_inject.jsonl
+
 <span class="c"># memory probe and its self-test</span>
 python memcheck.py --out NAME_memcheck.jsonl
 python memcheck.py --inject 5 --out NAME_memcheck_inject.jsonl</pre>
 <ol class="steps">
-<li><b>Open a pull request</b> with the four files, the device name, driver version and PyTorch version.</li>
+<li><b>Open a pull request</b> with the six files, the device name, driver version and PyTorch version.</li>
 <li><b>Rows are added only from attached files.</b> The table is regenerated from them, so a row cannot say more than its file does.</li>
 <li><b>Found a fault?</b> Open an issue with the file. A real finding on real hardware is the most useful thing anyone can contribute.</li>
 </ol>
@@ -431,8 +451,9 @@ python memcheck.py --inject 5 --out NAME_memcheck_inject.jsonl</pre>
 <p class="lede">Each probe targets one part of the chip. The order follows where the research says faults hide.</p>
 <div class="road">
 <div class="r done"><b>Compute probe, three shapes, four precisions</b><span>Matrix multiply with proven bound and bit-exact repeat. Done.</span></div>
-<div class="r done"><b>Memory probe, whole device</b><span>Six patterns, exact read-back, address and bit mask on every miss. Done.</span></div>
-<div class="r now"><b>Real model kernels</b><span>Attention, softmax, layer norm and a full small-LLM forward pass against a float64 reference. The data-dependent probe.</span></div>
+<div class="r done"><b>Memory probe, most of device memory</b><span>Six patterns, exact read-back, address and bit mask on every miss. Done.</span></div>
+<div class="r done"><b>Transformer kernel probe</b><span>Softmax, layer norm, GELU and the fused attention kernel against a float64 reference with derived bounds. Done.</span></div>
+<div class="r now"><b>Full model forward pass</b><span>A small LLM, every layer checked against a CPU float64 reference. The end-to-end data-dependent probe.</span></div>
 <div class="r"><b>Hours under load</b><span>The same probes for hours at full power with temperature logged next to every result.</span></div>
 <div class="r"><b>Fleet mode</b><span>Run every probe across many devices automatically and collect the files. Fault rates are per thousand units, so volume is how they get found.</span></div>
 <div class="r"><b>Fault injection inside the computation</b><span>Flip bits during the multiply on the device, to measure how sensitive each chip and precision is. Also the basis for a space radiation column.</span></div>
@@ -448,8 +469,10 @@ python memcheck.py --inject 5 --out NAME_memcheck_inject.jsonl</pre>
 <li><b>Zheng et al., OSDI 2026.</b> SDCs in the Wild: characterising and diagnosing SDC-defective GPUs in production LLM training. The source of the finding that microbenchmark screening misses most faulty units. <a href="https://www.usenix.org/conference/osdi26/presentation/zheng">usenix.org</a></li>
 <li><b>Lei et al., OSDI 2026.</b> Safeguarding LLM Training at Scale: online SDC detection and insights from 35 million GPU hours. <a href="https://www.usenix.org/conference/osdi26/presentation/lei">usenix.org</a></li>
 <li><b>Higham, Accuracy and Stability of Numerical Algorithms.</b> The componentwise rounding error bound for inner products used by the reference check.</li>
+<li><b>Fasi, Higham, Mikaitis and Pranesh, 2021.</b> Numerical behavior of NVIDIA tensor cores. The measurement that tensor cores accumulate with truncation, which sets the fp16 and bf16 bound. <a href="https://peerj.com/articles/cs-330">peerj.com</a></li>
+<li><b>Valpey and Pai, 2025.</b> Modeling three generations of tensor cores. A formal model of rounding and accumulation order on Volta, Turing and Ampere. <a href="https://arxiv.org/abs/2502.15999">arxiv.org</a></li>
 <li><b>Huang and Abraham, 1984.</b> Algorithm-based fault tolerance for matrix operations. The original idea of checking a matrix result against a cheap independent computation.</li>
-<li><b>OCP Test and Validation.</b> The open diagnostic output format and reference implementation both probes write to. <a href="https://github.com/opencomputeproject/ocp-diag-core">ocp-diag-core</a></li>
+<li><b>OCP Test and Validation.</b> The open diagnostic output format and reference implementation all three probes write to. <a href="https://github.com/opencomputeproject/ocp-diag-core">ocp-diag-core</a></li>
 </ul>
 </section>
 
@@ -458,7 +481,7 @@ python memcheck.py --inject 5 --out NAME_memcheck_inject.jsonl</pre>
 <h2>About and cite</h2>
 <p>Chip Integrity is maintained by Yasha Khandelwal, Bengaluru. The code is MIT licensed. The project stays vendor neutral: the same tests run on every chip, and a row is published only with its result file.</p>
 <pre>Yasha Khandelwal. ai-chip-integrity: an open tester for silent computation errors in AI chips.
-Version 0.2.0, 2026. https://github.com/tech4biz-yasha/ai-chip-integrity</pre>
+Version 0.3.0, 2026. https://github.com/tech4biz-yasha/ai-chip-integrity</pre>
 <p>Questions, rows and findings: <a href="mailto:yasha.khandelwal@tech4biz.io">yasha.khandelwal@tech4biz.io</a> or an issue on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</p>
 </section>
 

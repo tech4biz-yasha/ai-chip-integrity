@@ -1,0 +1,182 @@
+"""
+Tests for kernels.py. Run from the repo root:  python -m pytest -q
+All tests run on the CPU so they work on any machine.
+"""
+
+import json
+import os
+import pathlib
+import sys
+
+import pytest
+import torch
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+import kernels  # noqa: E402
+
+BASE = ["--device", "cpu", "--size", "128", "--iters", "4"]
+
+
+def strict_load(path):
+    def no_constants(tok):
+        raise ValueError(f"non-standard JSON constant {tok}")
+    with open(path, encoding="utf-8") as f:
+        return [json.loads(line, parse_constant=no_constants) for line in f if line.strip()]
+
+
+def by_step(objs):
+    names, diag, meas = {}, {}, {}
+    for o in objs:
+        sa = o.get("testStepArtifact")
+        if not sa:
+            continue
+        sid = sa["testStepId"]
+        if "testStepStart" in sa:
+            names[sid] = sa["testStepStart"]["name"]
+        if "diagnosis" in sa:
+            diag[names[sid]] = sa["diagnosis"]["verdict"]
+        if "measurement" in sa:
+            meas.setdefault(names[sid], {})[sa["measurement"]["name"]] = sa["measurement"]["value"]
+    return diag, meas
+
+
+@pytest.fixture(autouse=True)
+def clear_hook():
+    kernels._FAULT_HOOK = None
+    yield
+    kernels._FAULT_HOOK = None
+
+
+def test_all_kernels_all_precisions_pass(tmp_path):
+    out = tmp_path / "k.jsonl"
+    rc = kernels.main(BASE + ["--out", str(out)])
+    diag, meas = by_step(strict_load(out))
+    assert rc == 0
+    assert len(diag) == 12
+    for name, v in diag.items():
+        assert v == "no-silent-errors", name
+        assert meas[name]["reference_check_failed_runs"] == 0
+        assert meas[name]["repeat_check_failed_runs"] == 0
+        assert 0 < meas[name]["worst_error_over_bound_ratio"] <= 1.0, name
+
+
+def test_bounds_are_tight_for_fp32():
+    """An fp32 bound that is loose by orders of magnitude would hide real faults."""
+    for name in kernels.KERNELS:
+        _, ref, bound = kernels.make_case(name, torch.float32, 1, 128)
+        rel = bound.max() / ref.abs().max()
+        # attention carries the worst-case QK^T rounding through softmax, so its bound is wider
+        assert rel < (1e-3 if name == "attention" else 1e-4), (name, float(rel))
+
+
+@pytest.mark.parametrize("seed", range(6))
+def test_injected_bit_flips_are_all_caught(tmp_path, seed):
+    out = tmp_path / "k.jsonl"
+    rc = kernels.main(["--device", "cpu", "--size", "64", "--iters", "6", "--inject", "5",
+                       "--seed", str(seed), "--out", str(out)])
+    diag, meas = by_step(strict_load(out))
+    assert rc == 0
+    for name, v in diag.items():
+        assert v == "injection-self-test-pass", name
+        assert meas[name]["injected_runs_detected"] == 5
+
+
+def test_intermittent_fault_is_silent_data_corruption(tmp_path):
+    def hook(i, c):
+        if i == 2:
+            c.view(-1)[9] += 0.5
+    kernels._FAULT_HOOK = hook
+    out = tmp_path / "k.jsonl"
+    rc = kernels.main(BASE + ["--kernels", "gelu", "--dtypes", "fp32", "--out", str(out)])
+    diag, _ = by_step(strict_load(out))
+    assert rc == 1
+    assert diag["gelu_fp32"] == "silent-data-corruption"
+
+
+def test_one_ulp_intermittent_change_is_still_caught(tmp_path):
+    def hook(i, c):
+        if i == 3:
+            v = c.view(torch.int32).view(-1)
+            v[5] = v[5] ^ 1
+    kernels._FAULT_HOOK = hook
+    out = tmp_path / "k.jsonl"
+    rc = kernels.main(BASE + ["--kernels", "softmax", "--dtypes", "fp32", "--out", str(out)])
+    diag, meas = by_step(strict_load(out))
+    assert rc == 1
+    assert meas["softmax_fp32"]["reference_check_failed_runs"] == 0
+    assert meas["softmax_fp32"]["repeat_check_failed_runs"] == 1
+    assert diag["softmax_fp32"] == "silent-data-corruption"
+
+
+def test_systematic_error_is_outside_bound(tmp_path):
+    def hook(i, c):
+        c.view(-1)[0] += 0.25
+    kernels._FAULT_HOOK = hook
+    out = tmp_path / "k.jsonl"
+    rc = kernels.main(BASE + ["--kernels", "layernorm", "--dtypes", "fp32", "--out", str(out)])
+    diag, _ = by_step(strict_load(out))
+    assert rc == 1
+    assert diag["layernorm_fp32"] == "outside-error-bound"
+
+
+def test_low_precision_internal_math_is_outside_bound(tmp_path):
+    """Softmax computed in fp16 internally violates the FP32-accumulation assumption and must be reported."""
+    def hook(i, c):
+        # replace the output with a softmax computed entirely in fp16 (CPU path), then back to fp32
+        x = kernels.make_case("softmax", torch.float32, 1234, 128)[0][0]
+        c.copy_(torch.softmax(x.half(), dim=1).float())
+    kernels._FAULT_HOOK = hook
+    out = tmp_path / "k.jsonl"
+    rc = kernels.main(BASE + ["--kernels", "softmax", "--dtypes", "fp32", "--out", str(out)])
+    diag, meas = by_step(strict_load(out))
+    assert rc == 1
+    assert diag["softmax_fp32"] == "outside-error-bound"
+    assert meas["softmax_fp32"]["worst_error_over_bound_ratio"] > 10
+
+
+def test_tanh_gelu_is_outside_bound(tmp_path):
+    """The tanh approximation differs from erf-GELU by up to about 5e-4: it must not pass as erf-GELU."""
+    def hook(i, c):
+        x = kernels.make_case("gelu", torch.float32, 1234, 128)[0][0]
+        c.copy_(torch.nn.functional.gelu(x, approximate="tanh"))
+    kernels._FAULT_HOOK = hook
+    out = tmp_path / "k.jsonl"
+    rc = kernels.main(BASE + ["--kernels", "gelu", "--dtypes", "fp32", "--out", str(out)])
+    diag, _ = by_step(strict_load(out))
+    assert rc == 1
+    assert diag["gelu_fp32"] == "outside-error-bound"
+
+
+def test_nan_output_is_flagged(tmp_path):
+    def hook(i, c):
+        if i == 1:
+            c.view(-1)[0] = float("nan")
+    kernels._FAULT_HOOK = hook
+    out = tmp_path / "k.jsonl"
+    rc = kernels.main(BASE + ["--kernels", "attention", "--dtypes", "fp32", "--out", str(out)])
+    diag, meas = by_step(strict_load(out))
+    assert rc == 1
+    assert meas["attention_fp32"]["worst_nonfinite_values"] == 1
+    assert diag["attention_fp32"] == "silent-data-corruption"
+
+
+def test_bad_args_rejected(tmp_path):
+    with pytest.raises(SystemExit):
+        kernels.main(BASE + ["--kernels", "conv", "--out", str(tmp_path / "k.jsonl")])
+
+
+@pytest.mark.skipif(not os.environ.get("OCP_SCHEMA_DIR"), reason="set OCP_SCHEMA_DIR to ocp-diag-core/json_spec/output")
+def test_output_matches_official_ocp_schema(tmp_path):
+    jsonschema = pytest.importorskip("jsonschema")
+    referencing = pytest.importorskip("referencing")
+    schema_dir = pathlib.Path(os.environ["OCP_SCHEMA_DIR"])
+    resources = []
+    for p in schema_dir.glob("*.json"):
+        doc = json.loads(p.read_text())
+        resources.append((doc["$id"], referencing.Resource.from_contents(doc)))
+    registry = referencing.Registry().with_resources(resources)
+    validator = jsonschema.Draft202012Validator(json.loads((schema_dir / "root.json").read_text()), registry=registry)
+    out = tmp_path / "k.jsonl"
+    kernels.main(BASE + ["--inject", "2", "--out", str(out)])
+    for obj in strict_load(out):
+        validator.validate(obj)

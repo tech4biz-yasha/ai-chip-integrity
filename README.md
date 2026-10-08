@@ -4,7 +4,7 @@ An open tester for silent computation errors in AI chips.
 
 It runs a fixed calculation on a GPU, NPU or CPU many times and proves, element by element, whether the chip returned the right answer every time. Results come out in the Open Compute Project Test and Validation format, so they drop straight into fleet tooling.
 
-**Status: early.** Two probes so far: `screen.py` v0.2.0 (matrix multiply across several shapes and four precisions) and `memcheck.py` v0.1.0 (a sweep of the whole device memory). One device at a time, three measured chips. Read the limits section before relying on a PASS.
+**Status: early.** Three probes so far: `screen.py` v0.2.1 (matrix multiply across several shapes and four precisions), `kernels.py` v0.1.0 (softmax, layer norm, GELU and fused attention) and `memcheck.py` v0.1.0 (a sweep of most of the device memory). One device at a time, four measured chips. Read the limits section before relying on a PASS.
 
 ## Why this exists
 
@@ -20,20 +20,32 @@ Every row comes from a run of this code with the result files in [`results/`](re
 
 | Device | Date | Tool | Shapes (MxKxN) | Runs per step | fp32 | fp16 | bf16 | int8 | Injected faults caught | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
+| NVIDIA H200, PyTorch 2.8.0+cu128, rented pod | 2026-10-08 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | 60 of 60 | no-silent-errors |
 | NVIDIA A100-SXM4-80GB, PyTorch 2.8.0+cu128, rented pod | 2026-10-07 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | 60 of 60 | no-silent-errors |
 | NVIDIA H100 80GB HBM3 (SXM), driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-07 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | 60 of 60 | no-silent-errors |
 | Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-07 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | skipped, no int8 matmul on MPS | 45 of 45 | no-silent-errors |
 | Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-07 | v0.1.0 | 1024x1024x1024 | 50 | PASS, 1.6 s | PASS, 1.1 s | not run | not run | 10 of 10 | no-silent-errors |
 
+**Kernel probe (`kernels.py` v0.1.0)**
+
+| Device | Date | Kernels | Size | Runs per step | fp32 | fp16 | bf16 | Injected faults caught | Verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-08 | softmax, layer norm, GELU, attention | 4096x4096; attention 8 heads x 1024 tokens x 128 | 25 | PASS | PASS | PASS | 36 of 36 | no-silent-errors |
+
+Notes on the Apple row: all 300 results across 12 steps were inside the bound and bit-for-bit identical to their first run. In the clean run, steps took 1.2 to 16.0 s for 25 runs, mostly the CPU-side check. Result files: `results/mac_kernels.jsonl` and `results/mac_kernels_inject.jsonl`. Data centre GPU rows are next.
+
 **Memory sweep (`memcheck.py` v0.1.0)**
 
 | Device | Date | Memory tested | Patterns | Dwell | Bad words | Injected flips located | Verdict |
 |---|---|---|---|---|---|---|---|
+| NVIDIA H200, 139.8 GiB total, rented pod | 2026-10-08 | 111.25 GiB (29,863,444,480 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
 | NVIDIA A100-SXM4-80GB, 79.3 GiB total, rented pod | 2026-10-07 | 63.00 GiB (16,911,433,728 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
 | NVIDIA H100 80GB HBM3 (SXM), 79.2 GiB total, rented pod | 2026-10-07 | 62.75 GiB (16,844,324,864 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
 | Apple GPU via MPS, MacBook Pro (arm64), 11.8 GiB recommended max | 2026-10-07 | 5.50 GiB (1,476,395,008 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
 
-The A100 sweep took 28.3 s, the H100 sweep took 21.6 s both clean and with injection, so about 17 GiB/s of write, read and compare at HBM speed; the Mac sweep took 69 s clean and 85 s with injection. Result files: `results/a100_memcheck.jsonl`, `results/a100_memcheck_inject.jsonl`, `results/h100_memcheck.jsonl`, `results/h100_memcheck_inject.jsonl`, `results/mac_memcheck.jsonl` and `results/mac_memcheck_inject.jsonl`.
+The H200 sweep took 24.8 s for 111.25 GiB, the A100 sweep took 28.3 s, the H100 sweep took 21.6 s both clean and with injection, so about 17 GiB/s of write, read and compare at HBM speed; the Mac sweep took 69 s clean and 85 s with injection. Result files: `results/h200_memcheck.jsonl`, `results/h200_memcheck_inject.jsonl`, `results/a100_memcheck.jsonl`, `results/a100_memcheck_inject.jsonl`, `results/h100_memcheck.jsonl`, `results/h100_memcheck_inject.jsonl`, `results/mac_memcheck.jsonl` and `results/mac_memcheck_inject.jsonl`.
+
+Notes on the H200 row: all 600 results across 12 steps were bit-for-bit identical to their first run and int8 was exact on every element. Result files: `results/h200_clean.jsonl` and `results/h200_inject.jsonl`.
 
 Notes on the A100 row: all 600 results across 12 steps were bit-for-bit identical to their first run and int8 was exact on every element, the same as the H100. Result files: `results/a100_clean.jsonl` and `results/a100_inject.jsonl`.
 
@@ -50,14 +62,18 @@ Every run is checked two ways.
 **1. Reference check.** For float precisions the reference `R` is computed in float64 on the CPU from the rounded inputs, and each element of the device result must satisfy
 
 ```
-|C - R|  <=  g * (|A| @ |B|)  +  u_out * ( |R| + g * (|A| @ |B|) )
+|C - R|  <=  acc  +  u_out * ( |R| + acc )  +  floor
 
-g      = n * u / (1 - n * u)        Higham's inner product bound for n terms
-u      = 2^-24                      unit roundoff of the accumulator (FP32 assumed)
-u_out  = 2^-24, 2^-11 or 2^-8       unit roundoff of the output type (fp32, fp16, bf16)
+acc    = g * (|A| @ |B|)  +  products with a subnormal input
+g      = n * u / (1 - n * u)        Higham's inner product bound
+fp32   n = K,  u = 2^-24            IEEE FP32 fused multiply-add, TF32 off (CUDA and CPU)
+fp16   n = 2K, u = 2^-23            matrix units: faithful accumulation, truncation allowed,
+bf16                                any block width (also fp32 on other devices, plus 2^-20 per product)
+u_out  = 2^-24, 2^-11 or 2^-8       output rounding (fp32, fp16, bf16)
+floor  = half the subnormal spacing of the output type
 ```
 
-The first term is the largest error any rounding sequence of the dot product can produce (`n` here is the inner dimension K); the second is the final rounding to the output type. Any element outside the bound, and any NaN or Inf, is a wrong answer, not a tolerance judgement.
+The first term is the largest error the accumulation can produce under the arithmetic model in [`arith.py`](arith.py); the second is the final rounding to the output type. NVIDIA tensor cores accumulate with truncation rather than round to nearest (Fasi, Higham, Mikaitis and Pranesh, PeerJ CS 2021; Valpey and Pai, arXiv 2502.15999), so for fp16 and bf16 the bound uses the truncation unit and allows for block accumulation. Up to v0.2.0 the bound used `n = K, u = 2^-24` for every precision, about four times tighter at fp16 and bf16; every published row passed that tighter bound, so it passes this one. Any element outside the bound, and any NaN or Inf, is a wrong answer, not a tolerance judgement.
 
 For int8 the device returns int32 and the reference is computed exactly in int64, so the bound is zero: any difference at all is a wrong answer.
 
@@ -74,7 +90,39 @@ For int8 the device returns int32 and the reference is computed exactly in int64
 
 **Self-test.** `--inject N` flips one random bit of one random output element in `N` runs (never run 0), after the result has been copied back from the device. It proves the checker catches corruption; it does not stress the chip. The verdict then becomes `injection-self-test-pass` only if every injected run was caught and no uninjected run failed.
 
-## Probe 2: memory (`memcheck.py`)
+## Probe 2: transformer kernels (`kernels.py`)
+
+Matrix multiply exercises the multiply-accumulate units. A transformer block also runs exponentials, divisions, square roots and error functions, which run on different hardware, and faults are data dependent. This probe runs four kernels through the device's own implementations and checks every output element against a float64 reference on the CPU, with the same two checks as the compute probe.
+
+| Kernel | Default input | Operations exercised |
+|---|---|---|
+| `softmax` | 4096 x 4096 logits, N(0, 3) | exp, sum reduction, divide |
+| `layernorm` | 4096 x 4096 activations, N(2, 1.5), random weight and bias | mean, variance, reciprocal square root, scale, shift |
+| `gelu` | 4096 x 4096, N(0, 3), erf form | erf, multiply |
+| `attention` | 8 heads x 1024 tokens x 128, `scaled_dot_product_attention` | QK^T, softmax, PV through the fused kernel |
+
+Precisions: fp32, fp16, bf16. 25 runs per kernel and precision by default.
+
+**Bounds.** Each kernel has a componentwise bound from standard rounding-error analysis (Higham), applied to every element:
+
+1. softmax: the relative error of each exponential, `EPS_FN + u|x_i - max| + u`, carried through the sum (`gamma_n`) and the quotient.
+2. layer norm: error of the mean, of each deviation, of the variance (sized to cover the two-pass, Welford and `E[x^2] - mean^2` methods), of the reciprocal square root, then of scale and shift.
+3. GELU: argument scaling, erf, `1 + erf`, the product and the output rounding.
+4. attention: the matrix-unit error of every logit from QK^T, propagated through softmax as `expm1(2 * max logit error)`; the exp of each weight and of every online-softmax rescale (at most one per block of 16 keys); the row sum; P rounded to the input precision, with an absolute allowance where P is subnormal; and the matrix-unit error of PV.
+
+Every bound adds the output rounding of the test precision and an absolute floor of the smallest normal value of the output type, because below it the rounding error is absolute and devices may flush subnormals.
+
+**Stated assumptions**, the arithmetic model in [`arith.py`](arith.py), recorded in every result file:
+
+1. Scalar FP32 arithmetic rounds to nearest; matrix units accumulate faithfully (truncation allowed).
+2. exp, divide, square root and reciprocal square root are within `EPS_FN = 2^-20` relative error, eight FP32 ulps anywhere in a binade. erf is within `2^-20` absolute, which admits the absolutely accurate approximations vector libraries use (PyTorch's ARM CPU erf is Abramowitz and Stegun 7.1.26: up to 5.4e-7 absolute error, but up to 100% relative near zero).
+3. Fused attention keeps logits and softmax in FP32 and holds P in the input precision. On CUDA, fp16 and bf16 attention may only use the fused kernels (flash, memory-efficient, cuDNN), so the unfused path, which rounds logits to the input precision, cannot stand in silently.
+
+A device that breaks any of them, or that substitutes the tanh approximation for GELU, shows as `outside-error-bound` on every run and the message says so. At the test default, the fp32 bounds sit within 3e-5 of the output scale for softmax, layer norm and GELU, and within 1e-3 for attention, whose bound carries worst-case matrix-unit accumulation through the softmax (`tests/test_kernels.py::test_bounds_are_tight_for_fp32`).
+
+Verdicts and the `--inject N` self-test are the same as the compute probe.
+
+## Probe 3: memory (`memcheck.py`)
 
 The matrix multiply touches a few megabytes. The memory sweep fills as much of the device memory as it can (by default 80% of what is free on CUDA, 48% of the recommended maximum on Apple MPS, 2 GiB on CPU, or `--gb` to choose), writes a known value into every 32-bit word, waits a dwell time (default 2 s), reads everything back and counts every word that differs.
 
@@ -96,9 +144,11 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python screen.py                 # compute probe; auto picks cuda, then mps, then cpu; 3 shapes x 4 precisions
 python screen.py --inject 5      # compute self-test
+python kernels.py                # kernel probe; softmax, layer norm, GELU, attention x fp32, fp16, bf16
+python kernels.py --inject 3     # kernel self-test
 python memcheck.py               # memory probe; 6 patterns over most of the device memory
 python memcheck.py --inject 5    # memory self-test
-python -m pytest -q              # 39 tests on CPU; 2 more validate the output against OCP's schema
+python -m pytest -q              # 72 tests on CPU; 3 more validate the output against OCP's schema
 ```
 
 Options for `memcheck.py`:
@@ -136,26 +186,28 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 
 ## Output format
 
-Both probes write one JSON object per line following the [OCP Test and Validation output spec](https://github.com/opencomputeproject/ocp-diag-core/tree/main/json_spec), version 2.0, written through the official `ocptv` library:
+All three probes write one JSON object per line following the [OCP Test and Validation output spec](https://github.com/opencomputeproject/ocp-diag-core/tree/main/json_spec), version 2.0, written through the official `ocptv` library:
 
 - `testRunStart` with the parameters used, the host name as DUT id, the device as a hardware component, and the `torch` and `python` versions as software components
 - one test step per shape and precision, named `gemm_<precision>_<MxKxN>` (for example `gemm_fp16_4096x4096x4096`), carrying the measurements `runs`, `shape_mkn`, `exact_check`, `seconds`, `reference_check_failed_runs`, `repeat_check_failed_runs`, `worst_error_over_bound_ratio` (float precisions only), `worst_abs_error`, `worst_nonfinite_values`, and in self-test mode `injected_runs` and `injected_runs_detected`, with validators on the counts that must be zero or equal to the injected count
 - a `diagnosis` per step with the verdict above
 - `testRunEnd` with the overall PASS or FAIL
 
+`kernels.py` writes one step per kernel and precision, named `<kernel>_<precision>` (for example `attention_bf16`), with `runs`, `size`, `elements`, `seconds`, `assumed_fn_rel_error`, `reference_check_failed_runs`, `repeat_check_failed_runs`, `worst_error_over_bound_ratio`, `worst_abs_error`, `worst_nonfinite_values`, the self-test counts, and a diagnosis with the verdict.
+
 `memcheck.py` writes one step per pass (`memory_sweep_pass1`, ...) with `bytes_tested`, `device_memory_bytes`, `coverage_fraction`, `dwell_seconds`, `seconds`, one `bad_words_<pattern>` per pattern (validated to be zero outside self-test), a warning log line per failing pattern with the first byte offsets and the bad-bit mask, and in self-test mode `injected_<pattern>` and `injected_detected_<pattern>`.
 
 ## Assumptions and limits
 
-1. The bound assumes the device accumulates in FP32 or better. That is enforced on CUDA by the flags above. On other devices a lower accumulation precision would show up as `outside-error-bound` on every run, and the message says so. It was not the case on the Apple GPU measured above.
-2. These are two probes. A PASS means "no silent error in these matrix multiplies and this memory sweep, in these runs, on this device today". It is not a certificate of a healthy chip. The OSDI 2026 results above show that defects depend on the data, the kernel, temperature and age; this version sweeps shapes, precisions and memory but not the rest.
+1. Every bound follows from the arithmetic model in `arith.py`: FP32 scalar arithmetic rounds to nearest, matrix units accumulate faithfully in FP32 (truncation allowed), exp, divide and square roots stay within eight ulps, and erf within 2^-20 absolute. TF32 is switched off on CUDA. A device that accumulates below FP32 or breaks the model in another way shows up as `outside-error-bound` on every run, and the message says so. That was not the case on any chip measured above.
+2. These are three probes. A PASS means "no silent error in these matrix multiplies, these transformer kernels and this memory sweep, in these runs, on this device today". It is not a certificate of a healthy chip. The OSDI 2026 results above show that defects depend on the data, the kernel, temperature and age; this version sweeps shapes, precisions and memory but not the rest.
 3. Runs take seconds, not hours, so thermal and aging effects are not exercised.
 4. One device per run. Multi-device comparison is on the roadmap.
 5. The injected faults are applied to the output on the CPU side. They test the checker, not the chip.
 
 ## Roadmap
 
-1. Real model layers and full inference as workloads, since faults are data dependent.
+1. A full small-LLM forward pass with every layer checked against a CPU float64 reference, since faults are data dependent.
 2. More input patterns, and fp8 where the hardware has it.
 3. Long runs under load so temperature and aging are part of the test.
 4. Fault injection inside the computation on the device, so a chip's sensitivity to bit flips can be measured (the basis for a space radiation column).
@@ -164,7 +216,7 @@ Both probes write one JSON object per line following the [OCP Test and Validatio
 
 ## Contributing a row
 
-Run `python screen.py`, `python screen.py --inject 5`, `python memcheck.py` and `python memcheck.py --inject 5` on your device, then open a pull request with the four result files, the device name, driver version and PyTorch version. Rows are added only from attached result files.
+Run `python screen.py`, `python screen.py --inject 5`, `python kernels.py`, `python kernels.py --inject 3`, `python memcheck.py` and `python memcheck.py --inject 5` on your device, then open a pull request with the six result files, the device name, driver version and PyTorch version. Rows are added only from attached result files.
 
 ## Citing
 
