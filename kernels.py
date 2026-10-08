@@ -30,19 +30,23 @@ the checks catch corruption. Output: OCP Test & Validation JSON to --out.
 
 import argparse
 import math
+import os
 import platform
 import random
 import socket
 import sys
 import time
 
-import torch
-import torch.nn.functional as F
-import ocptv.output as tv
+# must be set before CUDA initialises so cuBLAS runs deterministically
+os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 
-import arith
+import torch  # noqa: E402
+import torch.nn.functional as F  # noqa: E402
+import ocptv.output as tv  # noqa: E402
 
-from screen import FileWriter, pick_device, device_label, lock_down_math, flip_bit, NONDET_SHARE, NONDET_MIN
+import arith  # noqa: E402
+
+from screen import FileWriter, pick_device, device_label, lock_down_math, flip_bit, NONDET_SHARE, NONDET_MIN  # noqa: E402
 
 VERSION = "0.1.0"
 U_RN, U_TC, EPS_FN = arith.U_RN, arith.U_TC, arith.EPS_FN

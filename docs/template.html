@@ -448,16 +448,21 @@ python memcheck.py --inject 5 --out NAME_memcheck_inject.jsonl</pre>
 <section id="roadmap">
 <div class="kicker">TAKE PART</div>
 <h2>Roadmap</h2>
-<p class="lede">Each probe targets one part of the chip. The order follows where the research says faults hide.</p>
+<p class="lede">Twelve probes, each aimed at one part of the chip. The first three are built.</p>
 <div class="road">
-<div class="r done"><b>Compute probe, three shapes, four precisions</b><span>Matrix multiply with proven bound and bit-exact repeat. Done.</span></div>
-<div class="r done"><b>Memory probe, most of device memory</b><span>Six patterns, exact read-back, address and bit mask on every miss. Done.</span></div>
-<div class="r done"><b>Transformer kernel probe</b><span>Softmax, layer norm, GELU and the fused attention kernel against a float64 reference with derived bounds. Done.</span></div>
-<div class="r now"><b>Full model forward pass</b><span>A small LLM, every layer checked against a CPU float64 reference. The end-to-end data-dependent probe.</span></div>
-<div class="r"><b>Hours under load</b><span>The same probes for hours at full power with temperature logged next to every result.</span></div>
+<div class="r done"><b>1. Matrix multiply</b><span>Three shapes, four precisions, a proven bound and a bit-exact repeat check. Done.</span></div>
+<div class="r done"><b>2. Memory pattern sweep</b><span>Six patterns over most of device memory, exact read-back, address and bit mask on every miss. Done.</span></div>
+<div class="r done"><b>3. Transformer kernels</b><span>Softmax, layer norm, GELU and the fused attention kernel against a float64 reference with derived bounds. Done.</span></div>
+<div class="r now"><b>4. Full model forward pass</b><span>A small LLM, every layer checked against a CPU float64 reference. Each layer is fed the device's own input, so its bound stays as tight as a single kernel's.</span></div>
+<div class="r"><b>5. Reductions and all-reduce</b><span>Sums across threads, blocks and then GPUs over NVLink and PCIe, with checksums that must agree at both ends.</span></div>
+<div class="r"><b>6. Checksum-protected matrix multiply</b><span>Huang and Abraham's row and column checksums, which detect and locate a wrong element inside the multiply itself.</span></div>
+<div class="r"><b>7. Hours under load</b><span>The same probes for hours at full power, with temperature and clocks logged next to every result.</span></div>
+<div class="r"><b>8. Clock and voltage margin sweep</b><span>Lower the margin step by step where the driver allows it and record where each unit starts to fail. Likely needs bare-metal access.</span></div>
+<div class="r"><b>9. Data pattern library</b><span>Denormals, near-overflow values, alternating signs and worst-case rounding patterns.</span></div>
+<div class="r"><b>10. Fault injection inside the computation</b><span>Flip bits in registers during the multiply to measure how often a flip becomes a wrong answer. The basis for a space radiation column.</span></div>
+<div class="r"><b>11. ECC and error counters</b><span>Read the chip's own counters before and after every probe and record whether the hardware noticed what the probe noticed.</span></div>
+<div class="r"><b>12. Recovery</b><span>After a detected fault, reset and rerun on the same card to see whether the fault clears. Likely needs bare-metal access.</span></div>
 <div class="r"><b>Fleet mode</b><span>Run every probe across many devices automatically and collect the files. Fault rates are per thousand units, so volume is how they get found.</span></div>
-<div class="r"><b>Fault injection inside the computation</b><span>Flip bits during the multiply on the device, to measure how sensitive each chip and precision is. Also the basis for a space radiation column.</span></div>
-<div class="r"><b>Between devices</b><span>All-reduce over NVLink and PCIe with checksums.</span></div>
 <div class="r"><b>Vendor comparison</b><span>Run NVIDIA DCGM and AMD AGFHC on the same device and record what each catches.</span></div>
 </div>
 </section>
