@@ -60,6 +60,7 @@ def parse(path):
 
 KERNEL_ORDER = ["softmax", "layernorm", "gelu", "rope", "attention"]
 PRECISION_ORDER = ["fp32", "fp16", "bf16", "int8", "fp8", "fp8fast"]
+PATTERN_ORDER = ["wide", "mantissa", "cancel", "alternate", "sparse", "subnormal", "near_max", "extremes"]
 
 
 def vkey(version):
@@ -81,7 +82,7 @@ def row_for(table, r, **base):
 
 def summarise(runs):
     """Group runs by device and probe into table rows."""
-    compute, memory, kernel = {}, {}, {}
+    compute, memory, kernel, pattern = {}, {}, {}, {}
     for r in runs:
         inject = int(r["params"].get("inject", 0)) > 0
         if r["run"] == "ai-chip-integrity-screen":
@@ -126,6 +127,29 @@ def summarise(runs):
                 row["rep_fail"] = sum(s.get("repeat_check_failed_runs", 0) for s in live)
                 row["verdicts"] = sorted({s["_verdict"] for s in live})
                 row["clean_file"] = r["file"]
+        elif r["run"] == "ai-chip-integrity-patterns":
+            row = row_for(pattern, r, torch=r["torch"])
+            if row is None:
+                continue
+            if inject:
+                row["injected"] = sum(s.get("injected_runs", 0) for s in r["steps"].values())
+                row["caught"] = sum(s.get("injected_runs_detected", 0) for s in r["steps"].values())
+                row["inject_file"] = r["file"]
+            else:
+                live = {n: s for n, s in r["steps"].items() if "_skipped" not in s}
+                order = lambda lst: (lambda x: (lst.index(x) if x in lst else 99, x))
+                row["runs"] = sum(s.get("runs", 0) for s in live.values())
+                row["skipped"] = len(r["steps"]) - len(live)
+                row["patterns"] = sorted({s.get("pattern") or "_".join(n.split("_")[2:-1]) for n, s in live.items()},
+                                         key=order(PATTERN_ORDER))
+                row["precisions"] = sorted({n.split("_")[1] for n in live}, key=order(PRECISION_ORDER))
+                row["flushed"] = sorted({n.split("_")[1] for n, s in live.items() if s.get("subnormal_inputs_flushed") is True},
+                                        key=order(PRECISION_ORDER))
+                row["subnormal_checked"] = any("subnormal_inputs_flushed" in s for s in live.values())
+                row["ref_fail"] = sum(s.get("reference_check_failed_runs", 0) for s in live.values())
+                row["rep_fail"] = sum(s.get("repeat_check_failed_runs", 0) for s in live.values())
+                row["verdicts"] = sorted({s["_verdict"] for s in live.values()})
+                row["clean_file"] = r["file"]
         elif r["run"] == "ai-chip-integrity-memcheck":
             row = row_for(memory, r)
             if row is None:
@@ -146,7 +170,7 @@ def summarise(runs):
                 row["clean_file"] = r["file"]
     order = lambda d: (0 if "H100" in d else 1 if "A100" in d else 2 if "NVIDIA" in d else 3, d)
     return ([compute[k] for k in sorted(compute, key=order)], [memory[k] for k in sorted(memory, key=order)],
-            [kernel[k] for k in sorted(kernel, key=order)])
+            [kernel[k] for k in sorted(kernel, key=order)], [pattern[k] for k in sorted(pattern, key=order)])
 
 
 def esc(s):
@@ -177,6 +201,39 @@ def compute_rows(rows):
 <td>{r['runs']:,}</td>
 <td>{r['ref_fail'] + r['rep_fail']}</td>
 <td>{caught}</td>
+<td class="{'ok' if ok else 'bad'}">{esc(verdict)}</td>
+<td>{files}</td>
+</tr>""")
+    return "\n".join(out)
+
+
+def pattern_rows(rows):
+    out = []
+    for r in rows:
+        if "runs" not in r:
+            continue
+        verdict = ", ".join(r["verdicts"])
+        ok = r["verdicts"] == ["no-silent-errors"]
+        caught = f'{r.get("caught", 0)} of {r.get("injected", 0)}' if "injected" in r else "not run"
+        prec = ", ".join(r["precisions"]) + (f' ({r["skipped"]} skipped)' if r["skipped"] else "")
+        if not r["subnormal_checked"]:
+            sub = "not run"
+        elif r["flushed"]:
+            sub = "flushed: " + ", ".join(r["flushed"])
+        else:
+            sub = "kept"
+        files = f'<a href="{REPO}/blob/main/{r["clean_file"]}">clean</a>'
+        if "inject_file" in r:
+            files += f' · <a href="{REPO}/blob/main/{r["inject_file"]}">self-test</a>'
+        out.append(f"""<tr>
+<td>{esc(r['device'])}<span class="sub">PyTorch {esc(r['torch'])} · tool v{esc(r['version'])}</span></td>
+<td class="date">{esc(min(r['dates']))}</td>
+<td>{esc(", ".join(r['patterns']))}</td>
+<td>{esc(prec)}</td>
+<td>{r['runs']:,}</td>
+<td>{r['ref_fail'] + r['rep_fail']}</td>
+<td>{caught}</td>
+<td>{esc(sub)}</td>
 <td class="{'ok' if ok else 'bad'}">{esc(verdict)}</td>
 <td>{files}</td>
 </tr>""")
@@ -247,13 +304,13 @@ def memory_rows(rows):
 
 def main():
     runs = [parse(p) for p in sorted(glob.glob(os.path.join(RESULTS, "*.jsonl")))]
-    compute, memory, kernel = summarise(runs)
+    compute, memory, kernel, pattern = summarise(runs)
     chips = sorted({r["device"] for r in runs})
-    total_runs = sum(r.get("runs", 0) for r in compute + kernel)
-    total_caught = sum(r.get("caught", 0) for r in compute + kernel + memory)
-    total_injected = sum(r.get("injected", 0) for r in compute + kernel + memory)
+    total_runs = sum(r.get("runs", 0) for r in compute + kernel + pattern)
+    total_caught = sum(r.get("caught", 0) for r in compute + kernel + pattern + memory)
+    total_injected = sum(r.get("injected", 0) for r in compute + kernel + pattern + memory)
     total_words = sum(r.get("bytes", 0) for r in memory) // 4
-    faults = (sum(r.get("ref_fail", 0) + r.get("rep_fail", 0) for r in compute + kernel)
+    faults = (sum(r.get("ref_fail", 0) + r.get("rep_fail", 0) for r in compute + kernel + pattern)
               + sum(r.get("bad", 0) for r in memory))
     built = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
@@ -266,6 +323,7 @@ def main():
                 .replace("{{CAUGHT}}", f"{total_caught} of {total_injected}")
                 .replace("{{COMPUTE_ROWS}}", compute_rows(compute))
                 .replace("{{MEMORY_ROWS}}", memory_rows(memory))
+                .replace("{{PATTERN_ROWS}}", pattern_rows(pattern) or '<tr><td colspan="10">No rows yet. The data pattern probe is new; rows are added as the files come in.</td></tr>')
                 .replace("{{KERNEL_ROWS}}", kernel_rows(kernel) or '<tr><td colspan="10">No rows yet. The kernel probe was added after the first four chips were measured; rows are added as the files come in.</td></tr>')
                 .replace("{{BUILT}}", built))
     assert not re.search(r"{{[A-Z_]+}}", html), "unfilled placeholder"

@@ -42,7 +42,7 @@ import ocptv.output as tv  # noqa: E402
 
 import arith  # noqa: E402
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 
 FP8 = getattr(torch, "float8_e4m3fn", None)   # E4M3, the FP8 format inference engines run on
 
@@ -171,13 +171,13 @@ def accumulation_factor(name, k, dev_type):
 
 
 def error_bound(ref, abs_ab, k, u_out, g=None, flush_ab=None, out_floor=0.0):
-    """|C - R| <= acc + u_out*(|R| + acc) + floor, acc = g*|A||B| (+ products with a subnormal input).
-    Integers: exact (zero)."""
+    """|C - R| <= acc + u_out*(|R| + acc) + floor, acc = g*|A||B| (+ products with a subnormal input,
+    + products that underflow FP32, + the float64 reference's own rounding). Integers: exact (zero)."""
     if u_out is None:
         return torch.zeros_like(ref)
     if g is None:
         g = arith.ieee_dot(k)
-    acc = g * abs_ab
+    acc = (g + arith.reference_dot(k)) * abs_ab + arith.underflow_floor(k)
     if flush_ab is not None:
         acc = acc + flush_ab
     return acc + u_out * (ref.abs() + acc) + out_floor
@@ -193,14 +193,18 @@ def flip_bit(c, int_view, bits, rng):
     return idx, bit
 
 
-def screen_case(step, dev, name, shape, iters, seed, inject, rng, hw):
+def screen_case(step, dev, name, shape, iters, seed, inject, rng, hw, case=None, allow_flush=True):
+    """One step: run C = A @ B `iters` times and judge every run. `case` = (a, b, ref, |A||B|) supplies the
+    inputs (the data pattern probe uses this); by default they come from make_case. allow_flush=False drops the
+    allowance for a device flushing subnormal inputs, for callers that have already matched the reference to
+    the device's flushing behaviour."""
     dtype, out_dtype, int_view, bits, u_out = DTYPES[name]
     m, k, n = shape
-    a, b, ref, abs_ab = make_case(m, k, n, dtype, seed)
+    a, b, ref, abs_ab = case if case is not None else make_case(m, k, n, dtype, seed)
     exact = u_out is None
     g = None if exact else accumulation_factor(name, k, dev.type)
     bound = error_bound(ref, abs_ab, k, u_out, g=g,
-                        flush_ab=None if exact else flush_products(a, b),
+                        flush_ab=None if exact or not allow_flush else flush_products(a, b),
                         out_floor=0.0 if exact else arith.subnormal_floor(out_dtype))
     if dtype == FP8 and k > FP8_EXACT_K:
         raise RuntimeError(f"FP8 exact check needs K <= {FP8_EXACT_K}; got {k}")

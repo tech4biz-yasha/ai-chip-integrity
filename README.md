@@ -4,7 +4,7 @@ An open tester for silent computation errors in AI chips.
 
 It runs a fixed calculation on a GPU, NPU or CPU many times and proves, element by element, whether the chip returned the right answer every time. Results come out in the Open Compute Project Test and Validation format, so they drop straight into fleet tooling.
 
-**Status: early.** Three probes so far: `screen.py` v0.3.0 (matrix multiply across several shapes, four precisions and exact FP8), `kernels.py` v0.2.0 (softmax, layer norm, GELU, rotary embeddings and fused attention) and `memcheck.py` v0.1.0 (a sweep of most of the device memory). One device at a time, four measured chips. Read the limits section before relying on a PASS.
+**Status: early.** Four probes so far, numbered as on the roadmap below: `screen.py` v0.3.1 (probe 1, matrix multiply across several shapes, four precisions and exact FP8), `memcheck.py` v0.1.0 (probe 2, a sweep of most of the device memory), `kernels.py` v0.2.0 (probe 3, softmax, layer norm, GELU, rotary embeddings and fused attention) and `patterns.py` v0.1.0 (probe 9, data patterns that drive the matrix multiply). One device at a time, four measured chips. Read the limits section before relying on a PASS.
 
 ## Why this exists
 
@@ -34,6 +34,14 @@ Every row comes from a run of this code with the result files in [`results/`](re
 | Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-08 | v0.1.0 | softmax, layer norm, GELU, attention | 4096x4096; attention 8 heads x 1024 tokens x 128 | 25 | PASS | PASS | PASS | 36 of 36 | no-silent-errors |
 
 Notes on the Apple rows: in the v0.2.0 run all 375 results across 15 steps were inside the bound and bit-for-bit identical to their first run, including RoPE with angles up to 4095 radians; result files `results/mac_kernels_v020.jsonl` and `results/mac_kernels_v020_inject.jsonl`. The v0.1.0 run (300 results across 12 steps, all clean, 36 of 36 faults caught) is kept as `results/mac_kernels.jsonl` and `results/mac_kernels_inject.jsonl`; the site shows the newest version per device. Data centre GPU rows are next.
+
+**Data pattern probe (`patterns.py`)**
+
+| Device | Date | Tool | Patterns | Shapes (MxKxN) | Runs per step | fp32 | fp16 | bf16 | int8 | FP8 | Subnormal inputs | Injected faults caught | Verdict |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-10 | v0.1.0 | wide, mantissa, cancel, alternate, sparse, subnormal, near_max | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | skipped, no int8 matmul on MPS | skipped, no FP8 on MPS | flushed in fp32 and bf16, kept in fp16 | 126 of 126 | no-silent-errors |
+
+Notes on the Apple row: all 840 results across 42 steps were inside the bound and bit-for-bit identical to their first run. The Apple GPU's matrix multiply flushes subnormal inputs to zero in fp32 and bf16 and keeps them in fp16; each precision was checked against the exact model that matches. Result files: `results/mac_patterns.jsonl` and `results/mac_patterns_inject.jsonl`.
 
 **Memory sweep (`memcheck.py` v0.1.0)**
 
@@ -67,8 +75,9 @@ Every run is checked two ways.
 ```
 |C - R|  <=  acc  +  u_out * ( |R| + acc )  +  floor
 
-acc    = g * (|A| @ |B|)  +  products with a subnormal input
+acc    = (g + g_ref) * (|A| @ |B|)  +  (K + 1) * 2^-126  +  products with a subnormal input
 g      = n * u / (1 - n * u)        Higham's inner product bound
+g_ref  = gamma(K, 2^-53)            the float64 reference's own rounding (from v0.3.1)
 fp32   n = K,  u = 2^-24            IEEE FP32 fused multiply-add, TF32 off (CUDA and CPU)
 fp16   n = 2K, u = 2^-23            matrix units: faithful accumulation, truncation allowed,
 bf16                                any block width (also fp32 on other devices, plus 2^-20 per product)
@@ -76,7 +85,7 @@ u_out  = 2^-24, 2^-11 or 2^-8       output rounding (fp32, fp16, bf16)
 floor  = half the subnormal spacing of the output type
 ```
 
-The first term is the largest error the accumulation can produce under the arithmetic model in [`arith.py`](arith.py); the second is the final rounding to the output type. NVIDIA tensor cores accumulate with truncation rather than round to nearest (Fasi, Higham, Mikaitis and Pranesh, PeerJ CS 2021; Valpey and Pai, arXiv 2502.15999), so for fp16 and bf16 the bound uses the truncation unit and allows for block accumulation. Up to v0.2.0 the bound used `n = K, u = 2^-24` for every precision, about four times tighter at fp16 and bf16; every published row passed that tighter bound, so it passes this one. Any element outside the bound, and any NaN or Inf, is a wrong answer, not a tolerance judgement.
+The first term is the largest error the accumulation can produce under the arithmetic model in [`arith.py`](arith.py), plus the reference's own rounding and FP32 underflow; the second is the final rounding to the output type. NVIDIA tensor cores accumulate with truncation rather than round to nearest (Fasi, Higham, Mikaitis and Pranesh, PeerJ CS 2021; Valpey and Pai, arXiv 2502.15999), so for fp16 and bf16 the bound uses the truncation unit and allows for block accumulation. Up to v0.2.0 the bound used `n = K, u = 2^-24` for every precision, about four times tighter at fp16 and bf16; every published row passed that tighter bound, so it passes this one. Any element outside the bound, and any NaN or Inf, is a wrong answer, not a tolerance judgement.
 
 For int8 the device returns int32 and the reference is computed exactly in int64, so the bound is zero: any difference at all is a wrong answer.
 
@@ -95,7 +104,22 @@ For int8 the device returns int32 and the reference is computed exactly in int64
 
 **Self-test.** `--inject N` flips one random bit of one random output element in `N` runs (never run 0), after the result has been copied back from the device. It proves the checker catches corruption; it does not stress the chip. The verdict then becomes `injection-self-test-pass` only if every injected run was caught and no uninjected run failed.
 
-## Probe 2: transformer kernels (`kernels.py`)
+## Probe 2: memory (`memcheck.py`)
+
+The matrix multiply touches a few megabytes. The memory sweep fills as much of the device memory as it can (by default 80% of what is free on CUDA, 48% of the recommended maximum on Apple MPS, 2 GiB on CPU, or `--gb` to choose), writes a known value into every 32-bit word, waits a dwell time (default 2 s), reads everything back and counts every word that differs.
+
+Six patterns run in order: all zeros, all ones, `0xAAAAAAAA`, `0x55555555`, an address hash (every word pseudo-random from its own address, so neighbouring cells never hold the same value) and the bitwise inverse of that hash. Together they drive every bit of every word to both 0 and 1 while its neighbours hold the opposite, which is what catches stuck bits, coupled cells and weak rows. The expected value is recomputed on the device at read time, so the comparison runs at device speed. For every failing pattern the first ten byte offsets and the OR of the bad bits are logged, so a stuck bit shows up as a single mask such as `0x00000020`.
+
+**Verdict per pass**
+
+| Verdict | Meaning |
+|---|---|
+| `no-memory-errors` | Every word read back correctly on every pattern |
+| `memory-errors` | At least one word differed; the measurements say which patterns and the log says where |
+
+**Self-test.** `--inject N` flips one random bit in N random words of device memory after each pattern is written. Unlike the compute probe's self-test, this corrupts real device memory, so it also exercises the read-back path. The verdict is `injection-self-test-pass` only when every injected flip is located and no other word fails.
+
+## Probe 3: transformer kernels (`kernels.py`)
 
 Matrix multiply exercises the multiply-accumulate units. A transformer block also runs exponentials, divisions, square roots and error functions, which run on different hardware, and faults are data dependent. This probe runs five kernels through the device's own implementations and checks every output element against a float64 reference on the CPU, with the same two checks as the compute probe.
 
@@ -129,20 +153,26 @@ A device that breaks any of them, or that substitutes the tanh approximation for
 
 Verdicts and the `--inject N` self-test are the same as the compute probe.
 
-## Probe 3: memory (`memcheck.py`)
+## Probe 9: data patterns (`patterns.py`)
 
-The matrix multiply touches a few megabytes. The memory sweep fills as much of the device memory as it can (by default 80% of what is free on CUDA, 48% of the recommended maximum on Apple MPS, 2 GiB on CPU, or `--gb` to choose), writes a known value into every 32-bit word, waits a dwell time (default 2 s), reads everything back and counts every word that differs.
+Some faults only fire on particular bit patterns, and uniform random inputs almost never produce them. This probe runs the compute probe's matrix multiply, with the same two checks and the same proven or exact reference, on inputs built to reach specific parts of the arithmetic.
 
-Six patterns run in order: all zeros, all ones, `0xAAAAAAAA`, `0x55555555`, an address hash (every word pseudo-random from its own address, so neighbouring cells never hold the same value) and the bitwise inverse of that hash. Together they drive every bit of every word to both 0 and 1 while its neighbours hold the opposite, which is what catches stuck bits, coupled cells and weak rows. The expected value is recomputed on the device at read time, so the comparison runs at device speed. For every failing pattern the first ten byte offsets and the OR of the bad bits are logged, so a stuck bit shows up as a single mask such as `0x00000020`.
+| Pattern | Inputs | What it reaches |
+|---|---|---|
+| `wide` | random exponents across about 80 binades (fp32, bf16) or 15 (fp16) | the shifters that align operands before they are added |
+| `mantissa` | every mantissa bit set, at exponents -2 to 2 | the longest carry chains in multipliers and adders |
+| `cancel` | A = [Y Y], B = [X; -X] | an exact answer of zero, so only rounding may remain |
+| `alternate` | checkerboard signs, so every product in a dot product has the same sign | sums at their largest, the worst case for truncating accumulators |
+| `sparse` | nine values in ten exactly zero | zero handling and zero skipping |
+| `subnormal` | A below the smallest normal number of its type, B large enough that every product is normal | the subnormal input path |
+| `near_max` | scaled so the largest possible partial sum is a quarter to a half of the output type's maximum | the largest exponents and the output conversion |
+| `extremes` | int8 only: -128, -127, 0 and 127 | the corners of the integer multiplier |
 
-**Verdict per pass**
+Every input set is scaled by a power of two where needed, so that no partial sum, in any order, can overflow the output type or an FP32 accumulator. FP8 keeps its inputs in {-1, 0, 1} so its answers stay exact, so it runs `alternate` and `sparse` only; int8 runs `extremes`, `alternate` and `sparse`.
 
-| Verdict | Meaning |
-|---|---|
-| `no-memory-errors` | Every word read back correctly on every pattern |
-| `memory-errors` | At least one word differed; the measurements say which patterns and the log says where |
+**Subnormals.** Flushing subnormal inputs to zero is allowed by the arithmetic model, but a bound wide enough to cover both behaviours would let real faults through. So before the `subnormal` step the probe multiplies one small matrix to measure whether the device flushes subnormal inputs in that precision, records `subnormal_inputs_flushed`, and then checks the device against the exact model that matches, with no allowance for the other. A test in `tests/test_patterns.py` makes the CPU flush inside the matmul only and confirms that judging it against the wrong model fails.
 
-**Self-test.** `--inject N` flips one random bit in N random words of device memory after each pattern is written. Unlike the compute probe's self-test, this corrupts real device memory, so it also exercises the read-back path. The verdict is `injection-self-test-pass` only when every injected flip is located and no other word fails.
+The bound for every float step adds two terms the compute probe also carries from v0.3.1: the float64 reference's own rounding, `gamma(K, 2^-53) * (|A| @ |B|)`, and `(K + 1) * 2^-126` for products that may underflow FP32. Both are far below the other terms on ordinary data; they make the bound hold on the extreme inputs as well.
 
 ## Run it
 
@@ -153,9 +183,11 @@ python screen.py                 # compute probe; auto picks cuda, then mps, the
 python screen.py --inject 5      # compute self-test
 python kernels.py                # kernel probe; softmax, layer norm, GELU, RoPE, attention x fp32, fp16, bf16
 python kernels.py --inject 3     # kernel self-test
+python patterns.py               # data pattern probe; 8 patterns through the matrix multiply
+python patterns.py --inject 3    # data pattern self-test
 python memcheck.py               # memory probe; 6 patterns over most of the device memory
 python memcheck.py --inject 5    # memory self-test
-python -m pytest -q              # 82 tests on CPU; 3 more validate the output against OCP's schema
+python -m pytest -q              # 96 tests on CPU; 4 more validate the output against OCP's schema
 ```
 
 Options for `memcheck.py`:
@@ -198,6 +230,19 @@ Options for `kernels.py`:
 | `--inject` | `0` | bit flips to inject per step (self-test) |
 | `--out` | `kernels.jsonl` | OCP output file |
 
+Options for `patterns.py`:
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--device` | `auto` | `cpu`, `mps`, `cuda` or `cuda:N` |
+| `--shapes` | `1024x1024x1024,32x4096x11008` | comma list of `MxKxN` |
+| `--iters` | `20` | runs per shape, precision and pattern |
+| `--dtypes` | `fp32,fp16,bf16,int8,fp8,fp8fast` | comma list of precisions |
+| `--patterns` | all eight | comma list from `wide`, `mantissa`, `cancel`, `alternate`, `sparse`, `subnormal`, `near_max`, `extremes` |
+| `--seed` | `1234` | input seed |
+| `--inject` | `0` | bit flips to inject per step (self-test) |
+| `--out` | `patterns.jsonl` | OCP output file |
+
 Exit code is 0 for PASS and 1 for FAIL. A precision or shape the device does not support (for example int8 matmul on a device without it) is skipped and recorded as an error artifact.
 
 On CUDA, `screen.py` and `kernels.py` turn off TF32 and reduced precision reductions, set `CUBLAS_WORKSPACE_CONFIG`, and ask PyTorch for deterministic algorithms, so the bound and the repeat check both hold. `kernels.py` also limits fp16 and bf16 attention to the fused kernels; that control needs PyTorch 2.3 or later, and on older versions the device default runs.
@@ -209,8 +254,9 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 | Path | What it is |
 |---|---|
 | `screen.py` | Probe 1, matrix multiply |
-| `kernels.py` | Probe 2, transformer kernels |
-| `memcheck.py` | Probe 3, memory sweep |
+| `kernels.py` | Probe 3, transformer kernels |
+| `patterns.py` | Probe 9, data patterns through the matrix multiply |
+| `memcheck.py` | Probe 2, memory sweep |
 | `arith.py` | The arithmetic model every bound is derived from, with its id written into each result file |
 | `build_site.py` | Builds `docs/index.html` (chipintegrity.org) from `docs/template.html` and every file in `results/`, so the published tables can never say more than the files do. One row per device and probe; a newer tool version replaces the older row. Run `python build_site.py` after adding result files |
 | `results/` | Every published result file, in OCP format |
@@ -218,17 +264,18 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 
 ## Tests
 
-`python -m pytest -q` runs 82 tests on the CPU in a few seconds; 3 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set.
+`python -m pytest -q` runs 96 tests on the CPU in a few seconds; 4 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set.
 
 1. `tests/test_screen.py` (37): every verdict path, every bit position caught by the self-test, NaN handling, int8 and FP8 off-by-one, FP8 inputs exact and K above 4096 skipped, rectangular shapes, bound tightness.
 2. `tests/test_kernels.py` (19): all kernels and precisions, the self-test on six seeds, intermittent and systematic faults, a one-ulp change, internal fp16 arithmetic and tanh-GELU both caught as outside the bound, NaN handling, fp32 bound tightness, a sin that is off by 1e-4 caught in RoPE, RoPE angles reaching every position, and the device's own exp, erf, sin and cos measured.
 3. `tests/test_memcheck.py` (8): a stuck bit reported with its offset, a dead row counted word by word, injected flips located, the patterns themselves.
 4. `tests/test_arith.py` (19): the model checked against simulations of the hardware it claims to cover. A simulated tensor core that truncates, at block widths 1 to 32, stays inside the bound; a constructed case breaks the old v0.2.0 bound by almost 2x and stays inside the new one; a FlashAttention-2 style kernel emulated op by op stays inside the attention bound; PyTorch's ARM CPU erf and GELU, emulated op by op, stay inside the GELU bound; and FP8 sums of {-1, 0, 1} stay exact in a 13-bit accumulator while a 9-bit one loses them.
-5. `tests/test_build_site.py` (2): a newer tool version replaces the older row for the same device on the site, and kernel sizes render from the files.
+5. `tests/test_build_site.py` (3): a newer tool version replaces the older row for the same device on the site, kernel sizes render from the files, and data pattern rows render with the flushing behaviour.
+6. `tests/test_patterns.py` (14): every pattern passes on CPU, each input set really has its pattern and stays clear of overflow, FP8 and int8 inputs stay exact, flushing is detected and judging a flushing device against the wrong model fails, a fault four times the bound is caught on the cancelling pattern, injected flips are caught on every pattern, and the output matches the OCP schema.
 
 ## Output format
 
-All three probes write one JSON object per line following the [OCP Test and Validation output spec](https://github.com/opencomputeproject/ocp-diag-core/tree/main/json_spec), version 2.0, written through the official `ocptv` library:
+All four probes write one JSON object per line following the [OCP Test and Validation output spec](https://github.com/opencomputeproject/ocp-diag-core/tree/main/json_spec), version 2.0, written through the official `ocptv` library:
 
 - `testRunStart` with the parameters used (for `screen.py` and `kernels.py` these include `bound_model`, the id of the arithmetic model in `arith.py`), the host name as DUT id, the device as a hardware component, and the `torch` and `python` versions as software components
 - one test step per shape and precision, named `gemm_<precision>_<MxKxN>` (for example `gemm_fp16_4096x4096x4096`), carrying the measurements `runs`, `shape_mkn`, `exact_check`, `accumulation_factor` (the `g` used in the bound, float precisions only), `seconds`, `reference_check_failed_runs`, `repeat_check_failed_runs`, `worst_error_over_bound_ratio` (float precisions only), `worst_abs_error`, `worst_nonfinite_values`, and in self-test mode `injected_runs` and `injected_runs_detected`, with validators on the counts that must be zero or equal to the injected count
@@ -237,19 +284,21 @@ All three probes write one JSON object per line following the [OCP Test and Vali
 
 `kernels.py` writes one step per kernel and precision, named `<kernel>_<precision>` (for example `attention_bf16`), with `runs`, `size`, `elements`, `seconds`, `assumed_fn_rel_error`, `reference_check_failed_runs`, `repeat_check_failed_runs`, `worst_error_over_bound_ratio`, `worst_abs_error`, `worst_nonfinite_values`, `device_exp_rel_worst_error`, `device_erf_abs_worst_error` or `device_sincos_abs_worst_error` (softmax, GELU and RoPE steps), the self-test counts, and a diagnosis with the verdict. Its run parameters also record `assumed_fn_rel_error` and `attention_kernels` (which attention kernels were allowed).
 
+`patterns.py` writes one step per shape, precision and pattern, named `gemm_<precision>_<pattern>_<MxKxN>` (for example `gemm_bf16_near_max_1024x1024x1024`), with the compute probe's measurements plus `pattern`, `input_scale_power_of_two` and, for the subnormal pattern, `subnormal_inputs_flushed`.
+
 `memcheck.py` writes one step per pass (`memory_sweep_pass1`, ...) with `bytes_tested`, `device_memory_bytes`, `coverage_fraction`, `dwell_seconds`, `seconds`, one `bad_words_<pattern>` per pattern (validated to be zero outside self-test), a warning log line per failing pattern with the first byte offsets and the bad-bit mask, and in self-test mode `injected_<pattern>` and `injected_detected_<pattern>`.
 
 ## Assumptions and limits
 
 1. Every bound follows from the arithmetic model in `arith.py`: FP32 scalar arithmetic rounds to nearest, matrix units accumulate faithfully in FP32 (truncation allowed), exp, divide and square roots stay within eight ulps, and erf within 2^-20 absolute. TF32 is switched off on CUDA. A device that accumulates below FP32 or breaks the model in another way shows up as `outside-error-bound` on every run, and the message says so. That was not the case on any chip measured above.
-2. These are three probes. A PASS means "no silent error in these matrix multiplies, these transformer kernels and this memory sweep, in these runs, on this device today". It is not a certificate of a healthy chip. The OSDI 2026 results above show that defects depend on the data, the kernel, temperature and age; this version sweeps shapes, precisions, five transformer kernels and memory, but not the rest.
+2. These are four probes. A PASS means "no silent error in these matrix multiplies, these data patterns, these transformer kernels and this memory sweep, in these runs, on this device today". It is not a certificate of a healthy chip. The OSDI 2026 results above show that defects depend on the data, the kernel, temperature and age; this version sweeps shapes, precisions, five transformer kernels and memory, but not the rest.
 3. Runs take seconds, not hours, so thermal and aging effects are not exercised.
 4. One device per run. Multi-device comparison is on the roadmap.
 5. In the compute and kernel probes the injected faults are applied to the output on the CPU side, so they test the checker, not the chip. The memory probe injects into device memory itself.
 
 ## Roadmap
 
-Twelve probes, each aimed at one part of the chip. The first three are built.
+Twelve probes, each aimed at one part of the chip. Four are built: 1, 2, 3 and 9.
 
 1. **Matrix multiply** (`screen.py`). Done for fp32, fp16, bf16, int8 and FP8 (E4M3, exact, from v0.3.0). FP4 follows once a Blackwell card is measured.
 2. **Memory pattern sweep** (`memcheck.py`). Done for device memory. On-chip SRAM (shared memory and L2) is next, NVIDIA GPUs only.
@@ -259,7 +308,7 @@ Twelve probes, each aimed at one part of the chip. The first three are built.
 6. **Checksum-protected matrix multiply** (algorithm-based fault tolerance, Huang and Abraham 1984). Row and column checksums that detect and locate a wrong element inside the multiply itself.
 7. **Hours under load.** The same probes repeated for hours at full power, with temperature and clocks logged next to every result.
 8. **Clock and voltage margin sweep.** Lower the margin step by step where the driver allows it and record where each unit starts to fail. Likely needs bare-metal access, since container pods rarely allow clock control.
-9. **Data pattern library.** Denormals, near-overflow values, alternating signs and worst-case rounding patterns. The bounds will have to allow devices that flush subnormals.
+9. **Data pattern library** (`patterns.py`). Done for the matrix multiply: wide exponents, full mantissas, cancellation, alternating signs, sparsity, subnormals with flush detection, near-overflow and int8 extremes. Patterns for the transformer kernels are next.
 10. **Fault injection inside the computation.** Flip bits in registers during the multiply (NVBit on NVIDIA) to measure how often a flip becomes a wrong answer. The basis for a space radiation column.
 11. **ECC and error counters.** Read the chip's own counters before and after every probe and record whether the hardware noticed what the probe noticed.
 12. **Recovery.** After a detected fault, reset and rerun on the same card to see whether the fault clears. Likely needs bare-metal access, since a GPU reset needs root on the host.
@@ -268,7 +317,7 @@ Around the probes: a fleet mode that runs every probe across many devices and co
 
 ## Contributing a row
 
-Run `python screen.py`, `python screen.py --inject 5`, `python kernels.py`, `python kernels.py --inject 3`, `python memcheck.py` and `python memcheck.py --inject 5` on your device, then open a pull request with the six result files, the device name, driver version and PyTorch version. Rows are added only from attached result files.
+Run `python screen.py`, `python screen.py --inject 5`, `python memcheck.py`, `python memcheck.py --inject 5`, `python kernels.py`, `python kernels.py --inject 3`, `python patterns.py` and `python patterns.py --inject 3` on your device, then open a pull request with the eight result files, the device name, driver version and PyTorch version. Rows are added only from attached result files.
 
 ## Citing
 

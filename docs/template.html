@@ -36,7 +36,7 @@
       "programmingLanguage": "Python",
       "license": "https://opensource.org/licenses/MIT",
       "author": {"@id": "https://chipintegrity.org/#person"},
-      "description": "Three probes for AI accelerators: a compute probe that checks matrix multiplies against a proven float64 error bound and bit-for-bit repeatability, a kernel probe that does the same for softmax, layer norm, GELU, rotary embeddings and attention, and a memory probe that writes six patterns into every word of device memory and reads them back. Output follows the OCP Test and Validation spec."
+      "description": "Four probes for AI accelerators: a compute probe that checks matrix multiplies against a proven float64 error bound and bit-for-bit repeatability, a memory probe that writes six patterns into every word of most of device memory and reads them back, a kernel probe that checks softmax, layer norm, GELU, rotary embeddings and attention the same two ways, and a data pattern probe that drives the matrix multiply with inputs built to reach particular bits. Output follows the OCP Test and Validation spec."
     },
     {
       "@type": "Dataset",
@@ -265,7 +265,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <section id="method">
 <div class="kicker">LEARN, PART 3 OF 5</div>
 <h2>How a chip is tested here</h2>
-<p class="lede">Three probes. The first makes the chip multiply matrices and judges every output element. The second does the same for the other kernels inside a transformer. The third fills the chip's memory with known values and reads every one back. Each probe has two independent checks, so a fault has to hide from both.</p>
+<p class="lede">Four probes so far, numbered as on the roadmap. Probe 1 makes the chip multiply matrices and judges every output element. Probe 2 fills the chip's memory with known values and reads every one back. Probe 3 checks the other kernels inside a transformer the same way as probe 1. Probe 9 feeds the matrix multiply inputs built to reach particular bits. Each probe has two independent checks, so a fault has to hide from both.</p>
 
 <h3>Probe 1: compute</h3>
 <p>The chip multiplies two fixed matrices, A and B, fifty times at each of three shapes and four precisions, plus FP8. Two checks run on every output.</p>
@@ -298,17 +298,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 </div>
 </div>
 
-<h3>Probe 2: transformer kernels</h3>
-<p>Matrix multiply uses the multiply-accumulate units. A transformer block also runs exponentials, divisions, square roots, error functions, sines and cosines, which live on different silicon, and the research says faults are data-dependent: a unit that multiplies correctly can still get a softmax wrong. The kernel probe runs five of them with the device's own kernels, including its attention kernel, and judges every output element the same two ways.</p>
-<div class="grid2">
-<div class="panel"><h3>Softmax</h3><p>Rows of logits. Exercises exp, a sum reduction and a divide. The bound follows the error of each exponential through the sum and the quotient.</p></div>
-<div class="panel"><h3>Layer norm</h3><p>Mean, variance, reciprocal square root, scale and shift. The variance allowance is sized for the two-pass, Welford and E[x²]&minus;&mu;² methods, so a correct implementation of any of them passes.</p></div>
-<div class="panel"><h3>GELU</h3><p>The erf form, elementwise. The bound comes from the argument scaling, the erf itself and three roundings.</p></div>
-<div class="panel"><h3>Rotary embeddings</h3><p>How most current language models encode token position. The device takes sin and cos of real angles, up to 4,095 radians at the default size, then rotates each pair of values. Large angles test the argument reduction inside sin and cos.</p></div>
-<div class="panel" style="grid-column:1/-1"><h3>Attention</h3><p>softmax(QK<sup>T</sup>/&radic;d)V through the device's fused attention kernel. The bound carries the tensor-core error of QK<sup>T</sup> through the softmax, allows for the running rescale fused kernels apply block by block, and for P being held in fp16 or bf16. That is why it is the widest.</p></div>
-</div>
-<p>Every bound on this site follows from one written arithmetic model, recorded in every result file: FP32 arithmetic rounds to nearest, tensor cores accumulate faithfully in FP32, exp, divide and square roots stay within eight ulps, and erf, sin and cos within 2<sup>&minus;20</sup> absolute, which admits the shortcut erf that PyTorch uses on ARM processors. Each step also measures the device's own exp, erf, sin and cos on its inputs, so a loose function library can be told apart from a faulty unit. CUDA's own math library documents errors well inside that. A device that breaks the model, or that substitutes an approximate GELU, shows as outside-error-bound on every run, and the message says so. Below the smallest normal value of the output type the bound becomes an absolute floor, because fp16 cannot represent a probability of 10<sup>&minus;8</sup> and no chip should be blamed for that.</p>
-<h3>Probe 3: memory</h3>
+<h3>Probe 2: memory</h3>
 <p>The matrix multiply touches a few megabytes. Most of an 80 GB chip is memory, and a bad row or a stuck bit there corrupts whatever lands on it. The memory probe fills most of the device memory, writes a known value into every 32-bit word, waits, and reads every word back.</p>
 <div class="fig">
 <div style="padding:22px 24px 10px">
@@ -330,13 +320,36 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 </div>
 <div class="cap">For each failing word the probe records the byte offset and the bits that differed, so a stuck bit shows as a single mask such as 0x00000020 at a known address.</div>
 </div>
+<h3>Probe 3: transformer kernels</h3>
+<p>Matrix multiply uses the multiply-accumulate units. A transformer block also runs exponentials, divisions, square roots, error functions, sines and cosines, which live on different silicon, and the research says faults are data-dependent: a unit that multiplies correctly can still get a softmax wrong. The kernel probe runs five of them with the device's own kernels, including its attention kernel, and judges every output element the same two ways.</p>
+<div class="grid2">
+<div class="panel"><h3>Softmax</h3><p>Rows of logits. Exercises exp, a sum reduction and a divide. The bound follows the error of each exponential through the sum and the quotient.</p></div>
+<div class="panel"><h3>Layer norm</h3><p>Mean, variance, reciprocal square root, scale and shift. The variance allowance is sized for the two-pass, Welford and E[x²]&minus;&mu;² methods, so a correct implementation of any of them passes.</p></div>
+<div class="panel"><h3>GELU</h3><p>The erf form, elementwise. The bound comes from the argument scaling, the erf itself and three roundings.</p></div>
+<div class="panel"><h3>Rotary embeddings</h3><p>How most current language models encode token position. The device takes sin and cos of real angles, up to 4,095 radians at the default size, then rotates each pair of values. Large angles test the argument reduction inside sin and cos.</p></div>
+<div class="panel" style="grid-column:1/-1"><h3>Attention</h3><p>softmax(QK<sup>T</sup>/&radic;d)V through the device's fused attention kernel. The bound carries the tensor-core error of QK<sup>T</sup> through the softmax, allows for the running rescale fused kernels apply block by block, and for P being held in fp16 or bf16. That is why it is the widest.</p></div>
+</div>
+<p>Every bound on this site follows from one written arithmetic model, recorded in every result file: FP32 arithmetic rounds to nearest, tensor cores accumulate faithfully in FP32, exp, divide and square roots stay within eight ulps, and erf, sin and cos within 2<sup>&minus;20</sup> absolute, which admits the shortcut erf that PyTorch uses on ARM processors. Each step also measures the device's own exp, erf, sin and cos on its inputs, so a loose function library can be told apart from a faulty unit. CUDA's own math library documents errors well inside that. A device that breaks the model, or that substitutes an approximate GELU, shows as outside-error-bound on every run, and the message says so. Below the smallest normal value of the output type the bound becomes an absolute floor, because fp16 cannot represent a probability of 10<sup>&minus;8</sup> and no chip should be blamed for that.</p>
+<h3>Probe 9: data patterns</h3>
+<p>Some faults only fire on particular bit patterns, and uniform random inputs almost never produce them. The data pattern probe runs the same matrix multiply, with the same two checks and the same proven or exact reference, on inputs built to reach specific parts of the arithmetic. Every input set is scaled by a power of two where needed, so no partial sum in any order can overflow.</p>
+<div class="verdict">
+<div class="v">wide</div><div>Random exponents across about 80 binades, which exercises the shifters that line numbers up before they are added.</div>
+<div class="v">mantissa</div><div>Every mantissa bit set to 1, the longest carry chains a multiplier or adder can see.</div>
+<div class="v">cancel</div><div>Built so the exact answer is zero, so only rounding may remain in the result.</div>
+<div class="v">alternate</div><div>Checkerboard signs, which make every product in a dot product the same sign, so sums grow to their largest.</div>
+<div class="v">sparse</div><div>Nine values in ten are exact zeros, for the logic that handles and skips zeros.</div>
+<div class="v">subnormal</div><div>Inputs below the smallest normal number. The probe first measures whether the chip flushes them to zero, then holds it to the exact model that matches, with no allowance for the other.</div>
+<div class="v">near_max</div><div>Scaled so the largest possible sum is a quarter to a half of the output type's maximum.</div>
+<div class="v">extremes</div><div>int8 only: &minus;128, &minus;127, 0 and 127, the corners of the integer multiplier.</div>
+</div>
+<p>FP8 keeps its inputs in {&minus;1, 0, 1} so its answers stay exact, so it runs the alternate and sparse patterns only.</p>
 </section>
 
 <section id="verdicts">
 <div class="kicker">LEARN, PART 4 OF 5</div>
 <h2>Reading a verdict</h2>
 <p class="lede">Every step ends in one of these words. They are chosen so a reader can tell a chip fault from a software quirk without opening the file.</p>
-<h3>Compute and kernel probes</h3>
+<h3>Compute, kernel and data pattern probes</h3>
 <div class="verdict">
 <div class="v">no-silent-errors</div><div>Every run inside the bound and bit-identical to run 0. The baseline.</div>
 <div class="v bad">silent-data-corruption</div><div>Some runs differ from run 0. An intermittent fault, the kind a fleet scanner exists to find.</div>
@@ -371,7 +384,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <dt>reference bound</dt><dd>The largest error that correct rounding can produce for a given computation and precision. Anything larger is a wrong answer. The bound used here is the standard componentwise bound for inner products from Higham.</dd>
 <dt>fault injection</dt><dd>Deliberately corrupting a value to confirm the checks notice. Used here as a self-test on every published row.</dd>
 <dt>dwell</dt><dd>The pause between writing memory and reading it back. Weak cells lose their value over time, so a longer dwell catches more of them.</dd>
-<dt>OCP Test and Validation</dt><dd>The Open Compute Project's open format for hardware diagnostic output, used by cloud operators so that any test's results can be read by any fleet tool. All three probes write it.</dd>
+<dt>OCP Test and Validation</dt><dd>The Open Compute Project's open format for hardware diagnostic output, used by cloud operators so that any test's results can be read by any fleet tool. All four probes write it.</dd>
 </dl>
 </section>
 
@@ -390,6 +403,12 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <tbody>{{KERNEL_ROWS}}</tbody>
 </table></div>
 <p class="note">Worst error over bound is the largest measured error on the device divided by the bound at that element, across every kernel and precision. Values near 1 at fp16 and bf16 are expected: there the bound is dominated by the single rounding of the output, so there is almost nothing to spare. A value above 1 is a failed run.</p>
+<h3>Data pattern probe</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Device</th><th>Date</th><th>Patterns</th><th>Precisions</th><th>Runs</th><th>Silent faults</th><th>Injected caught</th><th>Subnormal inputs</th><th>Verdict</th><th>Files</th></tr></thead>
+<tbody>{{PATTERN_ROWS}}</tbody>
+</table></div>
+<p class="note">Subnormal inputs says whether the chip kept or flushed subnormal inputs to zero, per precision. Either is allowed; the probe measures which, then checks the chip against that exact model.</p>
 <h3>Memory probe</h3>
 <div class="tablewrap"><table>
 <thead><tr><th>Device</th><th>Date</th><th>Memory tested</th><th>Patterns</th><th>Dwell</th><th>Bad words</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
@@ -450,7 +469,7 @@ python memcheck.py --inject 5 --out NAME_memcheck_inject.jsonl</pre>
 <section id="roadmap">
 <div class="kicker">TAKE PART</div>
 <h2>Roadmap</h2>
-<p class="lede">Twelve probes, each aimed at one part of the chip. The first three are built.</p>
+<p class="lede">Twelve probes, each aimed at one part of the chip. Four are built: 1, 2, 3 and 9.</p>
 <div class="road">
 <div class="r done"><b>1. Matrix multiply</b><span>Three shapes, four precisions plus FP8, a proven or exact reference and a bit-exact repeat check. Done. FP4 once a Blackwell card is measured.</span></div>
 <div class="r done"><b>2. Memory pattern sweep</b><span>Six patterns over most of device memory, exact read-back, address and bit mask on every miss. Done. On-chip SRAM next.</span></div>
@@ -460,7 +479,7 @@ python memcheck.py --inject 5 --out NAME_memcheck_inject.jsonl</pre>
 <div class="r"><b>6. Checksum-protected matrix multiply</b><span>Huang and Abraham's row and column checksums, which detect and locate a wrong element inside the multiply itself.</span></div>
 <div class="r"><b>7. Hours under load</b><span>The same probes for hours at full power, with temperature and clocks logged next to every result.</span></div>
 <div class="r"><b>8. Clock and voltage margin sweep</b><span>Lower the margin step by step where the driver allows it and record where each unit starts to fail. Likely needs bare-metal access.</span></div>
-<div class="r"><b>9. Data pattern library</b><span>Denormals, near-overflow values, alternating signs and worst-case rounding patterns.</span></div>
+<div class="r done"><b>9. Data pattern library</b><span>Wide exponents, full mantissas, cancellation, alternating signs, sparsity, subnormals with flush detection, near-overflow and int8 extremes, for the matrix multiply. Done. Patterns for the transformer kernels next.</span></div>
 <div class="r"><b>10. Fault injection inside the computation</b><span>Flip bits in registers during the multiply to measure how often a flip becomes a wrong answer. The basis for a space radiation column.</span></div>
 <div class="r"><b>11. ECC and error counters</b><span>Read the chip's own counters before and after every probe and record whether the hardware noticed what the probe noticed.</span></div>
 <div class="r"><b>12. Recovery</b><span>After a detected fault, reset and rerun on the same card to see whether the fault clears. Likely needs bare-metal access.</span></div>
@@ -480,7 +499,7 @@ python memcheck.py --inject 5 --out NAME_memcheck_inject.jsonl</pre>
 <li><b>DeepSeek-AI, 2024.</b> DeepSeek-V3 technical report. Reports that Hopper's FP8 tensor cores keep 14 bits when they add, which is why the FP8 inputs here are chosen so every sum fits in 13. <a href="https://arxiv.org/abs/2412.19437">arxiv.org</a></li>
 <li><b>Valpey and Pai, 2025.</b> Modeling three generations of tensor cores. A formal model of rounding and accumulation order on Volta, Turing and Ampere. <a href="https://arxiv.org/abs/2502.15999">arxiv.org</a></li>
 <li><b>Huang and Abraham, 1984.</b> Algorithm-based fault tolerance for matrix operations. The original idea of checking a matrix result against a cheap independent computation.</li>
-<li><b>OCP Test and Validation.</b> The open diagnostic output format and reference implementation all three probes write to. <a href="https://github.com/opencomputeproject/ocp-diag-core">ocp-diag-core</a></li>
+<li><b>OCP Test and Validation.</b> The open diagnostic output format and reference implementation all four probes write to. <a href="https://github.com/opencomputeproject/ocp-diag-core">ocp-diag-core</a></li>
 </ul>
 </section>
 

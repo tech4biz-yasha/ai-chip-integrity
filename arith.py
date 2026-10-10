@@ -30,6 +30,10 @@ written into every result file.
           subnormal spacing. (Subnormal inputs to the matrix multiply may be flushed; screen.py allows
           for that separately.)
 
+  REF     The float64 reference is computed with rounding too: a dot product of n terms is within
+          gamma(n, 2^-53) of its absolute sum, and that is added to every bound. Products too small for
+          FP32's normal range may underflow: each can lose at most the smallest normal number, 2^-126.
+
 A device that keeps intermediates below FP32, uses TF32 where FP32 was requested, or has a less
 accurate exp or erf than EPS_FN, shows as outside-error-bound on every run, and the probes say so.
 """
@@ -70,6 +74,16 @@ def matrix_dot(n, fp32_inputs=False):
     """Error factor for a dot product of n terms on a matrix unit, any block width, truncating or not."""
     g = gamma(2 * n, U_TC)
     return g + EPS_MUL * (1.0 + g) if fp32_inputs else g
+
+
+def reference_dot(n):
+    """Rounding error factor of the float64 reference for a dot product of n terms."""
+    return gamma(n, 2.0 ** -53)
+
+
+def underflow_floor(n):
+    """Most that n products and their running sum can lose to FP32 underflow, absolute."""
+    return (n + 1) * 2.0 ** -126
 
 
 def subnormal_floor(dtype):
