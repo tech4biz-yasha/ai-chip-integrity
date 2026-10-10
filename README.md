@@ -4,7 +4,7 @@ An open tester for silent computation errors in AI chips.
 
 It runs a fixed calculation on a GPU, NPU or CPU many times and proves, element by element, whether the chip returned the right answer every time. Results come out in the Open Compute Project Test and Validation format, so they drop straight into fleet tooling.
 
-**Status: early.** Six probes so far, numbered as on the roadmap below: `screen.py` v0.3.2 (probe 1, matrix multiply across several shapes, four precisions and exact FP8), `memcheck.py` v0.1.1 (probe 2, a sweep of most of the device memory), `kernels.py` v0.2.1 (probe 3, softmax, layer norm, GELU, rotary embeddings and fused attention) `abft.py` v0.1.0 (probe 6, checksum-protected matrix multiply with proven thresholds), `patterns.py` v0.1.2 (probe 9, data patterns that drive the matrix multiply) and `counters.py` v0.1.0 (probe 11, the chip's own error counters, read around every run of the other four). One device at a time, four measured chips. Read the limits section before relying on a PASS.
+**Status: early.** Six probes so far, numbered as on the roadmap below: `screen.py` v0.3.2 (probe 1, matrix multiply across several shapes, four precisions and exact FP8), `memcheck.py` v0.1.1 (probe 2, a sweep of most of the device memory), `kernels.py` v0.2.2 (probe 3, softmax, layer norm, GELU, rotary embeddings and fused attention) `abft.py` v0.1.0 (probe 6, checksum-protected matrix multiply with proven thresholds), `patterns.py` v0.1.2 (probe 9, data patterns that drive the matrix multiply) and `counters.py` v0.1.0 (probe 11, the chip's own error counters, read around every run of the other four). One device at a time, four measured chips. Read the limits section before relying on a PASS.
 
 ## Why this exists
 
@@ -155,7 +155,7 @@ Every bound adds the output rounding of the test precision and an absolute floor
 
 1. Scalar FP32 arithmetic rounds to nearest; matrix units accumulate faithfully (truncation allowed).
 2. exp, divide, square root and reciprocal square root are within `EPS_FN = 2^-20` relative error, eight FP32 ulps anywhere in a binade. erf, sin and cos are within `2^-20` absolute, which admits the absolutely accurate approximations vector libraries use (PyTorch's ARM CPU erf is Abramowitz and Stegun 7.1.26: up to 5.4e-7 absolute error, but up to 100% relative near zero).
-3. Fused attention keeps logits and softmax in FP32 and holds P in the input precision. On CUDA, fp16 and bf16 attention may only use the fused kernels (flash, memory-efficient, cuDNN), so the unfused path, which rounds logits to the input precision, cannot stand in silently.
+3. Fused attention keeps logits and softmax in FP32 and holds P in the input precision. On CUDA, fp16 and bf16 attention may only use the fused kernels (flash, memory-efficient, cuDNN), so the unfused path, which rounds logits to the input precision, cannot stand in silently. The fused kernels take a batch dimension, so the probe passes (1, heads, tokens, dim), tries each kernel on its own in the order flash, cuDNN, memory-efficient (then the math path for fp32 only), runs the first that accepts the inputs, and records its name as `attention_backend`; if none accepts, the step is refused with every reason.
 
 A device that breaks any of them, or that substitutes the tanh approximation for GELU, shows as `outside-error-bound` on every run and the message says so. To tell a faulty unit from a loose function library, every softmax, GELU and RoPE step also measures the device's own exp, erf, sin and cos on that step's inputs and records the worst error; when it exceeds the allowance, the verdict message says the library is outside the model. At the test default, the fp32 bounds sit within 3e-5 of the output scale for softmax, layer norm and GELU, and within 1e-3 for attention, whose bound carries worst-case matrix-unit accumulation through the softmax (`tests/test_kernels.py::test_bounds_are_tight_for_fp32`).
 
@@ -233,7 +233,7 @@ python patterns.py               # data pattern probe; 8 patterns through the ma
 python patterns.py --inject 3    # data pattern self-test
 python memcheck.py               # memory probe; 6 patterns over most of the device memory
 python memcheck.py --inject 5    # memory self-test
-python -m pytest -q              # 155 tests on CPU; 6 more validate the output against OCP's schema
+python -m pytest -q              # 159 tests on CPU; 6 more validate the output against OCP's schema
 ```
 
 Options for `memcheck.py`:
@@ -303,7 +303,7 @@ Options for `patterns.py`:
 
 Exit code is 0 for PASS and 1 for FAIL. A precision or shape the device does not support (for example int8 matmul on a device without it) is skipped and recorded as an error artifact.
 
-On CUDA, `screen.py` and `kernels.py` turn off TF32 and reduced precision reductions, set `CUBLAS_WORKSPACE_CONFIG`, and ask PyTorch for deterministic algorithms, so the bound and the repeat check both hold. `kernels.py` also limits fp16 and bf16 attention to the fused kernels; that control needs PyTorch 2.3 or later, and on older versions the device default runs.
+On CUDA, `screen.py` and `kernels.py` turn off TF32 and reduced precision reductions, set `CUBLAS_WORKSPACE_CONFIG`, and ask PyTorch for deterministic algorithms, so the bound and the repeat check both hold. `kernels.py` also limits fp16 and bf16 attention to the fused kernels and records which one ran; that control needs PyTorch 2.3 or later, and on older versions the device default runs.
 
 To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproject/ocp-diag-core) and set `OCP_SCHEMA_DIR` to its `json_spec/output` folder.
 
@@ -324,10 +324,10 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 
 ## Tests
 
-`python -m pytest -q` runs 155 tests on the CPU in a few seconds; 6 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set. On CPUs whose matrix multiply ignores flush-to-zero, such as Apple silicon, the two flushing tests in `tests/test_patterns.py` skip themselves, giving 153 passed.
+`python -m pytest -q` runs 159 tests on the CPU in a few seconds; 6 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set. On CPUs whose matrix multiply ignores flush-to-zero, such as Apple silicon, the two flushing tests in `tests/test_patterns.py` skip themselves, giving 157 passed.
 
 1. `tests/test_screen.py` (37): every verdict path, every bit position caught by the self-test, NaN handling, int8 and FP8 off-by-one, FP8 inputs exact and K above 4096 skipped, rectangular shapes, bound tightness.
-2. `tests/test_kernels.py` (19): all kernels and precisions, the self-test on six seeds, intermittent and systematic faults, a one-ulp change, internal fp16 arithmetic and tanh-GELU both caught as outside the bound, NaN handling, fp32 bound tightness, a sin that is off by 1e-4 caught in RoPE, RoPE angles reaching every position, and the device's own exp, erf, sin and cos measured.
+2. `tests/test_kernels.py` (23): all kernels and precisions, the self-test on six seeds, intermittent and systematic faults, a one-ulp change, internal fp16 arithmetic and tanh-GELU both caught as outside the bound, NaN handling, fp32 bound tightness, a sin that is off by 1e-4 caught in RoPE, RoPE angles reaching every position, the device's own exp, erf, sin and cos measured, and the CUDA attention path forced onto the CPU: a batch dimension added with the same shape and values back, the kernel that ran recorded, fused kernels only for fp16 and bf16, and a loud refusal when no kernel fits.
 3. `tests/test_memcheck.py` (8): a stuck bit reported with its offset, a dead row counted word by word, injected flips located, the patterns themselves.
 4. `tests/test_arith.py` (19): the model checked against simulations of the hardware it claims to cover. A simulated tensor core that truncates, at block widths 1 to 32, stays inside the bound; a constructed case breaks the old v0.2.0 bound by almost 2x and stays inside the new one; a FlashAttention-2 style kernel emulated op by op stays inside the attention bound; PyTorch's ARM CPU erf and GELU, emulated op by op, stay inside the GELU bound; and FP8 sums of {-1, 0, 1} stay exact in a 13-bit accumulator while a 9-bit one loses them.
 5. `tests/test_build_site.py` (5): a newer tool version replaces the older row for the same device on the site, kernel sizes render from the files, data pattern rows render with the flushing behaviour, a mixed policy is shown as such, and checksum rows render with their located self-test count.
@@ -345,7 +345,7 @@ All four probes write one JSON object per line following the [OCP Test and Valid
 - a `diagnosis` per step with the verdict above
 - `testRunEnd` with the overall PASS or FAIL
 
-`kernels.py` writes one step per kernel and precision, named `<kernel>_<precision>` (for example `attention_bf16`), with `runs`, `size`, `elements`, `seconds`, `assumed_fn_rel_error`, `reference_check_failed_runs`, `repeat_check_failed_runs`, `worst_error_over_bound_ratio`, `worst_abs_error`, `worst_nonfinite_values`, `device_exp_rel_worst_error`, `device_erf_abs_worst_error` or `device_sincos_abs_worst_error` (softmax, GELU and RoPE steps), the self-test counts, and a diagnosis with the verdict. Its run parameters also record `assumed_fn_rel_error` and `attention_kernels` (which attention kernels were allowed).
+`kernels.py` writes one step per kernel and precision, named `<kernel>_<precision>` (for example `attention_bf16`), with `runs`, `attention_backend` (attention steps: `flash`, `cudnn`, `efficient`, `math` or `default`), `size`, `elements`, `seconds`, `assumed_fn_rel_error`, `reference_check_failed_runs`, `repeat_check_failed_runs`, `worst_error_over_bound_ratio`, `worst_abs_error`, `worst_nonfinite_values`, `device_exp_rel_worst_error`, `device_erf_abs_worst_error` or `device_sincos_abs_worst_error` (softmax, GELU and RoPE steps), the self-test counts, and a diagnosis with the verdict. Its run parameters also record `assumed_fn_rel_error` and `attention_kernels` (which attention kernels were allowed).
 
 `abft.py` writes one step per shape and precision, named `abft_<precision>_<MxKxN>`, with `runs`, `shape_mkn`, `seconds`, `flop_overhead`, `checksum_scale_power_of_two`, `row_threshold_median`, `typical_value_median`, `threshold_over_typical_value`, `worst_row_residual_over_threshold`, `worst_column_residual_over_threshold`, `checksum_check_failed_runs`, `reference_check_failed_runs`, `repeat_check_failed_runs`, `checksum_missed_runs`, in self-test mode `injected_runs` and `injected_runs_located`, and a diagnosis with the verdict and, on a failure, the flagged rows and columns.
 

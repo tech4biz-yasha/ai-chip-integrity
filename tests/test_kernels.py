@@ -216,3 +216,47 @@ def test_output_matches_official_ocp_schema(tmp_path):
     kernels.main(BASE + ["--inject", "2", "--out", str(out)])
     for obj in strict_load(out):
         validator.validate(obj)
+
+
+def attention_inputs(dtype=torch.float32):
+    g = torch.Generator().manual_seed(3)
+    return tuple(torch.randn(4, 32, 64, generator=g).to(dtype) for _ in range(3))
+
+
+def test_cuda_attention_path_adds_a_batch_and_records_the_kernel(monkeypatch):
+    """The path NVIDIA GPUs take: fused kernels need 4-D inputs, which the first H100 run showed when every
+    fp16 and bf16 attention step was refused with 3-D inputs. Forced onto the CPU, it must return the same
+    shape and values as the default kernel and record which kernel ran."""
+    from torch.nn.attention import SDPBackend
+    q, k, v = attention_inputs()
+    monkeypatch.setattr(kernels, "attention_backends",
+                        lambda dtype: [("efficient", SDPBackend.EFFICIENT_ATTENTION), ("math", SDPBackend.MATH)])
+    kernels.ATTENTION_BACKEND.clear()
+    out = kernels.attention(q, k, v, choose=True)
+    assert out.shape == q.shape
+    assert torch.allclose(out, torch.nn.functional.scaled_dot_product_attention(q, k, v), atol=1e-6)
+    assert kernels.ATTENTION_BACKEND[torch.float32] in ("efficient", "math")
+
+
+def test_cuda_attention_path_refuses_loudly_when_no_kernel_fits(monkeypatch):
+    """With only a kernel that cannot run, the step must be refused with every reason, never silently fall
+    back to an unchecked path."""
+    from torch.nn.attention import SDPBackend
+    q, k, v = attention_inputs()
+    monkeypatch.setattr(kernels, "attention_backends", lambda dtype: [("cudnn", SDPBackend.CUDNN_ATTENTION)]
+                        if hasattr(SDPBackend, "CUDNN_ATTENTION") else [("efficient", SDPBackend.EFFICIENT_ATTENTION)])
+    with pytest.raises(RuntimeError, match="no allowed attention kernel"):
+        kernels.attention(q, k, v, choose=True)
+
+
+def test_fused_only_for_half_precisions():
+    names = lambda dt: [n for n, _ in kernels.attention_backends(dt)]
+    assert "math" not in names(torch.float16) and "math" not in names(torch.bfloat16)
+    assert names(torch.float32)[-1] == "math" and names(torch.float16)[0] == "flash"
+
+
+def test_attention_step_records_its_kernel(tmp_path):
+    out = tmp_path / "k.jsonl"
+    kernels.main(["--device", "cpu", "--kernels", "attention", "--iters", "3", "--dtypes", "fp32", "--out", str(out)])
+    text = out.read_text()
+    assert '"name": "attention_backend", "value": "default"' in text

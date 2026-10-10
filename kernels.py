@@ -49,7 +49,7 @@ import counters  # noqa: E402
 
 from screen import FileWriter, pick_device, device_label, lock_down_math, flip_bit, NONDET_SHARE, NONDET_MIN  # noqa: E402
 
-VERSION = "0.2.1"
+VERSION = "0.2.2"
 U_RN, U_TC, EPS_FN = arith.U_RN, arith.U_TC, arith.EPS_FN
 DTYPES = {
     "fp32": (torch.float32, torch.int32, 32),
@@ -240,22 +240,46 @@ def rope(x, theta):
     return x * cos + rot * sin
 
 
-def attention(q, k, v):
-    """On CUDA, fp16 and bf16 may only use fused kernels, whose logits and softmax stay in FP32 as the bound
-    assumes; the unfused math path rounds logits to the input precision, so it is not allowed to stand in
-    silently. fp32 may also use the math path (plain FP32 with TF32 off). Elsewhere the default kernel runs."""
-    if q.device.type == "cuda":
+ATTENTION_BACKEND = {}        # dtype -> name of the attention kernel that last ran on CUDA
+
+
+def attention_backends(dtype):
+    """CUDA attention kernels in the order they are tried. fp16 and bf16 may only use fused kernels, whose logits
+    and softmax stay in FP32 as the bound assumes; the unfused math path rounds logits to the input precision,
+    so it may not stand in silently. fp32 may also use the math path (plain FP32 with TF32 off)."""
+    from torch.nn.attention import SDPBackend
+    order = [("flash", SDPBackend.FLASH_ATTENTION)]
+    if hasattr(SDPBackend, "CUDNN_ATTENTION"):
+        order.append(("cudnn", SDPBackend.CUDNN_ATTENTION))
+    order.append(("efficient", SDPBackend.EFFICIENT_ATTENTION))
+    if dtype == torch.float32:
+        order.append(("math", SDPBackend.MATH))
+    return order
+
+
+def attention(q, k, v, choose=None):
+    """q, k and v are (heads, L, dim). On CUDA the fused kernels only take (batch, heads, L, dim), so a batch of
+    one is added, and each kernel is tried on its own in a fixed order: the first that accepts the inputs runs
+    and its name is kept, so the step records exactly which kernel it tested. Elsewhere the default kernel runs.
+    choose=True forces the CUDA path on any device; the tests use it to exercise that path on a CPU."""
+    if q.device.type == "cuda" if choose is None else choose:
         try:
-            from torch.nn.attention import SDPBackend, sdpa_kernel
+            from torch.nn.attention import sdpa_kernel
         except ImportError:                       # torch < 2.3: no backend control
             return F.scaled_dot_product_attention(q, k, v)
-        allowed = [SDPBackend.FLASH_ATTENTION, SDPBackend.EFFICIENT_ATTENTION]
-        if hasattr(SDPBackend, "CUDNN_ATTENTION"):
-            allowed.append(SDPBackend.CUDNN_ATTENTION)
-        if q.dtype == torch.float32:
-            allowed.append(SDPBackend.MATH)
-        with sdpa_kernel(allowed):
-            return F.scaled_dot_product_attention(q, k, v)
+        q4, k4, v4 = q.unsqueeze(0), k.unsqueeze(0), v.unsqueeze(0)
+        refused = []
+        for label, backend in attention_backends(q.dtype):
+            try:
+                with sdpa_kernel([backend]):
+                    out = F.scaled_dot_product_attention(q4, k4, v4)
+            except RuntimeError as e:
+                refused.append(f"{label}: {str(e)[:60]}")
+                continue
+            ATTENTION_BACKEND[q.dtype] = label
+            return out.squeeze(0)
+        raise RuntimeError("no allowed attention kernel accepted the inputs (" + "; ".join(refused) + ")")
+    ATTENTION_BACKEND[q.dtype] = "default"
     return F.scaled_dot_product_attention(q, k, v)
 
 
@@ -354,6 +378,8 @@ def probe(step, dev, kernel, dname, size, iters, seed, inject, rng, hw):
         fn = None
     eq0 = [tv.Validator(type=tv.ValidatorType.EQUAL, value=0)]
     step.add_measurement(name="runs", value=iters, hardware_info=hw)
+    if kernel == "attention":
+        step.add_measurement(name="attention_backend", value=ATTENTION_BACKEND.get(dtype, "default"), hardware_info=hw)
     step.add_measurement(name="size", value=size, hardware_info=hw)
     step.add_measurement(name="elements", value=int(ref.numel()), hardware_info=hw)
     step.add_measurement(name="seconds", value=round(secs, 3), unit="s", hardware_info=hw)
