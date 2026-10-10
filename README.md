@@ -4,7 +4,7 @@ An open tester for silent computation errors in AI chips.
 
 It runs a fixed calculation on a GPU, NPU or CPU many times and proves, element by element, whether the chip returned the right answer every time. Results come out in the Open Compute Project Test and Validation format, so they drop straight into fleet tooling.
 
-**Status: early.** Three probes so far: `screen.py` v0.2.1 (matrix multiply across several shapes and four precisions), `kernels.py` v0.2.0 (softmax, layer norm, GELU, rotary embeddings and fused attention) and `memcheck.py` v0.1.0 (a sweep of most of the device memory). One device at a time, four measured chips. Read the limits section before relying on a PASS.
+**Status: early.** Three probes so far: `screen.py` v0.3.0 (matrix multiply across several shapes, four precisions and exact FP8), `kernels.py` v0.2.0 (softmax, layer norm, GELU, rotary embeddings and fused attention) and `memcheck.py` v0.1.0 (a sweep of most of the device memory). One device at a time, four measured chips. Read the limits section before relying on a PASS.
 
 ## Why this exists
 
@@ -46,6 +46,8 @@ Notes on the Apple rows: in the v0.2.0 run all 375 results across 15 steps were 
 
 The H200 sweep took 24.8 s for 111.25 GiB, the A100 sweep took 28.3 s, the H100 sweep took 21.6 s both clean and with injection, so about 17 GiB/s of write, read and compare at HBM speed; the Mac sweep took 69 s clean and 85 s with injection. Result files: `results/h200_memcheck.jsonl`, `results/h200_memcheck_inject.jsonl`, `results/a100_memcheck.jsonl`, `results/a100_memcheck_inject.jsonl`, `results/h100_memcheck.jsonl`, `results/h100_memcheck_inject.jsonl`, `results/mac_memcheck.jsonl` and `results/mac_memcheck_inject.jsonl`.
 
+The rows above were measured with v0.2.0, before the FP8 steps existed; FP8 rows come with the next data centre runs.
+
 Notes on the H200 row: all 600 results across 12 steps were bit-for-bit identical to their first run and int8 was exact on every element. Result files: `results/h200_clean.jsonl` and `results/h200_inject.jsonl`.
 
 Notes on the A100 row: all 600 results across 12 steps were bit-for-bit identical to their first run and int8 was exact on every element, the same as the H100. Result files: `results/a100_clean.jsonl` and `results/a100_inject.jsonl`.
@@ -56,7 +58,7 @@ Notes on the Apple rows: in the v0.2.0 run all 450 results across 9 steps were b
 
 ## Probe 1: compute (`screen.py`)
 
-Matrix multiplies `C = A @ B` with fixed inputs, repeated `--iters` times for every shape and precision. Three shapes run by default: 1024x1024x1024, 4096x4096x4096, and 32x4096x11008, which is the shape of an LLM decode step through a feed-forward layer (M tokens by K hidden by N intermediate). Float inputs are drawn uniformly from [-1, 1) with a fixed seed, then rounded to the test precision, so every precision starts from the same underlying matrices. int8 inputs are integers in [-16, 16).
+Matrix multiplies `C = A @ B` with fixed inputs, repeated `--iters` times for every shape and precision. Three shapes run by default: 1024x1024x1024, 4096x4096x4096, and 32x4096x11008, which is the shape of an LLM decode step through a feed-forward layer (M tokens by K hidden by N intermediate). Float inputs are drawn uniformly from [-1, 1) with a fixed seed, then rounded to the test precision, so every precision starts from the same underlying matrices. int8 inputs are integers in [-16, 16), and FP8 inputs come from {-1, 0, 1}.
 
 Every run is checked two ways.
 
@@ -78,6 +80,8 @@ The first term is the largest error the accumulation can produce under the arith
 
 For int8 the device returns int32 and the reference is computed exactly in int64, so the bound is zero: any difference at all is a wrong answer.
 
+**FP8.** From v0.3.0 the probe also runs the FP8 (E4M3) tensor-core path that inference engines use, through `torch._scaled_mm` with FP32 output, once with full accumulation (`fp8`) and once with fast accumulation (`fp8fast`). The inputs come from {-1, 0, 1}, so every product is exact and every partial sum is an integer no larger than K: with K up to 4096 that fits in 13 significant bits. Hopper's FP8 tensor cores are reported to keep 14 bits when they add (DeepSeek-V3 technical report, 2024), so the exact answer is the only correct one, even with fast accumulation, and any difference is a fault or an accumulator narrower than 13 bits. It needs an Ada, Hopper or Blackwell GPU; on an A100 or an Apple GPU these steps are skipped and recorded. Shapes with K above 4096 are skipped for FP8. FP4 follows once a Blackwell card is measured.
+
 **2. Repeat check.** Every run is compared bit for bit with the first run on the same device. A single flipped bit anywhere in the output fails this check, even when it is far too small to leave the reference bound.
 
 **Verdict per precision**
@@ -86,7 +90,7 @@ For int8 the device returns int32 and the reference is computed exactly in int64
 |---|---|
 | `no-silent-errors` | Every run inside the bound and bit-identical to run 0 |
 | `silent-data-corruption` | Some runs differ from run 0 (intermittent fault), possibly also outside the bound |
-| `outside-error-bound` | All runs agree with each other but sit outside the bound: a faulty unit, a device breaking the arithmetic model (accumulating below FP32, or TF32 used for fp32), or an int8 result that is not exact |
+| `outside-error-bound` | All runs agree with each other but sit outside the bound: a faulty unit, a device breaking the arithmetic model (accumulating below FP32, or TF32 used for fp32), or an int8 or FP8 result that is not exact |
 | `nondeterministic-kernel` | At least 3 runs and at least 10% of runs differ from run 0, yet all stay inside the bound. The repeat check cannot be used on that device and precision |
 
 **Self-test.** `--inject N` flips one random bit of one random output element in `N` runs (never run 0), after the result has been copied back from the device. It proves the checker catches corruption; it does not stress the chip. The verdict then becomes `injection-self-test-pass` only if every injected run was caught and no uninjected run failed.
@@ -145,13 +149,13 @@ Six patterns run in order: all zeros, all ones, `0xAAAAAAAA`, `0x55555555`, an a
 ```
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python screen.py                 # compute probe; auto picks cuda, then mps, then cpu; 3 shapes x 4 precisions
+python screen.py                 # compute probe; auto picks cuda, then mps, then cpu; 3 shapes x 4 precisions, plus FP8
 python screen.py --inject 5      # compute self-test
 python kernels.py                # kernel probe; softmax, layer norm, GELU, RoPE, attention x fp32, fp16, bf16
 python kernels.py --inject 3     # kernel self-test
 python memcheck.py               # memory probe; 6 patterns over most of the device memory
 python memcheck.py --inject 5    # memory self-test
-python -m pytest -q              # 77 tests on CPU; 3 more validate the output against OCP's schema
+python -m pytest -q              # 82 tests on CPU; 3 more validate the output against OCP's schema
 ```
 
 Options for `memcheck.py`:
@@ -176,7 +180,7 @@ Options for `screen.py`:
 | `--shapes` | `1024x1024x1024,4096x4096x4096,32x4096x11008` | comma list of `MxKxN` |
 | `--size` | none | shortcut for one square `NxNxN` shape |
 | `--iters` | `50` | runs per shape and precision |
-| `--dtypes` | `fp32,fp16,bf16,int8` | comma list from `fp32`, `fp16`, `bf16`, `int8` |
+| `--dtypes` | `fp32,fp16,bf16,int8,fp8,fp8fast` | comma list from `fp32`, `fp16`, `bf16`, `int8`, `fp8`, `fp8fast` |
 | `--seed` | `1234` | input seed |
 | `--inject` | `0` | bit flips to inject per step (self-test) |
 | `--out` | `results.jsonl` | OCP output file |
@@ -214,12 +218,12 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 
 ## Tests
 
-`python -m pytest -q` runs 77 tests on the CPU in a few seconds; 3 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set.
+`python -m pytest -q` runs 82 tests on the CPU in a few seconds; 3 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set.
 
-1. `tests/test_screen.py` (33): every verdict path, every bit position caught by the self-test, NaN handling, int8 off-by-one, rectangular shapes, bound tightness.
+1. `tests/test_screen.py` (37): every verdict path, every bit position caught by the self-test, NaN handling, int8 and FP8 off-by-one, FP8 inputs exact and K above 4096 skipped, rectangular shapes, bound tightness.
 2. `tests/test_kernels.py` (19): all kernels and precisions, the self-test on six seeds, intermittent and systematic faults, a one-ulp change, internal fp16 arithmetic and tanh-GELU both caught as outside the bound, NaN handling, fp32 bound tightness, a sin that is off by 1e-4 caught in RoPE, RoPE angles reaching every position, and the device's own exp, erf, sin and cos measured.
 3. `tests/test_memcheck.py` (8): a stuck bit reported with its offset, a dead row counted word by word, injected flips located, the patterns themselves.
-4. `tests/test_arith.py` (18): the model checked against simulations of the hardware it claims to cover. A simulated tensor core that truncates, at block widths 1 to 32, stays inside the bound; a constructed case breaks the old v0.2.0 bound by almost 2x and stays inside the new one; a FlashAttention-2 style kernel emulated op by op stays inside the attention bound; PyTorch's ARM CPU erf and GELU, emulated op by op, stay inside the GELU bound.
+4. `tests/test_arith.py` (19): the model checked against simulations of the hardware it claims to cover. A simulated tensor core that truncates, at block widths 1 to 32, stays inside the bound; a constructed case breaks the old v0.2.0 bound by almost 2x and stays inside the new one; a FlashAttention-2 style kernel emulated op by op stays inside the attention bound; PyTorch's ARM CPU erf and GELU, emulated op by op, stay inside the GELU bound; and FP8 sums of {-1, 0, 1} stay exact in a 13-bit accumulator while a 9-bit one loses them.
 5. `tests/test_build_site.py` (2): a newer tool version replaces the older row for the same device on the site, and kernel sizes render from the files.
 
 ## Output format
@@ -247,7 +251,7 @@ All three probes write one JSON object per line following the [OCP Test and Vali
 
 Twelve probes, each aimed at one part of the chip. The first three are built.
 
-1. **Matrix multiply** (`screen.py`). Done for fp32, fp16, bf16 and int8. FP8 is next; FP4 follows once a Blackwell card is measured.
+1. **Matrix multiply** (`screen.py`). Done for fp32, fp16, bf16, int8 and FP8 (E4M3, exact, from v0.3.0). FP4 follows once a Blackwell card is measured.
 2. **Memory pattern sweep** (`memcheck.py`). Done for device memory. On-chip SRAM (shared memory and L2) is next, NVIDIA GPUs only.
 3. **Transformer kernels** (`kernels.py`). Done, with rotary embeddings (sin and cos) added in v0.2.0.
 4. **Full model forward pass.** A small LLM with every layer checked against a CPU float64 reference. Each layer is fed the device's own input to that layer, so its bound stays as tight as a single kernel's; one bound carried through the whole model would be too loose to catch anything.

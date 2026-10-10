@@ -59,6 +59,7 @@ def parse(path):
 
 
 KERNEL_ORDER = ["softmax", "layernorm", "gelu", "rope", "attention"]
+PRECISION_ORDER = ["fp32", "fp16", "bf16", "int8", "fp8", "fp8fast"]
 
 
 def vkey(version):
@@ -97,7 +98,7 @@ def summarise(runs):
                 row["steps"] = len(live)
                 row["skipped"] = sum(1 for s in r["steps"].values() if "_skipped" in s)
                 row["precisions"] = sorted({n.split("_")[1] for n, s in r["steps"].items() if "_skipped" not in s},
-                                           key=["fp32", "fp16", "bf16", "int8"].index)
+                                           key=lambda p: (PRECISION_ORDER.index(p) if p in PRECISION_ORDER else 99, p))
                 row["shapes"] = r["params"].get("shapes", r["params"].get("size", ""))
                 row["ref_fail"] = sum(s.get("reference_check_failed_runs", 0) for s in live)
                 row["rep_fail"] = sum(s.get("repeat_check_failed_runs", 0) for s in live)

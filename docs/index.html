@@ -268,7 +268,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <p class="lede">Three probes. The first makes the chip multiply matrices and judges every output element. The second does the same for the other kernels inside a transformer. The third fills the chip's memory with known values and reads every one back. Each probe has two independent checks, so a fault has to hide from both.</p>
 
 <h3>Probe 1: compute</h3>
-<p>The chip multiplies two fixed matrices, A and B, fifty times at each of three shapes and four precisions. Two checks run on every output.</p>
+<p>The chip multiplies two fixed matrices, A and B, fifty times at each of three shapes and four precisions, plus FP8. Two checks run on every output.</p>
 <div class="fig">
 <svg viewBox="0 0 1000 250" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, ui-monospace, Menlo, monospace" font-size="12">
 <rect x="20" y="88" width="170" height="64" fill="none" stroke="#2B3B5E"/><text x="36" y="114" fill="#E8ECF4">fixed inputs A, B</text><text x="36" y="134" fill="#93A0BA">seeded, rounded</text>
@@ -289,7 +289,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <div class="panel">
 <h3>The reference check, in plain words</h3>
 <p>Floating point arithmetic rounds at every step, so two correct computers can legitimately differ in the last digit. The question is how different they are allowed to be. Numerical analysis has a proven answer: for a dot product of length K, the rounding error can never exceed a bound that depends only on K, the precision and how the hardware rounds. Every element of the chip's result is compared with a float64 reference and must sit inside that bound. For int8 the arithmetic is exact, so the bound is zero.</p>
-<div class="formula">|C − R| ≤ acc + u_out·(|R| + acc)<br>acc = g·(|A|@|B|)<br>g = n·u / (1 − n·u)<br>fp32: n = K, u = 2⁻²⁴<br>fp16, bf16: n = 2K, u = 2⁻²³<br>u_out: 2⁻²⁴ fp32, 2⁻¹¹ fp16, 2⁻⁸ bf16<br>int8: exact, bound 0</div>
+<div class="formula">|C − R| ≤ acc + u_out·(|R| + acc)<br>acc = g·(|A|@|B|)<br>g = n·u / (1 − n·u)<br>fp32: n = K, u = 2⁻²⁴<br>fp16, bf16: n = 2K, u = 2⁻²³<br>u_out: 2⁻²⁴ fp32, 2⁻¹¹ fp16, 2⁻⁸ bf16<br>int8, FP8: exact, bound 0</div>
 <p>fp32 runs on the FP32 fused multiply-add units with TF32 off. fp16 and bf16 run on tensor cores, which round by truncation rather than to nearest and add in blocks, as Fasi, Higham, Mikaitis and Pranesh measured, so they get the wider allowance. Every fp16 and bf16 row published so far passed a bound four times tighter than this one. An element outside the bound is a wrong answer, not a difference of opinion about tolerance.</p>
 </div>
 <div class="panel">
@@ -549,7 +549,7 @@ python memcheck.py --inject 5 --out NAME_memcheck_inject.jsonl</pre>
 <h2>Roadmap</h2>
 <p class="lede">Twelve probes, each aimed at one part of the chip. The first three are built.</p>
 <div class="road">
-<div class="r done"><b>1. Matrix multiply</b><span>Three shapes, four precisions, a proven bound and a bit-exact repeat check. Done. FP8 next, and FP4 once a Blackwell card is measured.</span></div>
+<div class="r done"><b>1. Matrix multiply</b><span>Three shapes, four precisions plus FP8, a proven or exact reference and a bit-exact repeat check. Done. FP4 once a Blackwell card is measured.</span></div>
 <div class="r done"><b>2. Memory pattern sweep</b><span>Six patterns over most of device memory, exact read-back, address and bit mask on every miss. Done. On-chip SRAM next.</span></div>
 <div class="r done"><b>3. Transformer kernels</b><span>Softmax, layer norm, GELU, rotary embeddings and the fused attention kernel against a float64 reference with derived bounds. Done.</span></div>
 <div class="r now"><b>4. Full model forward pass</b><span>A small LLM, every layer checked against a CPU float64 reference. Each layer is fed the device's own input, so its bound stays as tight as a single kernel's.</span></div>
@@ -574,6 +574,7 @@ python memcheck.py --inject 5 --out NAME_memcheck_inject.jsonl</pre>
 <li><b>Lei et al., OSDI 2026.</b> Safeguarding LLM Training at Scale: online SDC detection and insights from 35 million GPU hours. <a href="https://www.usenix.org/conference/osdi26/presentation/lei">usenix.org</a></li>
 <li><b>Higham, Accuracy and Stability of Numerical Algorithms.</b> The componentwise rounding error bound for inner products used by the reference check.</li>
 <li><b>Fasi, Higham, Mikaitis and Pranesh, 2021.</b> Numerical behavior of NVIDIA tensor cores. The measurement that tensor cores accumulate with truncation, which sets the fp16 and bf16 bound. <a href="https://peerj.com/articles/cs-330">peerj.com</a></li>
+<li><b>DeepSeek-AI, 2024.</b> DeepSeek-V3 technical report. Reports that Hopper's FP8 tensor cores keep 14 bits when they add, which is why the FP8 inputs here are chosen so every sum fits in 13. <a href="https://arxiv.org/abs/2412.19437">arxiv.org</a></li>
 <li><b>Valpey and Pai, 2025.</b> Modeling three generations of tensor cores. A formal model of rounding and accumulation order on Volta, Turing and Ampere. <a href="https://arxiv.org/abs/2502.15999">arxiv.org</a></li>
 <li><b>Huang and Abraham, 1984.</b> Algorithm-based fault tolerance for matrix operations. The original idea of checking a matrix result against a cheap independent computation.</li>
 <li><b>OCP Test and Validation.</b> The open diagnostic output format and reference implementation all three probes write to. <a href="https://github.com/opencomputeproject/ocp-diag-core">ocp-diag-core</a></li>

@@ -142,6 +142,32 @@ def test_gelu_bound_covers_arm_cpu_erf(seed):
     assert float(((y - ref).abs() / bound).max()) <= 1.0
 
 
+def narrow_accumulator_dot(terms, bits):
+    """Sum with an accumulator that keeps only `bits` significant bits and truncates, one term at a time."""
+    acc = 0.0
+    for t in terms:
+        s = acc + t
+        if s:
+            ulp = 2.0 ** (math.frexp(abs(s))[1] - bits)
+            s = truncate(s, ulp)
+        acc = s
+    return acc
+
+
+def test_fp8_ternary_sums_need_13_bits_and_no_more():
+    """Why the FP8 check is exact: sums of K <= 4096 terms from {-1, 0, 1} are integers no larger than 4096,
+    exact in a 13-bit accumulator. A narrower accumulator does lose them, so the check would catch one."""
+    rng = random.Random(5)
+    worst13, lost_narrow = 0.0, 0
+    for trial in range(6):
+        terms = [float(rng.choice((1, 1, 1, 0, -1))) for _ in range(4096)]   # biased, so the sum grows large
+        exact = math.fsum(terms)
+        worst13 = max(worst13, abs(narrow_accumulator_dot(terms, 13) - exact))
+        lost_narrow += narrow_accumulator_dot(terms, 9) != exact
+    assert worst13 == 0.0
+    assert lost_narrow > 0
+
+
 def test_model_id_is_recorded_constants():
     assert "2^-23" in arith.MODEL_ID and "2^-20" in arith.MODEL_ID
     assert arith.ulps(arith.EPS_FN) == 8.0

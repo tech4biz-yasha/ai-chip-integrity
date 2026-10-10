@@ -68,17 +68,17 @@ def clear_hook():
 
 def test_clean_run_passes_all_dtypes(tmp_path):
     out = tmp_path / "r.jsonl"
-    rc = screen.main(BASE + ["--dtypes", "fp32,fp16,bf16,int8", "--out", str(out)])
+    rc = screen.main(BASE + ["--dtypes", "fp32,fp16,bf16,int8,fp8,fp8fast", "--out", str(out)])
     objs = strict_load(out)
     d = diagnoses(objs)
     assert rc == 0
     assert run_end(objs)["result"] == "PASS"
-    for dt in ("fp32", "fp16", "bf16", "int8"):
+    for dt in ("fp32", "fp16", "bf16", "int8", "fp8", "fp8fast"):
         name = f"gemm_{dt}_{SQ}"
         assert d[name]["verdict"] == "no-silent-errors"
         assert measurement(objs, name, "reference_check_failed_runs") == 0
         assert measurement(objs, name, "repeat_check_failed_runs") == 0
-        if dt != "int8":
+        if dt not in ("int8", "fp8", "fp8fast"):
             assert measurement(objs, name, "worst_error_over_bound_ratio") <= 1.0
         else:
             assert measurement(objs, name, "exact_check") is True
@@ -183,6 +183,37 @@ def test_int8_off_by_one_is_flagged(tmp_path):
     objs = strict_load(out)
     assert rc == 1
     assert diagnoses(objs)[f"gemm_int8_{SQ}"]["verdict"] == "outside-error-bound"
+
+
+@pytest.mark.parametrize("dt", ["fp8", "fp8fast"])
+def test_fp8_off_by_one_is_flagged(tmp_path, dt):
+    """FP8 inputs from {-1, 0, 1} give an exact answer, so a single off-by-one is a wrong answer."""
+    def hook(i, c):
+        c.view(-1)[7] += 1.0
+    screen._FAULT_HOOK = hook
+    out = tmp_path / "r.jsonl"
+    rc = screen.main(BASE + ["--dtypes", dt, "--out", str(out)])
+    objs = strict_load(out)
+    assert rc == 1
+    d = diagnoses(objs)[f"gemm_{dt}_{SQ}"]
+    assert d["verdict"] == "outside-error-bound"
+    assert "13 significant bits" in d["message"]
+
+
+def test_fp8_inputs_are_ternary_and_exact():
+    a, b, ref, abs_ab = screen.make_case(32, 4096, 48, screen.FP8, seed=3)
+    assert a.dtype == screen.FP8 and b.dtype == screen.FP8
+    assert set(a.float().unique().tolist()) <= {-1.0, 0.0, 1.0}
+    assert float(abs_ab.abs().max()) == 0.0                     # exact: the bound is zero
+    assert float(ref.abs().max()) <= 4096
+
+
+def test_fp8_with_too_large_k_is_skipped_not_misjudged(tmp_path):
+    out = tmp_path / "r.jsonl"
+    rc = screen.main(["--device", "cpu", "--shapes", "16x8192x16", "--iters", "3", "--dtypes", "fp8", "--out", str(out)])
+    objs = strict_load(out)
+    errors = [o["testStepArtifact"]["error"] for o in objs if "error" in o.get("testStepArtifact", {})]
+    assert rc == 0 and errors and "K <= 4096" in errors[0]["message"]
 
 
 def test_rectangular_shapes_and_injection(tmp_path):
