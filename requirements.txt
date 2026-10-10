@@ -1,3 +1,4 @@
 torch>=2.2
 ocptv==0.1.7
 pytest>=8
+nvidia-ml-py>=12.535; sys_platform == "linux"

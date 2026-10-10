@@ -29,11 +29,13 @@ import sys
 import time
 
 import torch
-import ocptv.output as tv
+import ocptv.output as tv  # noqa: E402
+
+import counters  # noqa: E402
 
 from screen import FileWriter, pick_device, device_label
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 WORD = 4
 MAX_RECORD = 1000
 PATTERNS = ["zeros", "ones", "aaaa", "5555", "hash", "hash_inv"]
@@ -202,6 +204,7 @@ def main(argv=None):
           + (f" of {total / 2**30:.1f} GiB" if total else "") + f"  dwell={args.dwell}s  passes={args.passes}  inject={args.inject}")
     all_ok = True
     run.start(dut=dut)
+    before = counters.snapshot(dev)
     try:
         for pn in range(1, args.passes + 1):
             step = run.add_step(f"memory_sweep_pass{pn}")
@@ -234,6 +237,10 @@ def main(argv=None):
                 if bw and not args.inject:
                     print(f"         {k:9s} {bw} bad words, first byte offsets {offs}, bad bits 0x{xb:08X}")
     finally:
+        try:
+            all_ok &= counters.record(run, hw, before, counters.snapshot(dev), probe_ok=all_ok, injected=args.inject > 0)
+        except Exception as e:                       # the cross-check must never cost the run its result file
+            print(f"  error counters could not be recorded: {e}")
         run.end(status=tv.TestStatus.COMPLETE,
                 result=tv.TestResult.PASS if all_ok else tv.TestResult.FAIL)
         writer.close()

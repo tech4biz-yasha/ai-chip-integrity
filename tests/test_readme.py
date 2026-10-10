@@ -12,6 +12,7 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 README = (ROOT / "README.md").read_text()
 PROBES = ["screen.py", "memcheck.py", "kernels.py", "patterns.py"]
+VERSIONED = PROBES + ["counters.py"]
 
 
 def options_table(script):
@@ -28,7 +29,7 @@ def argparse_options(script):
             yield node.args[0].value, default.value if isinstance(default, ast.Constant) else None
 
 
-@pytest.mark.parametrize("script", PROBES)
+@pytest.mark.parametrize("script", VERSIONED)
 def test_status_line_carries_the_code_version(script):
     version = re.search(r'VERSION = "([\d.]+)"', (ROOT / script).read_text()).group(1)
     assert f"`{script}` v{version}" in README
@@ -62,7 +63,7 @@ def test_every_result_file_is_in_the_readme():
 
 
 def test_every_script_and_test_file_is_documented():
-    for script in PROBES + ["arith.py", "build_site.py"]:
+    for script in VERSIONED + ["arith.py", "build_site.py"]:
         assert f"| `{script}` |" in README, f"{script} missing from the Files table"
     for test_file in (ROOT / "tests").glob("test_*.py"):
         assert f"`tests/{test_file.name}`" in README, f"{test_file.name} missing from the Tests section"

@@ -4,7 +4,7 @@ An open tester for silent computation errors in AI chips.
 
 It runs a fixed calculation on a GPU, NPU or CPU many times and proves, element by element, whether the chip returned the right answer every time. Results come out in the Open Compute Project Test and Validation format, so they drop straight into fleet tooling.
 
-**Status: early.** Four probes so far, numbered as on the roadmap below: `screen.py` v0.3.1 (probe 1, matrix multiply across several shapes, four precisions and exact FP8), `memcheck.py` v0.1.0 (probe 2, a sweep of most of the device memory), `kernels.py` v0.2.0 (probe 3, softmax, layer norm, GELU, rotary embeddings and fused attention) and `patterns.py` v0.1.0 (probe 9, data patterns that drive the matrix multiply). One device at a time, four measured chips. Read the limits section before relying on a PASS.
+**Status: early.** Five probes so far, numbered as on the roadmap below: `screen.py` v0.3.2 (probe 1, matrix multiply across several shapes, four precisions and exact FP8), `memcheck.py` v0.1.1 (probe 2, a sweep of most of the device memory), `kernels.py` v0.2.1 (probe 3, softmax, layer norm, GELU, rotary embeddings and fused attention) `patterns.py` v0.1.1 (probe 9, data patterns that drive the matrix multiply) and `counters.py` v0.1.0 (probe 11, the chip's own error counters, read around every run of the other four). One device at a time, four measured chips. Read the limits section before relying on a PASS.
 
 ## Why this exists
 
@@ -174,6 +174,22 @@ Every input set is scaled by a power of two where needed, so that no partial sum
 
 The bound for every float step adds two terms the compute probe also carries from v0.3.1: the float64 reference's own rounding, `gamma(K, 2^-53) * (|A| @ |B|)`, and `(K + 1) * 2^-126` for products that may underflow FP32. Both are far below the other terms on ordinary data; they make the bound hold on the extreme inputs as well.
 
+## Probe 11: error counters (`counters.py`)
+
+Every run of the other four probes reads the chip's own error counters at its start and its end, and records them in one more step, `device_error_counters`. Then it asks the question a silent error raises: did the hardware notice?
+
+| Verdict | Meaning |
+|---|---|
+| `counters-quiet` | No counter moved and the probe found nothing wrong |
+| `silent-error-confirmed` | The probe found wrong answers and every counter stayed quiet: silent in the strict sense, the case ECC and the error logs cannot see |
+| `hardware-noticed` | The probe found wrong answers and a counter moved too |
+| `corrected-during-run` | A corrected-error counter moved but every answer was right. The hardware caught something; on a healthy chip that is worth watching. The run still passes |
+| `uncorrected-during-run` | An uncorrected-error counter moved, or row remapping failed: a hardware fault even if the answers held. The run fails |
+| `self-test-run` | Faults were planted in software, so no cross-check is drawn; the counters are still recorded |
+| `counters-unavailable` | No NVIDIA management library, or a device without these counters (Apple GPU, CPU). Never fails a run |
+
+On NVIDIA GPUs the counters come from NVML through the `nvidia-ml-py` package (installed on Linux by `requirements.txt`): volatile ECC counts since the driver loaded, corrected and uncorrected; remapped memory rows with their pending and failure flags (A100 and newer); and retired pages (older parts). Temperature, SM clock and power are recorded beside them for context. A counter the device does not support is left out of the file, never reported as zero. The device is matched to NVML by UUID, because CUDA and NVML can number devices differently.
+
 ## Run it
 
 ```
@@ -187,7 +203,7 @@ python patterns.py               # data pattern probe; 8 patterns through the ma
 python patterns.py --inject 3    # data pattern self-test
 python memcheck.py               # memory probe; 6 patterns over most of the device memory
 python memcheck.py --inject 5    # memory self-test
-python -m pytest -q              # 107 tests on CPU; 4 more validate the output against OCP's schema
+python -m pytest -q              # 124 tests on CPU; 5 more validate the output against OCP's schema
 ```
 
 Options for `memcheck.py`:
@@ -256,6 +272,7 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 | `screen.py` | Probe 1, matrix multiply |
 | `kernels.py` | Probe 3, transformer kernels |
 | `patterns.py` | Probe 9, data patterns through the matrix multiply |
+| `counters.py` | Probe 11, the chip's error counters, read around every run of the other probes |
 | `memcheck.py` | Probe 2, memory sweep |
 | `arith.py` | The arithmetic model every bound is derived from, with its id written into each result file |
 | `build_site.py` | Builds `docs/index.html` (chipintegrity.org) from `docs/template.html` and every file in `results/`, so the published tables can never say more than the files do. One row per device and probe; a newer tool version replaces the older row. Run `python build_site.py` after adding result files |
@@ -264,7 +281,7 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 
 ## Tests
 
-`python -m pytest -q` runs 107 tests on the CPU in a few seconds; 4 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set. On CPUs whose matrix multiply ignores flush-to-zero, such as Apple silicon, the two flushing tests in `tests/test_patterns.py` skip themselves, giving 105 passed.
+`python -m pytest -q` runs 124 tests on the CPU in a few seconds; 5 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set. On CPUs whose matrix multiply ignores flush-to-zero, such as Apple silicon, the two flushing tests in `tests/test_patterns.py` skip themselves, giving 122 passed.
 
 1. `tests/test_screen.py` (37): every verdict path, every bit position caught by the self-test, NaN handling, int8 and FP8 off-by-one, FP8 inputs exact and K above 4096 skipped, rectangular shapes, bound tightness.
 2. `tests/test_kernels.py` (19): all kernels and precisions, the self-test on six seeds, intermittent and systematic faults, a one-ulp change, internal fp16 arithmetic and tanh-GELU both caught as outside the bound, NaN handling, fp32 bound tightness, a sin that is off by 1e-4 caught in RoPE, RoPE angles reaching every position, and the device's own exp, erf, sin and cos measured.
@@ -272,7 +289,8 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 4. `tests/test_arith.py` (19): the model checked against simulations of the hardware it claims to cover. A simulated tensor core that truncates, at block widths 1 to 32, stays inside the bound; a constructed case breaks the old v0.2.0 bound by almost 2x and stays inside the new one; a FlashAttention-2 style kernel emulated op by op stays inside the attention bound; PyTorch's ARM CPU erf and GELU, emulated op by op, stay inside the GELU bound; and FP8 sums of {-1, 0, 1} stay exact in a 13-bit accumulator while a 9-bit one loses them.
 5. `tests/test_build_site.py` (3): a newer tool version replaces the older row for the same device on the site, kernel sizes render from the files, and data pattern rows render with the flushing behaviour.
 6. `tests/test_patterns.py` (14): every pattern passes on CPU, each input set really has its pattern and stays clear of overflow, FP8 and int8 inputs stay exact, flushing is detected and judging a flushing device against the wrong model fails, a fault four times the bound is caught on the cancelling pattern, injected flips are caught on every pattern, and the output matches the OCP schema.
-7. `tests/test_readme.py` (11): this README carries every probe's version, every option and its default, every result file, every script and test file, and the citation version, so it cannot drift from the code without a test failing.
+7. `tests/test_readme.py` (12): this README carries every probe's version, every option and its default, every result file, every script and test file, and the citation version, so it cannot drift from the code without a test failing.
+8. `tests/test_counters.py` (17): with a simulated NVIDIA management library, every cross-check verdict; unsupported counters left out rather than zeroed; no counters on CPU and Apple devices; corrected errors reported without failing a run; uncorrected errors failing it; a wrong answer with quiet counters confirmed silent; the site keeping the counter step out of the precision list; and the OCP schema.
 
 ## Output format
 
@@ -285,6 +303,8 @@ All four probes write one JSON object per line following the [OCP Test and Valid
 
 `kernels.py` writes one step per kernel and precision, named `<kernel>_<precision>` (for example `attention_bf16`), with `runs`, `size`, `elements`, `seconds`, `assumed_fn_rel_error`, `reference_check_failed_runs`, `repeat_check_failed_runs`, `worst_error_over_bound_ratio`, `worst_abs_error`, `worst_nonfinite_values`, `device_exp_rel_worst_error`, `device_erf_abs_worst_error` or `device_sincos_abs_worst_error` (softmax, GELU and RoPE steps), the self-test counts, and a diagnosis with the verdict. Its run parameters also record `assumed_fn_rel_error` and `attention_kernels` (which attention kernels were allowed).
 
+Every probe ends its run with a `device_error_counters` step from `counters.py`: `counters_available`, `ecc_enabled`, then for each counter the device supports `<counter>_before`, `<counter>_after` and `<counter>_delta` (`ecc_corrected_volatile`, `ecc_uncorrected_volatile`, `remapped_rows_corrected`, `remapped_rows_uncorrected`, `retired_pages_single_bit`, `retired_pages_double_bit`), `remap_pending`, `remap_failure`, `temperature_c`, `sm_clock_mhz` and `power_w` before and after, and a diagnosis with the cross-check verdict.
+
 `patterns.py` writes one step per shape, precision and pattern, named `gemm_<precision>_<pattern>_<MxKxN>` (for example `gemm_bf16_near_max_1024x1024x1024`), with the compute probe's measurements plus `pattern`, `input_scale_power_of_two` and, for the subnormal pattern, `subnormal_inputs_flushed`.
 
 `memcheck.py` writes one step per pass (`memory_sweep_pass1`, ...) with `bytes_tested`, `device_memory_bytes`, `coverage_fraction`, `dwell_seconds`, `seconds`, one `bad_words_<pattern>` per pattern (validated to be zero outside self-test), a warning log line per failing pattern with the first byte offsets and the bad-bit mask, and in self-test mode `injected_<pattern>` and `injected_detected_<pattern>`.
@@ -292,14 +312,14 @@ All four probes write one JSON object per line following the [OCP Test and Valid
 ## Assumptions and limits
 
 1. Every bound follows from the arithmetic model in `arith.py`: FP32 scalar arithmetic rounds to nearest, matrix units accumulate faithfully in FP32 (truncation allowed), exp, divide and square roots stay within eight ulps, and erf within 2^-20 absolute. TF32 is switched off on CUDA. A device that accumulates below FP32 or breaks the model in another way shows up as `outside-error-bound` on every run, and the message says so. That was not the case on any chip measured above.
-2. These are four probes. A PASS means "no silent error in these matrix multiplies, these data patterns, these transformer kernels and this memory sweep, in these runs, on this device today". It is not a certificate of a healthy chip. The OSDI 2026 results above show that defects depend on the data, the kernel, temperature and age; this version sweeps shapes, precisions, five transformer kernels and memory, but not the rest.
+2. These are five probes. A PASS means "no silent error in these matrix multiplies, these data patterns, these transformer kernels and this memory sweep, in these runs, on this device today". It is not a certificate of a healthy chip. The OSDI 2026 results above show that defects depend on the data, the kernel, temperature and age; this version sweeps shapes, precisions, five transformer kernels and memory, but not the rest.
 3. Runs take seconds, not hours, so thermal and aging effects are not exercised.
 4. One device per run. Multi-device comparison is on the roadmap.
-5. In the compute and kernel probes the injected faults are applied to the output on the CPU side, so they test the checker, not the chip. The memory probe injects into device memory itself.
+5. The error counters are NVIDIA's volatile counts since the driver last loaded; on other devices probe 11 records that none are available. In the compute and kernel probes the injected faults are applied to the output on the CPU side, so they test the checker, not the chip. The memory probe injects into device memory itself.
 
 ## Roadmap
 
-Twelve probes, each aimed at one part of the chip. Four are built: 1, 2, 3 and 9.
+Twelve probes, each aimed at one part of the chip. Five are built: 1, 2, 3, 9 and 11.
 
 1. **Matrix multiply** (`screen.py`). Done for fp32, fp16, bf16, int8 and FP8 (E4M3, exact, from v0.3.0). FP4 follows once a Blackwell card is measured.
 2. **Memory pattern sweep** (`memcheck.py`). Done for device memory. On-chip SRAM (shared memory and L2) is next, NVIDIA GPUs only.
@@ -311,7 +331,7 @@ Twelve probes, each aimed at one part of the chip. Four are built: 1, 2, 3 and 9
 8. **Clock and voltage margin sweep.** Lower the margin step by step where the driver allows it and record where each unit starts to fail. Likely needs bare-metal access, since container pods rarely allow clock control.
 9. **Data pattern library** (`patterns.py`). Done for the matrix multiply: wide exponents, full mantissas, cancellation, alternating signs, sparsity, subnormals with flush detection, near-overflow and int8 extremes. Patterns for the transformer kernels are next.
 10. **Fault injection inside the computation.** Flip bits in registers during the multiply (NVBit on NVIDIA) to measure how often a flip becomes a wrong answer. The basis for a space radiation column.
-11. **ECC and error counters.** Read the chip's own counters before and after every probe and record whether the hardware noticed what the probe noticed.
+11. **ECC and error counters** (`counters.py`). Done: every run of every probe reads the chip's counters before and after and records whether the hardware noticed what the probe noticed. Its first real test is on the next NVIDIA run.
 12. **Recovery.** After a detected fault, reset and rerun on the same card to see whether the fault clears. Likely needs bare-metal access, since a GPU reset needs root on the host.
 
 Around the probes: a fleet mode that runs every probe across many devices and collects the files, side by side runs against vendor diagnostics on the same device, and a rulebook for submitting rows to the public table.

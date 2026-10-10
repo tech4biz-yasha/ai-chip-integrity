@@ -45,10 +45,11 @@ import torch.nn.functional as F  # noqa: E402
 import ocptv.output as tv  # noqa: E402
 
 import arith  # noqa: E402
+import counters  # noqa: E402
 
 from screen import FileWriter, pick_device, device_label, lock_down_math, flip_bit, NONDET_SHARE, NONDET_MIN  # noqa: E402
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 U_RN, U_TC, EPS_FN = arith.U_RN, arith.U_TC, arith.EPS_FN
 DTYPES = {
     "fp32": (torch.float32, torch.int32, 32),
@@ -436,6 +437,7 @@ def main(argv=None):
     print(f"Device: {device_label(dev)} ({dev})  size={args.size}  runs={args.iters}  inject={args.inject}")
     all_ok = True
     run.start(dut=dut)
+    before = counters.snapshot(dev)
     try:
         for kernel in kernels:
             for name in names:
@@ -453,6 +455,10 @@ def main(argv=None):
                 all_ok &= ok
                 print(f"  {kernel:10s} {name:5s}  {'PASS' if ok else 'FAIL'}  {verdict}  ({secs:.1f}s)  {msg}")
     finally:
+        try:
+            all_ok &= counters.record(run, hw, before, counters.snapshot(dev), probe_ok=all_ok, injected=args.inject > 0)
+        except Exception as e:                       # the cross-check must never cost the run its result file
+            print(f"  error counters could not be recorded: {e}")
         run.end(status=tv.TestStatus.COMPLETE,
                 result=tv.TestResult.PASS if all_ok else tv.TestResult.FAIL)
         writer.close()

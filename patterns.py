@@ -36,9 +36,10 @@ import torch
 import ocptv.output as tv
 
 import arith
+import counters
 import screen
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 FLOAT_PATTERNS = ["wide", "mantissa", "cancel", "alternate", "sparse", "subnormal", "near_max"]
 APPLIES = {
     "fp32": FLOAT_PATTERNS, "fp16": FLOAT_PATTERNS, "bf16": FLOAT_PATTERNS,
@@ -226,6 +227,7 @@ def main(argv=None):
     print(f"Device: {screen.device_label(dev)} ({dev})  runs={args.iters}  inject={args.inject}")
     all_ok = True
     run.start(dut=dut)
+    before = counters.snapshot(dev)
     try:
         for shape in shapes:
             label = "x".join(map(str, shape))
@@ -255,6 +257,10 @@ def main(argv=None):
                     all_ok &= ok
                     print(f"  {label:>16s} {name:7s} {pattern:9s}  {'PASS' if ok else 'FAIL'}  {verdict}  ({secs:.1f}s)  {msg}")
     finally:
+        try:
+            all_ok &= counters.record(run, hw, before, counters.snapshot(dev), probe_ok=all_ok, injected=args.inject > 0)
+        except Exception as e:                       # the cross-check must never cost the run its result file
+            print(f"  error counters could not be recorded: {e}")
         run.end(status=tv.TestStatus.COMPLETE, result=tv.TestResult.PASS if all_ok else tv.TestResult.FAIL)
         writer.close()
     print(f"Result: {'PASS' if all_ok else 'FAIL'}   OCP output: {args.out}")

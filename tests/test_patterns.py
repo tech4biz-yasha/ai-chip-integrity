@@ -37,6 +37,8 @@ def by_step(objs):
         sid = sa["testStepId"]
         if "testStepStart" in sa:
             names[sid] = sa["testStepStart"]["name"]
+        if names.get(sid) == "device_error_counters":      # probe 11's cross-check, tested in test_counters.py
+            continue
         if "diagnosis" in sa:
             diag[names[sid]] = sa["diagnosis"]
         if "measurement" in sa:

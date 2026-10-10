@@ -36,7 +36,7 @@
       "programmingLanguage": "Python",
       "license": "https://opensource.org/licenses/MIT",
       "author": {"@id": "https://chipintegrity.org/#person"},
-      "description": "Four probes for AI accelerators: a compute probe that checks matrix multiplies against a proven float64 error bound and bit-for-bit repeatability, a memory probe that writes six patterns into every word of most of device memory and reads them back, a kernel probe that checks softmax, layer norm, GELU, rotary embeddings and attention the same two ways, and a data pattern probe that drives the matrix multiply with inputs built to reach particular bits. Output follows the OCP Test and Validation spec."
+      "description": "Five probes for AI accelerators: a compute probe that checks matrix multiplies against a proven float64 error bound and bit-for-bit repeatability, a memory probe that writes six patterns into every word of most of device memory and reads them back, a kernel probe that checks softmax, layer norm, GELU, rotary embeddings and attention the same two ways, a data pattern probe that drives the matrix multiply with inputs built to reach particular bits, and an error counter cross-check that records whether the chip's own counters noticed. Output follows the OCP Test and Validation spec."
     },
     {
       "@type": "Dataset",
@@ -265,7 +265,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <section id="method">
 <div class="kicker">LEARN, PART 3 OF 5</div>
 <h2>How a chip is tested here</h2>
-<p class="lede">Four probes so far, numbered as on the roadmap. Probe 1 makes the chip multiply matrices and judges every output element. Probe 2 fills the chip's memory with known values and reads every one back. Probe 3 checks the other kernels inside a transformer the same way as probe 1. Probe 9 feeds the matrix multiply inputs built to reach particular bits. Each probe has two independent checks, so a fault has to hide from both.</p>
+<p class="lede">Five probes so far, numbered as on the roadmap. Probe 1 makes the chip multiply matrices and judges every output element. Probe 2 fills the chip's memory with known values and reads every one back. Probe 3 checks the other kernels inside a transformer the same way as probe 1. Probe 9 feeds the matrix multiply inputs built to reach particular bits. Probe 11 reads the chip's own error counters around every run and asks whether the hardware noticed. Each probe has two independent checks, so a fault has to hide from both.</p>
 
 <h3>Probe 1: compute</h3>
 <p>The chip multiplies two fixed matrices, A and B, fifty times at each of three shapes and four precisions, plus FP8. Two checks run on every output.</p>
@@ -343,6 +343,8 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <div class="v">extremes</div><div>int8 only: &minus;128, &minus;127, 0 and 127, the corners of the integer multiplier.</div>
 </div>
 <p>FP8 keeps its inputs in {&minus;1, 0, 1} so its answers stay exact, so it runs the alternate and sparse patterns only.</p>
+<h3>Probe 11: error counters</h3>
+<p>A silent error is one the chip does not notice. So every run of the other probes reads the chip's own error counters at its start and its end: ECC counts, remapped memory rows and retired pages, with temperature, clock and power beside them. Then it asks whether the hardware noticed what the probe noticed. Wrong answers with every counter quiet are a silent error in the strict sense, the case ECC and the error logs cannot see. The counters come from NVIDIA's management library, so on other chips the probe records that none are available.</p>
 </section>
 
 <section id="verdicts">
@@ -355,6 +357,14 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <div class="v bad">silent-data-corruption</div><div>Some runs differ from run 0. An intermittent fault, the kind a fleet scanner exists to find.</div>
 <div class="v bad">outside-error-bound</div><div>All runs agree with each other but sit outside the proven bound. A faulty unit, a device accumulating below FP32, or for the kernel probe an exp, erf or GELU that is less accurate than assumed.</div>
 <div class="v warn">nondeterministic-kernel</div><div>Many runs differ, yet all stay inside the bound. The kernel is not repeatable on that device and precision, so the repeat check cannot be used there. Reported as a finding, not a fault.</div>
+</div>
+<h3>Error counters, every run</h3>
+<div class="verdict">
+<div class="v">counters-quiet</div><div>No counter moved and every answer was right.</div>
+<div class="v bad">silent-error-confirmed</div><div>Wrong answers, and every counter stayed quiet. The hardware did not notice.</div>
+<div class="v bad">hardware-noticed</div><div>Wrong answers, and a counter moved too.</div>
+<div class="v warn">corrected-during-run</div><div>Every answer was right, but the hardware corrected errors during the run. Worth watching on a healthy chip.</div>
+<div class="v bad">uncorrected-during-run</div><div>The hardware recorded uncorrected errors. A fault even if the answers held.</div>
 </div>
 <h3>Memory probe</h3>
 <div class="verdict">
@@ -384,7 +394,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <dt>reference bound</dt><dd>The largest error that correct rounding can produce for a given computation and precision. Anything larger is a wrong answer. The bound used here is the standard componentwise bound for inner products from Higham.</dd>
 <dt>fault injection</dt><dd>Deliberately corrupting a value to confirm the checks notice. Used here as a self-test on every published row.</dd>
 <dt>dwell</dt><dd>The pause between writing memory and reading it back. Weak cells lose their value over time, so a longer dwell catches more of them.</dd>
-<dt>OCP Test and Validation</dt><dd>The Open Compute Project's open format for hardware diagnostic output, used by cloud operators so that any test's results can be read by any fleet tool. All four probes write it.</dd>
+<dt>OCP Test and Validation</dt><dd>The Open Compute Project's open format for hardware diagnostic output, used by cloud operators so that any test's results can be read by any fleet tool. All five probes write it.</dd>
 </dl>
 </section>
 
@@ -581,7 +591,7 @@ python patterns.py --inject 3 --out NAME_patterns_inject.jsonl</pre>
 <section id="roadmap">
 <div class="kicker">TAKE PART</div>
 <h2>Roadmap</h2>
-<p class="lede">Twelve probes, each aimed at one part of the chip. Four are built: 1, 2, 3 and 9.</p>
+<p class="lede">Twelve probes, each aimed at one part of the chip. Five are built: 1, 2, 3, 9 and 11.</p>
 <div class="road">
 <div class="r done"><b>1. Matrix multiply</b><span>Three shapes, four precisions plus FP8, a proven or exact reference and a bit-exact repeat check. Done. FP4 once a Blackwell card is measured.</span></div>
 <div class="r done"><b>2. Memory pattern sweep</b><span>Six patterns over most of device memory, exact read-back, address and bit mask on every miss. Done. On-chip SRAM next.</span></div>
@@ -593,7 +603,7 @@ python patterns.py --inject 3 --out NAME_patterns_inject.jsonl</pre>
 <div class="r"><b>8. Clock and voltage margin sweep</b><span>Lower the margin step by step where the driver allows it and record where each unit starts to fail. Likely needs bare-metal access.</span></div>
 <div class="r done"><b>9. Data pattern library</b><span>Wide exponents, full mantissas, cancellation, alternating signs, sparsity, subnormals with flush detection, near-overflow and int8 extremes, for the matrix multiply. Done. Patterns for the transformer kernels next.</span></div>
 <div class="r"><b>10. Fault injection inside the computation</b><span>Flip bits in registers during the multiply to measure how often a flip becomes a wrong answer. The basis for a space radiation column.</span></div>
-<div class="r"><b>11. ECC and error counters</b><span>Read the chip's own counters before and after every probe and record whether the hardware noticed what the probe noticed.</span></div>
+<div class="r done"><b>11. ECC and error counters</b><span>Every run of every probe reads the chip's counters before and after and records whether the hardware noticed what the probe noticed. Done; first real test on the next NVIDIA run.</span></div>
 <div class="r"><b>12. Recovery</b><span>After a detected fault, reset and rerun on the same card to see whether the fault clears. Likely needs bare-metal access.</span></div>
 <div class="r"><b>Fleet mode</b><span>Run every probe across many devices automatically and collect the files. Fault rates are per thousand units, so volume is how they get found.</span></div>
 <div class="r"><b>Vendor comparison</b><span>Run NVIDIA DCGM and AMD AGFHC on the same device and record what each catches.</span></div>
@@ -611,7 +621,7 @@ python patterns.py --inject 3 --out NAME_patterns_inject.jsonl</pre>
 <li><b>DeepSeek-AI, 2024.</b> DeepSeek-V3 technical report. Reports that Hopper's FP8 tensor cores keep 14 bits when they add, which is why the FP8 inputs here are chosen so every sum fits in 13. <a href="https://arxiv.org/abs/2412.19437">arxiv.org</a></li>
 <li><b>Valpey and Pai, 2025.</b> Modeling three generations of tensor cores. A formal model of rounding and accumulation order on Volta, Turing and Ampere. <a href="https://arxiv.org/abs/2502.15999">arxiv.org</a></li>
 <li><b>Huang and Abraham, 1984.</b> Algorithm-based fault tolerance for matrix operations. The original idea of checking a matrix result against a cheap independent computation.</li>
-<li><b>OCP Test and Validation.</b> The open diagnostic output format and reference implementation all four probes write to. <a href="https://github.com/opencomputeproject/ocp-diag-core">ocp-diag-core</a></li>
+<li><b>OCP Test and Validation.</b> The open diagnostic output format and reference implementation all five probes write to. <a href="https://github.com/opencomputeproject/ocp-diag-core">ocp-diag-core</a></li>
 </ul>
 </section>
 

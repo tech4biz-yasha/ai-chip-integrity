@@ -136,7 +136,9 @@ def test_multiple_passes_and_bad_args(tmp_path):
     rc = memcheck.main(BASE + ["--passes", "2", "--out", str(out)])
     objs = strict_load(out)
     assert rc == 0
-    assert sum(1 for o in objs if o.get("testStepArtifact") and "diagnosis" in o["testStepArtifact"]) == 2
+    sweeps = [o for o in objs if o.get("testStepArtifact") and "diagnosis" in o["testStepArtifact"]
+              and o["testStepArtifact"]["diagnosis"]["verdict"] in ("no-memory-errors", "memory-errors")]
+    assert len(sweeps) == 2
     with pytest.raises(SystemExit):
         memcheck.main(BASE + ["--inject", "500", "--out", str(out)])
 

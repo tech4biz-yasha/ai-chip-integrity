@@ -49,15 +49,26 @@ def parse(path):
             steps[sid]["_verdict"] = sa["diagnosis"]["verdict"]
         if "error" in sa:
             steps[sid]["_skipped"] = True
+    named = {names.get(k, k): v for k, v in steps.items()}
+    counter_step = named.pop(COUNTER_STEP, None)          # probe 11's cross-check, not a precision or kernel
     hw = start["dutInfo"]["hardwareInfos"][0]["name"]
     sw = {s["name"]: s["version"] for s in start["dutInfo"].get("softwareInfos", [])}
     return {
         "file": os.path.relpath(path, ROOT), "run": start["name"], "version": start["version"],
         "params": start.get("parameters", {}), "result": end["result"], "date": ts[:10],
-        "device": hw, "torch": sw.get("torch", ""), "steps": {names.get(k, k): v for k, v in steps.items()},
+        "device": hw, "torch": sw.get("torch", ""), "steps": named, "counters": counter_step,
     }
 
 
+COUNTER_STEP = "device_error_counters"
+COUNTER_NOTES = {
+    "counters-quiet": "error counters quiet",
+    "corrected-during-run": "hardware corrected errors during the run",
+    "uncorrected-during-run": "uncorrected hardware errors during the run",
+    "silent-error-confirmed": "error counters stayed quiet while answers were wrong",
+    "hardware-noticed": "error counters moved with the wrong answers",
+    "counters-unavailable": "no error counters",
+}
 KERNEL_ORDER = ["softmax", "layernorm", "gelu", "rope", "attention"]
 PRECISION_ORDER = ["fp32", "fp16", "bf16", "int8", "fp8", "fp8fast"]
 PATTERN_ORDER = ["wide", "mantissa", "cancel", "alternate", "sparse", "subnormal", "near_max", "extremes"]
@@ -105,6 +116,7 @@ def summarise(runs):
                 row["rep_fail"] = sum(s.get("repeat_check_failed_runs", 0) for s in live)
                 row["verdicts"] = sorted({s["_verdict"] for s in live})
                 row["clean_file"] = r["file"]
+                row["counters"] = (r.get("counters") or {}).get("_verdict")
         elif r["run"] == "ai-chip-integrity-kernels":
             row = row_for(kernel, r, torch=r["torch"])
             if row is None:
@@ -127,6 +139,7 @@ def summarise(runs):
                 row["rep_fail"] = sum(s.get("repeat_check_failed_runs", 0) for s in live)
                 row["verdicts"] = sorted({s["_verdict"] for s in live})
                 row["clean_file"] = r["file"]
+                row["counters"] = (r.get("counters") or {}).get("_verdict")
         elif r["run"] == "ai-chip-integrity-patterns":
             row = row_for(pattern, r, torch=r["torch"])
             if row is None:
@@ -150,6 +163,7 @@ def summarise(runs):
                 row["rep_fail"] = sum(s.get("repeat_check_failed_runs", 0) for s in live.values())
                 row["verdicts"] = sorted({s["_verdict"] for s in live.values()})
                 row["clean_file"] = r["file"]
+                row["counters"] = (r.get("counters") or {}).get("_verdict")
         elif r["run"] == "ai-chip-integrity-memcheck":
             row = row_for(memory, r)
             if row is None:
@@ -168,6 +182,7 @@ def summarise(runs):
                 row["seconds"] = s.get("seconds")
                 row["verdict"] = s["_verdict"]
                 row["clean_file"] = r["file"]
+                row["counters"] = (r.get("counters") or {}).get("_verdict")
     order = lambda d: (0 if "H100" in d else 1 if "A100" in d else 2 if "NVIDIA" in d else 3, d)
     return ([compute[k] for k in sorted(compute, key=order)], [memory[k] for k in sorted(memory, key=order)],
             [kernel[k] for k in sorted(kernel, key=order)], [pattern[k] for k in sorted(pattern, key=order)])
@@ -187,14 +202,14 @@ def compute_rows(rows):
         if "runs" not in r:
             continue
         verdict = ", ".join(r["verdicts"])
-        ok = r["verdicts"] == ["no-silent-errors"]
+        ok = r["verdicts"] == ["no-silent-errors"] and not counters_note(r)[1]
         caught = f'{r.get("caught", 0)} of {r.get("injected", 0)}' if "injected" in r else "not run"
         prec = ", ".join(r["precisions"]) + (f' ({r["skipped"]} skipped)' if r["skipped"] else "")
         files = f'<a href="{REPO}/blob/main/{r["clean_file"]}">clean</a>'
         if "inject_file" in r:
             files += f' · <a href="{REPO}/blob/main/{r["inject_file"]}">self-test</a>'
         out.append(f"""<tr>
-<td>{esc(r['device'])}<span class="sub">PyTorch {esc(r['torch'])} · tool v{esc(r['version'])}</span></td>
+<td>{esc(r['device'])}<span class="sub">PyTorch {esc(r['torch'])} · tool v{esc(r['version'])}{counters_note(r)[0]}</span></td>
 <td class="date">{esc(min(r['dates']))}</td>
 <td>{esc(r['shapes']).replace(',', '<br>')}</td>
 <td>{esc(prec)}</td>
@@ -207,13 +222,21 @@ def compute_rows(rows):
     return "\n".join(out)
 
 
+def counters_note(r):
+    """Probe 11's result for the row, as a short note under the device name, and whether it is a failure."""
+    v = r.get("counters")
+    if not v:
+        return "", False
+    return f" · {esc(COUNTER_NOTES.get(v, v))}", v in ("uncorrected-during-run", "silent-error-confirmed", "hardware-noticed")
+
+
 def pattern_rows(rows):
     out = []
     for r in rows:
         if "runs" not in r:
             continue
         verdict = ", ".join(r["verdicts"])
-        ok = r["verdicts"] == ["no-silent-errors"]
+        ok = r["verdicts"] == ["no-silent-errors"] and not counters_note(r)[1]
         caught = f'{r.get("caught", 0)} of {r.get("injected", 0)}' if "injected" in r else "not run"
         prec = ", ".join(r["precisions"]) + (f' ({r["skipped"]} skipped)' if r["skipped"] else "")
         if not r["subnormal_checked"]:
@@ -226,7 +249,7 @@ def pattern_rows(rows):
         if "inject_file" in r:
             files += f' · <a href="{REPO}/blob/main/{r["inject_file"]}">self-test</a>'
         out.append(f"""<tr>
-<td>{esc(r['device'])}<span class="sub">PyTorch {esc(r['torch'])} · tool v{esc(r['version'])}</span></td>
+<td>{esc(r['device'])}<span class="sub">PyTorch {esc(r['torch'])} · tool v{esc(r['version'])}{counters_note(r)[0]}</span></td>
 <td class="date">{esc(min(r['dates']))}</td>
 <td>{esc(", ".join(r['patterns']))}</td>
 <td>{esc(prec)}</td>
@@ -256,14 +279,14 @@ def kernel_rows(rows):
         if "runs" not in r:
             continue
         verdict = ", ".join(r["verdicts"])
-        ok = r["verdicts"] == ["no-silent-errors"]
+        ok = r["verdicts"] == ["no-silent-errors"] and not counters_note(r)[1]
         caught = f'{r.get("caught", 0)} of {r.get("injected", 0)}' if "injected" in r else "not run"
         prec = ", ".join(r["precisions"]) + (f' ({r["skipped"]} skipped)' if r["skipped"] else "")
         files = f'<a href="{REPO}/blob/main/{r["clean_file"]}">clean</a>'
         if "inject_file" in r:
             files += f' · <a href="{REPO}/blob/main/{r["inject_file"]}">self-test</a>'
         out.append(f"""<tr>
-<td>{esc(r['device'])}<span class="sub">PyTorch {esc(r['torch'])} · tool v{esc(r['version'])}</span></td>
+<td>{esc(r['device'])}<span class="sub">PyTorch {esc(r['torch'])} · tool v{esc(r['version'])}{counters_note(r)[0]}</span></td>
 <td class="date">{esc(min(r['dates']))}</td>
 <td>{esc(", ".join(r['kernels']))}<span class="sub">{kernel_sizes(r)}</span></td>
 <td>{esc(prec)}</td>
@@ -282,14 +305,14 @@ def memory_rows(rows):
     for r in rows:
         if "bytes" not in r:
             continue
-        ok = r["verdict"] == "no-memory-errors"
+        ok = r["verdict"] == "no-memory-errors" and not counters_note(r)[1]
         caught = f'{r.get("caught", 0)} of {r.get("injected", 0)}' if "injected" in r else "not run"
         total = f' of {gib(r["total"])}' if r.get("total") else ""
         files = f'<a href="{REPO}/blob/main/{r["clean_file"]}">clean</a>'
         if "inject_file" in r:
             files += f' · <a href="{REPO}/blob/main/{r["inject_file"]}">self-test</a>'
         out.append(f"""<tr>
-<td>{esc(r['device'])}<span class="sub">tool v{esc(r['version'])}</span></td>
+<td>{esc(r['device'])}<span class="sub">tool v{esc(r['version'])}{counters_note(r)[0]}</span></td>
 <td class="date">{esc(min(r['dates']))}</td>
 <td>{gib(r['bytes'])}{total}<span class="sub">{r['bytes'] // 4:,} words</span></td>
 <td>{r['patterns']}</td>
