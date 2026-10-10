@@ -465,7 +465,8 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <div class="kicker">TAKE PART</div>
 <h2>Run it on your chip</h2>
 <p class="lede">One command, ten result files, one pull request. Works on CUDA, Apple MPS and CPU today.</p>
-<pre><span class="c"># install once</span>
+<pre><span class="c"># install once, in its own virtual environment (Python 3.10 or newer)</span>
+python3 -m venv chip-env &amp;&amp; source chip-env/bin/activate
 pip install ai-chip-integrity
 
 <span class="c"># a one-minute smoke test: every probe and its self-test at small sizes</span>
@@ -476,6 +477,7 @@ chip-integrity run --name NAME
 
 <span class="c"># or, on an NVIDIA GPU host with Docker, with nothing else installed</span>
 docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.4.0 run --name NAME --out-dir /results</pre>
+<p class="note">On many Macs the built-in <code>python3</code> is version 3.9, which pip skips. Install a newer Python from python.org or with Homebrew first, then create the environment with its versioned command, for example <code>python3.12 -m venv chip-env</code>.</p>
 <p class="note">The same ten files come from running each probe by hand from a clone of the repository, for example <code>python screen.py --out NAME_clean.jsonl</code> and then <code>python screen.py --inject 5 --out NAME_inject.jsonl</code> for its self-test. The README lists all ten commands.</p>
 <ol class="steps">
 <li><b>Open a pull request</b> with the ten files, the device name, driver version and PyTorch version.</li>

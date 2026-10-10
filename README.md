@@ -10,11 +10,16 @@ It runs a fixed calculation on a GPU, NPU or CPU many times and proves, element 
 
 ## Quick start
 
+It needs Python 3.10 or newer. Install it in its own virtual environment:
+
 ```
+python3 -m venv chip-env && source chip-env/bin/activate
 pip install ai-chip-integrity
 chip-integrity run --quick     # about a minute: every probe and its self-test at small sizes
 chip-integrity run             # the full run: ten OCP result files in chip-integrity-results/
 ```
+
+On many Macs the built-in `python3` is version 3.9, and pip then reports "No matching distribution found for ai-chip-integrity". Install a newer Python from python.org or with `brew install python`, and create the environment with its versioned command, for example `python3.12 -m venv chip-env`.
 
 On an NVIDIA GPU host with Docker and the NVIDIA container toolkit, with nothing else installed:
 
