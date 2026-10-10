@@ -69,3 +69,22 @@ def test_checksum_rows_render(tmp_path):
     assert len(rows) == 1 and rows[0]["precisions"] == ["fp32", "fp16", "bf16"] and rows[0]["missed"] == 0
     html = build_site.checksum_rows(rows)
     assert "6 of 6" in html and "no-silent-errors" in html
+
+
+def test_mixed_subnormal_policy_is_shown(tmp_path, monkeypatch):
+    import patterns
+    import screen
+    import torch
+    real = screen.matmul
+
+    def top_half_flushes(a, b, fast_accum=False):
+        if a.dtype == torch.float32:
+            rows = (torch.arange(a.shape[0])[:, None] < a.shape[0] // 2).expand_as(a)
+            a = torch.where((a.abs() < torch.finfo(a.dtype).tiny) & rows, torch.zeros_like(a), a)
+        return real(a, b, fast_accum)
+    monkeypatch.setattr(screen, "matmul", top_half_flushes)
+    out = tmp_path / "p.jsonl"
+    patterns.main(["--device", "cpu", "--shapes", "32x64x24", "--iters", "3", "--dtypes", "fp32",
+                   "--patterns", "subnormal,alternate", "--out", str(out)])
+    *_, rows, _ = build_site.summarise([build_site.parse(str(out))])
+    assert rows[0]["mixed"] == ["fp32"] and "mixed: fp32" in build_site.pattern_rows(rows)

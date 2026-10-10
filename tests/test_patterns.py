@@ -124,7 +124,7 @@ def flushing_device(monkeypatch):
             torch.set_flush_denormal(False)
             torch.set_num_threads(threads)
     monkeypatch.setattr(screen, "matmul", flushing)
-    if not patterns.flushes_subnormal_inputs(torch.device("cpu"), "fp32"):
+    if patterns.subnormal_policy(torch.device("cpu"), "fp32", 16, 16, 16) != "flushes":
         pytest.skip("this CPU's matmul ignores flush-to-zero")
 
 
@@ -136,6 +136,57 @@ def test_flushing_device_is_detected_and_judged_against_the_flushed_model(tmp_pa
     step = "gemm_fp32_subnormal_32x256x32"
     assert rc == 0 and diag[step]["verdict"] == "no-silent-errors"
     assert meas[step]["subnormal_inputs_flushed"] is True
+
+
+def kernels_by_shape(monkeypatch, flush_mask):
+    """Emulate a library that picks its kernel by shape, as oneDNN does on CPUs with AMX or AVX-512 BF16: the
+    matmul treats A's subnormal inputs as zero wherever flush_mask(a, b) marks them, and keeps them elsewhere.
+    This runs on any host, so the regression is tested everywhere, not only on such CPUs."""
+    real = screen.matmul
+
+    def matmul(a, b, fast_accum=False):
+        if a.dtype in (torch.float32, torch.float16, torch.bfloat16):
+            mask = flush_mask(a, b)
+            if mask is not None:
+                a = torch.where((a.abs() < torch.finfo(a.dtype).tiny) & mask, torch.zeros_like(a), a)
+        return real(a, b, fast_accum)
+    monkeypatch.setattr(screen, "matmul", matmul)
+
+
+def test_policy_is_measured_at_each_steps_own_shape(tmp_path, monkeypatch):
+    """The failure first seen on an H100 pod's host CPU: small multiplies kept subnormals and larger bf16 ones
+    flushed them. A policy measured on one small multiply judged the larger step against the wrong model."""
+    kernels_by_shape(monkeypatch, lambda a, b: torch.ones_like(a, dtype=torch.bool)
+                     if min(a.shape[0], a.shape[1], b.shape[1]) > 16 else None)
+    out = tmp_path / "p.jsonl"
+    rc = patterns.main(["--device", "cpu", "--shapes", "16x16x16,64x64x64", "--iters", "3", "--dtypes", "fp32",
+                        "--patterns", "subnormal", "--out", str(out)])
+    diag, meas = by_step(strict_load(out))
+    assert rc == 0
+    for name in ("fp32",):                          # fp32 keeps subnormals on every CPU, so only the emulation flushes
+        assert meas[f"gemm_{name}_subnormal_16x16x16"]["subnormal_input_policy"] == "keeps"
+        assert meas[f"gemm_{name}_subnormal_64x64x64"]["subnormal_input_policy"] == "flushes"
+        assert meas[f"gemm_{name}_subnormal_64x64x64"]["subnormal_inputs_flushed"] is True
+    assert all(d["verdict"] == "no-silent-errors" for d in diag.values())
+
+
+@pytest.mark.parametrize("inject", [0, 3])
+def test_a_kernel_that_mixes_policies_passes_and_is_reported(tmp_path, monkeypatch, inject):
+    """A kernel that flushes in some rows and keeps in others fits neither exact model, so the bound also lets
+    any product with a subnormal input be dropped. Injected flips must still be caught under that bound."""
+    def top_half(a, b):
+        rows = torch.arange(a.shape[0])[:, None] < a.shape[0] // 2
+        return rows.expand_as(a)
+    kernels_by_shape(monkeypatch, top_half)
+    out = tmp_path / "p.jsonl"
+    rc = patterns.main(["--device", "cpu", "--shapes", "32x64x24", "--iters", "5", "--dtypes", "fp32",
+                        "--patterns", "subnormal", "--inject", str(inject), "--out", str(out)])
+    diag, meas = by_step(strict_load(out))
+    assert rc == 0
+    for name in ("fp32",):
+        step = f"gemm_{name}_subnormal_32x64x24"
+        assert meas[step]["subnormal_input_policy"] == "mixed"
+        assert diag[step]["verdict"] == ("injection-self-test-pass" if inject else "no-silent-errors")
 
 
 def run_one_step(tmp_path, name, shape, case, allow_flush):

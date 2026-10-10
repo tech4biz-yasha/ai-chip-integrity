@@ -158,6 +158,8 @@ def summarise(runs):
                 row["precisions"] = sorted({n.split("_")[1] for n in live}, key=order(PRECISION_ORDER))
                 row["flushed"] = sorted({n.split("_")[1] for n, s in live.items() if s.get("subnormal_inputs_flushed") is True},
                                         key=order(PRECISION_ORDER))
+                row["mixed"] = sorted({n.split("_")[1] for n, s in live.items() if s.get("subnormal_input_policy") == "mixed"},
+                                      key=order(PRECISION_ORDER))
                 row["subnormal_checked"] = any("subnormal_inputs_flushed" in s for s in live.values())
                 row["ref_fail"] = sum(s.get("reference_check_failed_runs", 0) for s in live.values())
                 row["rep_fail"] = sum(s.get("repeat_check_failed_runs", 0) for s in live.values())
@@ -265,8 +267,9 @@ def pattern_rows(rows):
         prec = ", ".join(r["precisions"]) + (f' ({r["skipped"]} skipped)' if r["skipped"] else "")
         if not r["subnormal_checked"]:
             sub = "not run"
-        elif r["flushed"]:
-            sub = "flushed: " + ", ".join(r["flushed"])
+        elif r["flushed"] or r.get("mixed"):
+            sub = "; ".join(f"{label}: " + ", ".join(r[key]) for key, label in (("flushed", "flushed"), ("mixed", "mixed"))
+                            if r.get(key))
         else:
             sub = "kept"
         files = f'<a href="{REPO}/blob/main/{r["clean_file"]}">clean</a>'

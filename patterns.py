@@ -39,7 +39,7 @@ import arith
 import counters
 import screen
 
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 FLOAT_PATTERNS = ["wide", "mantissa", "cancel", "alternate", "sparse", "subnormal", "near_max"]
 APPLIES = {
     "fp32": FLOAT_PATTERNS, "fp16": FLOAT_PATTERNS, "bf16": FLOAT_PATTERNS,
@@ -53,13 +53,26 @@ SUBNORMAL_LIFT = {torch.float32: 100, torch.float16: 10, torch.bfloat16: 100}   
 DEFAULT_SHAPES = "1024x1024x1024,32x4096x11008"
 
 
-def flushes_subnormal_inputs(dev, name):
-    """Does this device and precision flush subnormal matmul inputs to zero? One small product decides it."""
-    dtype = screen.DTYPES[name][0]
-    a = torch.full((16, 16), torch.finfo(dtype).tiny / 4, dtype=torch.float64).to(dtype)
-    b = torch.full((16, 16), 2.0 ** SUBNORMAL_LIFT[dtype], dtype=torch.float64).to(dtype)
+def subnormal_policy(dev, name, m, k, n):
+    """How this device treats subnormal matmul inputs at this exact shape: "keeps", "flushes" or "mixed".
+
+    Measured at the step's own shape because libraries choose kernels by shape, and kernels differ: on CPUs with
+    AMX or AVX-512 BF16, the bf16 kernels treat subnormal inputs as zero whatever the flush setting, while the
+    path PyTorch takes for small matrices keeps them. A holds one subnormal value everywhere and B one power of
+    two, so every product is the same normal number and every sum is exact: each output is either k times that
+    product (kept), zero (flushed), or something between, which means the kernel treats parts of the matrix
+    differently."""
+    dtype, out_dtype = screen.DTYPES[name][0], screen.DTYPES[name][1]
+    s, lift = torch.finfo(dtype).tiny / 4, 2.0 ** SUBNORMAL_LIFT[dtype]
+    a = torch.full((m, k), s, dtype=torch.float64).to(dtype)
+    b = torch.full((k, n), lift, dtype=torch.float64).to(dtype)
     c = screen.matmul(a.to(dev), b.to(dev)).to("cpu").to(torch.float64)
-    return bool(float(c.abs().max()) == 0.0)
+    kept = torch.tensor(k * s * lift, dtype=torch.float64).to(out_dtype).to(torch.float64)
+    if bool((c == 0).all()):
+        return "flushes"
+    if bool((c == kept).all()):
+        return "keeps"
+    return "mixed"
 
 
 def _u(g, shape):
@@ -237,17 +250,22 @@ def main(argv=None):
                     step.start()
                     try:
                         subnormal = pattern == "subnormal"
-                        flushed = flushes_subnormal_inputs(dev, name) if subnormal else False
+                        policy = subnormal_policy(dev, name, *shape) if subnormal else None
+                        flushed = policy == "flushes"
                         case, shift = make_pattern_case(name, pattern, *shape, args.seed, flushed=flushed)
                         step.add_measurement(name="pattern", value=pattern, hardware_info=hw)
                         step.add_measurement(name="input_scale_power_of_two", value=shift, hardware_info=hw)
                         if subnormal:
                             step.add_measurement(name="subnormal_inputs_flushed", value=flushed, hardware_info=hw)
+                            step.add_measurement(name="subnormal_input_policy", value=policy, hardware_info=hw)
+                        # keeps or flushes: judged against that exact model. mixed: the bound also lets any
+                        # product with a subnormal input be dropped, so no split of the matrix can raise a false alarm
                         ok, verdict, msg, secs = screen.screen_case(step, dev, name, shape, args.iters, args.seed,
                                                                     args.inject, rng, hw, case=case,
-                                                                    allow_flush=not subnormal)
+                                                                    allow_flush=(not subnormal) or policy == "mixed")
                         if subnormal:
-                            msg += "; device flushes subnormal inputs" if flushed else "; device keeps subnormal inputs"
+                            msg += {"keeps": "; device keeps subnormal inputs", "flushes": "; device flushes subnormal inputs",
+                                    "mixed": "; device keeps subnormal inputs in some places and flushes them in others"}[policy]
                         step.end(status=tv.TestStatus.COMPLETE)
                     except (RuntimeError, TypeError, NotImplementedError) as e:
                         step.add_error(symptom="not-supported-on-device", message=str(e)[:500])

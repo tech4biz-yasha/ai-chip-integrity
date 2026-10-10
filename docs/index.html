@@ -342,7 +342,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <div class="v">cancel</div><div>Built so the exact answer is zero, so only rounding may remain in the result.</div>
 <div class="v">alternate</div><div>Checkerboard signs, which make every product in a dot product the same sign, so sums grow to their largest.</div>
 <div class="v">sparse</div><div>Nine values in ten are exact zeros, for the logic that handles and skips zeros.</div>
-<div class="v">subnormal</div><div>Inputs below the smallest normal number. The probe first measures whether the chip flushes them to zero, then holds it to the exact model that matches, with no allowance for the other.</div>
+<div class="v">subnormal</div><div>Inputs below the smallest normal number. The probe first measures, at the step's own shape, whether the chip flushes them to zero, then holds it to the exact model that matches, with no allowance for the other. Shape matters because libraries pick kernels by shape, and kernels differ.</div>
 <div class="v">near_max</div><div>Scaled so the largest possible sum is a quarter to a half of the output type's maximum.</div>
 <div class="v">extremes</div><div>int8 only: &minus;128, &minus;127, 0 and 127, the corners of the integer multiplier.</div>
 </div>
@@ -505,7 +505,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/mac_patterns.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/mac_patterns_inject.jsonl">self-test</a></td>
 </tr></tbody>
 </table></div>
-<p class="note">Subnormal inputs says whether the chip kept or flushed subnormal inputs to zero, per precision. Either is allowed; the probe measures which, then checks the chip against that exact model.</p>
+<p class="note">Subnormal inputs says whether the chip kept or flushed subnormal inputs to zero, per precision and measured at each shape. Either is allowed; the probe measures which, then checks the chip against that exact model. Mixed means a kernel kept them in some places and flushed them in others.</p>
 <h3>Memory probe</h3>
 <div class="tablewrap"><table>
 <thead><tr><th>Device</th><th>Date</th><th>Memory tested</th><th>Patterns</th><th>Dwell</th><th>Bad words</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
