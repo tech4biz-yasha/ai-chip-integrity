@@ -13,9 +13,9 @@ import pytest
 import torch
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-import abft  # noqa: E402
-import patterns  # noqa: E402
-import screen  # noqa: E402
+from chip_integrity import abft  # noqa: E402
+from chip_integrity import patterns  # noqa: E402
+from chip_integrity import screen  # noqa: E402
 
 
 def load(path):

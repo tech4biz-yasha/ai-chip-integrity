@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Tests on Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install CPU PyTorch and the package with its test extras
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[test]"
+      - name: Fetch the official OCP output schema
+        run: git clone --depth 1 https://github.com/opencomputeproject/ocp-diag-core.git "$RUNNER_TEMP/ocp-diag-core"
+      - name: Every test, including the OCP schema checks
+        env:
+          OCP_SCHEMA_DIR: ${{ runner.temp }}/ocp-diag-core/json_spec/output
+        run: python -m pytest -q
+      - name: Build the wheel and source package and check them
+        run: |
+          pip install build twine
+          python -m build
+          twine check --strict dist/*
+
+  docker:
+    name: Docker image, quick run on CPU
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Free disk space for the 4 GB PyTorch base image
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+      - name: Build the image
+        run: docker build -t chip-integrity:ci .
+      - name: Every probe and its self-test inside the image, at quick sizes
+        run: docker run --rm chip-integrity:ci run --quick --device cpu --out-dir /results

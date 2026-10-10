@@ -12,7 +12,7 @@ import pytest
 import torch
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-import memcheck  # noqa: E402
+from chip_integrity import memcheck  # noqa: E402
 
 BASE = ["--device", "cpu", "--gb", "0.004", "--dwell", "0"]   # about 4 MB, 1 M words
 

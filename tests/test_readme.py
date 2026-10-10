@@ -10,6 +10,7 @@ import re
 import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+PKG = ROOT / "chip_integrity"
 README = (ROOT / "README.md").read_text()
 PROBES = ["screen.py", "memcheck.py", "kernels.py", "patterns.py", "abft.py"]
 VERSIONED = PROBES + ["counters.py"]
@@ -22,7 +23,7 @@ def options_table(script):
 
 
 def argparse_options(script):
-    tree = ast.parse((ROOT / script).read_text())
+    tree = ast.parse((PKG / script).read_text())
     for node in ast.walk(tree):
         if isinstance(node, ast.Call) and getattr(node.func, "attr", "") == "add_argument":
             default = next((k.value for k in node.keywords if k.arg == "default"), None)
@@ -31,7 +32,7 @@ def argparse_options(script):
 
 @pytest.mark.parametrize("script", VERSIONED)
 def test_status_line_carries_the_code_version(script):
-    version = re.search(r'VERSION = "([\d.]+)"', (ROOT / script).read_text()).group(1)
+    version = re.search(r'VERSION = "([\d.]+)"', (PKG / script).read_text()).group(1)
     assert f"`{script}` v{version}" in README
 
 
@@ -63,8 +64,10 @@ def test_every_result_file_is_in_the_readme():
 
 
 def test_every_script_and_test_file_is_documented():
-    for script in VERSIONED + ["arith.py", "build_site.py"]:
-        assert f"| `{script}` |" in README, f"{script} missing from the Files table"
+    for script in VERSIONED + ["arith.py", "cli.py"]:
+        assert f"| `chip_integrity/{script}` |" in README, f"chip_integrity/{script} missing from the Files table"
+    for path in ["build_site.py", "pyproject.toml", "Dockerfile", ".github/workflows/"]:
+        assert f"| `{path}` |" in README, f"{path} missing from the Files table"
     for test_file in (ROOT / "tests").glob("test_*.py"):
         assert f"`tests/{test_file.name}`" in README, f"{test_file.name} missing from the Tests section"
 
@@ -73,3 +76,19 @@ def test_citation_version_matches_citation_file():
     cff = (ROOT / "CITATION.cff").read_text()
     version = re.search(r"^version: ([\d.]+)", cff, re.M).group(1)
     assert f"Version {version}, 2026." in README
+
+
+def test_package_version_matches_citation_file():
+    cff = re.search(r"^version: ([\d.]+)", (ROOT / "CITATION.cff").read_text(), re.M).group(1)
+    package = re.search(r'^__version__ = "([\d.]+)"', (PKG / "__init__.py").read_text(), re.M).group(1)
+    assert package == cff, f"chip_integrity/__init__.py says {package}, CITATION.cff says {cff}"
+
+
+def test_run_command_options_are_documented():
+    table = README[README.index("Options for `chip-integrity run`:"):]
+    table = table[:table.index("\n\n", table.index("|---"))]
+    tree = ast.parse((PKG / "cli.py").read_text())
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and getattr(node.func, "attr", "") == "add_argument" and getattr(node.func.value, "id", "") == "run":
+            flag = node.args[0].value
+            assert f"| `{flag}` |" in table, f"chip-integrity run {flag} missing from its options table"

@@ -1,0 +1,10 @@
+.git
+.github
+docs
+results
+tests
+**/__pycache__
+.pytest_cache
+*.jsonl
+chip-integrity-results
+chip-integrity-quick

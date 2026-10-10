@@ -12,7 +12,7 @@ import pytest
 import torch
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-import screen  # noqa: E402
+from chip_integrity import screen  # noqa: E402
 
 BASE = ["--device", "cpu", "--size", "96", "--iters", "8"]
 SQ = "96x96x96"

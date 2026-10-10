@@ -4,7 +4,21 @@ An open tester for silent computation errors in AI chips.
 
 It runs a fixed calculation on a GPU, NPU or CPU many times and proves, element by element, whether the chip returned the right answer every time. Results come out in the Open Compute Project Test and Validation format, so they drop straight into fleet tooling.
 
-**Status: early.** Six probes so far, numbered as on the roadmap below: `screen.py` v0.3.2 (probe 1, matrix multiply across several shapes, four precisions and exact FP8), `memcheck.py` v0.1.1 (probe 2, a sweep of most of the device memory), `kernels.py` v0.2.2 (probe 3, softmax, layer norm, GELU, rotary embeddings and fused attention) `abft.py` v0.1.0 (probe 6, checksum-protected matrix multiply with proven thresholds), `patterns.py` v0.1.2 (probe 9, data patterns that drive the matrix multiply) and `counters.py` v0.1.0 (probe 11, the chip's own error counters, read around every run of the other four). One device at a time, four measured chips. Read the limits section before relying on a PASS.
+**Status: early.** Six probes so far, numbered as on the roadmap below: `screen.py` v0.3.2 (probe 1, matrix multiply across several shapes, four precisions and exact FP8), `memcheck.py` v0.1.1 (probe 2, a sweep of most of the device memory), `kernels.py` v0.2.2 (probe 3, softmax, layer norm, GELU, rotary embeddings and fused attention), `abft.py` v0.1.0 (probe 6, checksum-protected matrix multiply with proven thresholds), `patterns.py` v0.1.2 (probe 9, data patterns that drive the matrix multiply) and `counters.py` v0.1.0 (probe 11, the chip's own error counters, read around every run of the other five). One device at a time, four measured chips. Read the limits section before relying on a PASS.
+
+## Quick start
+
+```
+pip install ai-chip-integrity
+chip-integrity run --quick     # about a minute: every probe and its self-test at small sizes
+chip-integrity run             # the full run: ten OCP result files in chip-integrity-results/
+```
+
+On an NVIDIA GPU host with Docker and the NVIDIA container toolkit, with nothing else installed:
+
+```
+docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.4.0
+```
 
 ## Why this exists
 
@@ -235,6 +249,22 @@ On NVIDIA GPUs the counters come from NVML through the `nvidia-ml-py` package (i
 
 ## Run it
 
+`chip-integrity run` executes every probe and then its self-test, each in its own process, and writes ten OCP result files. It runs exactly the ten probe commands listed further down, with the same self-test strength, so its files are the same as running them by hand.
+
+Options for `chip-integrity run`:
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--device` | `auto` | `cpu`, `mps`, `cuda` or `cuda:N`, passed to every probe |
+| `--name` | `chip` | prefix of the result file names |
+| `--out-dir` | `chip-integrity-results` | folder for the files; `chip-integrity-quick` with `--quick` |
+| `--quick` | off | small sizes: a smoke test, not a publishable row |
+| `--skip` | none | comma list of probes to leave out, from `screen`, `kernels`, `abft`, `patterns`, `memcheck` |
+
+The exit code is 0 when every step passes and 1 when any fails; a summary names each step and its file. `chip-integrity screen` (and `memcheck`, `kernels`, `abft`, `patterns`) runs one probe with its own options, listed below, and `chip-integrity --version` prints the suite version and every probe's version.
+
+From a clone of the repository, the probes also run as scripts, with no install beyond the requirements:
+
 ```
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
@@ -248,7 +278,7 @@ python patterns.py               # data pattern probe; 8 patterns through the ma
 python patterns.py --inject 3    # data pattern self-test
 python memcheck.py               # memory probe; 6 patterns over most of the device memory
 python memcheck.py --inject 5    # memory self-test
-python -m pytest -q              # 160 tests on CPU; 6 more validate the output against OCP's schema
+python -m pytest -q              # 175 tests on CPU; 6 more validate the output against OCP's schema
 ```
 
 Options for `memcheck.py`:
@@ -326,20 +356,25 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 
 | Path | What it is |
 |---|---|
-| `screen.py` | Probe 1, matrix multiply |
-| `kernels.py` | Probe 3, transformer kernels |
-| `abft.py` | Probe 6, checksum-protected matrix multiply |
-| `patterns.py` | Probe 9, data patterns through the matrix multiply |
-| `counters.py` | Probe 11, the chip's error counters, read around every run of the other probes |
-| `memcheck.py` | Probe 2, memory sweep |
-| `arith.py` | The arithmetic model every bound is derived from, with its id written into each result file |
+| `chip_integrity/screen.py` | Probe 1, matrix multiply |
+| `chip_integrity/kernels.py` | Probe 3, transformer kernels |
+| `chip_integrity/abft.py` | Probe 6, checksum-protected matrix multiply |
+| `chip_integrity/patterns.py` | Probe 9, data patterns through the matrix multiply |
+| `chip_integrity/counters.py` | Probe 11, the chip's error counters, read around every run of the other probes |
+| `chip_integrity/memcheck.py` | Probe 2, memory sweep |
+| `chip_integrity/arith.py` | The arithmetic model every bound is derived from, with its id written into each result file |
+| `chip_integrity/cli.py` | The `chip-integrity` command: `run` executes every probe and its self-test, each in its own process, and writes the ten result files; `chip-integrity <probe>` runs one probe with its own options |
+| `screen.py`, `kernels.py`, `abft.py`, `patterns.py`, `memcheck.py` | Small wrappers so `python screen.py` and the other probe commands keep working from a clone |
+| `pyproject.toml` | Package metadata for PyPI. The version lives in `chip_integrity/__init__.py` and must match `CITATION.cff` |
+| `Dockerfile` | The `ghcr.io/tech4biz-yasha/ai-chip-integrity` image: PyTorch 2.8.0 with CUDA 12.8, the same build the H100 rows were measured with, and `chip-integrity run` as its default command |
+| `.github/workflows/` | `ci.yml` runs every test, including the OCP schema checks, builds the package, and runs a quick pass inside the Docker image on every push; `release.yml` publishes the package to PyPI and the image to GitHub's container registry when a release is published |
 | `build_site.py` | Builds `docs/index.html` (chipintegrity.org) from `docs/template.html` and every file in `results/`, so the published tables can never say more than the files do. One row per device and probe; a newer tool version replaces the older row. Run `python build_site.py` after adding result files |
 | `results/` | Every published result file, in OCP format |
 | `tests/` | The test suite below |
 
 ## Tests
 
-`python -m pytest -q` runs 160 tests on the CPU in a few seconds; 6 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set. On CPUs whose matrix multiply ignores flush-to-zero, such as Apple silicon, the two flushing tests in `tests/test_patterns.py` skip themselves, giving 158 passed.
+`python -m pytest -q` runs 175 tests on the CPU in under a minute; 6 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set. On CPUs whose matrix multiply ignores flush-to-zero, such as Apple silicon, the two flushing tests in `tests/test_patterns.py` skip themselves, giving 173 passed.
 
 1. `tests/test_screen.py` (37): every verdict path, every bit position caught by the self-test, NaN handling, int8 and FP8 off-by-one, FP8 inputs exact and K above 4096 skipped, rectangular shapes, bound tightness.
 2. `tests/test_kernels.py` (23): all kernels and precisions, the self-test on six seeds, intermittent and systematic faults, a one-ulp change, internal fp16 arithmetic and tanh-GELU both caught as outside the bound, NaN handling, fp32 bound tightness, a sin that is off by 1e-4 caught in RoPE, RoPE angles reaching every position, the device's own exp, erf, sin and cos measured, and the CUDA attention path forced onto the CPU: a batch dimension added with the same shape and values back, the kernel that ran recorded, fused kernels only for fp16 and bf16, and a loud refusal when no kernel fits.
@@ -349,7 +384,8 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 6. `tests/test_patterns.py` (17): every pattern passes on CPU, each input set really has its pattern and stays clear of overflow, FP8 and int8 inputs stay exact, flushing is detected and judging a flushing device against the wrong model fails, the policy is measured at each step's own shape (a library that picks its kernel by shape), a kernel that keeps in some places and flushes in others passes with and without injected flips, a fault four times the bound is caught on the cancelling pattern, injected flips are caught on every pattern, and the output matches the OCP schema.
 7. `tests/test_abft.py` (25): clean runs in every precision, injected errors located to their exact row and column on several seeds, a single error pointing at its element, a fault in a checksum flagging only its line, no false alarm on the same-sign, wide, near-maximum and cancelling patterns in every precision, checksums scaled to stay in range, the rectangle fault counted as a blind spot, NaN, and the OCP schema.
 8. `tests/test_counters.py` (17): with a simulated NVIDIA management library, every cross-check verdict; unsupported counters left out rather than zeroed; no counters on CPU and Apple devices; corrected errors reported without failing a run; uncorrected errors failing it; a wrong answer with quiet counters confirmed silent; the site keeping the counter step out of the precision list; and the OCP schema.
-9. `tests/test_readme.py` (14): this README carries every probe's version, every option and its default, every result file, every script and test file, and the citation version, so it cannot drift from the code without a test failing.
+9. `tests/test_readme.py` (16): this README carries every probe's version, every option and its default, every option of `chip-integrity run`, every result file, every script and test file, and the citation version, and the package version matches the citation, so neither can drift from the code without a test failing.
+10. `tests/test_cli.py` (13): `chip-integrity run` executes exactly the ten probe commands in this README with the same file names and self-test strength, `--quick` only adds small sizes, `--skip` leaves whole probes out, a failing step fails the run without stopping the others, a quick run is never offered as a row, bad names and unknown probes are refused before anything runs, one probe runs with its own options, the old `python screen.py` paths still work, and a real quick run writes its files.
 
 ## Output format
 
@@ -399,7 +435,7 @@ Around the probes: a fleet mode that runs every probe across many devices and co
 
 ## Contributing a row
 
-Run `python screen.py`, `python screen.py --inject 5`, `python memcheck.py`, `python memcheck.py --inject 5`, `python kernels.py`, `python kernels.py --inject 3`, `python abft.py`, `python abft.py --inject 3`, `python patterns.py` and `python patterns.py --inject 3` on your device, then open a pull request with the ten result files, the device name, driver version and PyTorch version. Rows are added only from attached result files.
+Run `chip-integrity run --name NAME` on your device, or the ten probe commands in Run it, then open a pull request with the ten result files (`NAME_clean.jsonl`, `NAME_inject.jsonl`, `NAME_kernels.jsonl`, `NAME_kernels_inject.jsonl`, `NAME_abft.jsonl`, `NAME_abft_inject.jsonl`, `NAME_patterns.jsonl`, `NAME_patterns_inject.jsonl`, `NAME_memcheck.jsonl` and `NAME_memcheck_inject.jsonl`), the device name, driver version and PyTorch version. Rows are added only from attached result files.
 
 ## Citing
 

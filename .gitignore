@@ -1,3 +1,8 @@
 results*.jsonl
 __pycache__/
 .pytest_cache/
+dist/
+build/
+*.egg-info/
+chip-integrity-results/
+chip-integrity-quick/

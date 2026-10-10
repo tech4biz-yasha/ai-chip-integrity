@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-chip-integrity"
+dynamic = ["version"]
+description = "Open, vendor-neutral tests for silent computation errors in AI chips, with every result in OCP Test and Validation format"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Yasha Khandelwal", email = "yasha.khandelwal@tech4biz.io" }]
+requires-python = ">=3.10"
+keywords = [
+    "silent data corruption",
+    "SDC",
+    "GPU reliability",
+    "AI accelerator testing",
+    "OCP Test and Validation",
+    "ABFT",
+    "FP8",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Environment :: GPU :: NVIDIA CUDA",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: System Administrators",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: System :: Hardware",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = [
+    "torch>=2.2",
+    "ocptv==0.1.7",
+    "nvidia-ml-py>=12.535; sys_platform == 'linux'",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8", "numpy", "jsonschema"]
+
+[project.scripts]
+chip-integrity = "chip_integrity.cli:main"
+
+[project.urls]
+Homepage = "https://chipintegrity.org/"
+Source = "https://github.com/tech4biz-yasha/ai-chip-integrity"
+Issues = "https://github.com/tech4biz-yasha/ai-chip-integrity/issues"
+
+[tool.setuptools]
+packages = ["chip_integrity"]
+
+[tool.setuptools.dynamic]
+version = { attr = "chip_integrity.__version__" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

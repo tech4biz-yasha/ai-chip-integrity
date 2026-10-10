@@ -8,7 +8,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 import build_site  # noqa: E402
-import kernels  # noqa: E402
+from chip_integrity import kernels  # noqa: E402
 
 
 def make_kernel_file(path, version, kernel_list, inject=0):
@@ -51,8 +51,8 @@ def test_kernel_row_renders_rope_and_attention_sizes(tmp_path):
 def test_pattern_rows_render_with_flush_policy(tmp_path, monkeypatch):
     """The subnormal cell shows what was measured. bf16 is made to flush on every host, because hosts differ:
     CPUs with AMX or AVX-512 BF16 flush bf16 subnormals in their larger kernels, other CPUs keep them."""
-    import patterns
-    import screen
+    from chip_integrity import patterns
+    from chip_integrity import screen
     import torch
     real = screen.matmul
 
@@ -74,7 +74,7 @@ def test_pattern_rows_render_with_flush_policy(tmp_path, monkeypatch):
 
 
 def test_checksum_rows_render(tmp_path):
-    import abft
+    from chip_integrity import abft
     clean, inj = tmp_path / "a.jsonl", tmp_path / "a_inject.jsonl"
     abft.main(["--device", "cpu", "--shapes", "32x64x24", "--iters", "3", "--out", str(clean)])
     abft.main(["--device", "cpu", "--shapes", "32x64x24", "--iters", "4", "--inject", "2", "--out", str(inj)])
@@ -85,8 +85,8 @@ def test_checksum_rows_render(tmp_path):
 
 
 def test_mixed_subnormal_policy_is_shown(tmp_path, monkeypatch):
-    import patterns
-    import screen
+    from chip_integrity import patterns
+    from chip_integrity import screen
     import torch
     real = screen.matmul
 

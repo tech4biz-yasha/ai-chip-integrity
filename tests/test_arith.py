@@ -13,8 +13,8 @@ import pytest
 import torch
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-import arith  # noqa: E402
-import kernels  # noqa: E402
+from chip_integrity import arith  # noqa: E402
+from chip_integrity import kernels  # noqa: E402
 
 
 def truncate(x, ulp):

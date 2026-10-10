@@ -14,8 +14,8 @@ import torch
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 import build_site  # noqa: E402
-import counters  # noqa: E402
-import screen  # noqa: E402
+from chip_integrity import counters  # noqa: E402
+from chip_integrity import screen  # noqa: E402
 
 
 class FakeNVML(types.ModuleType):

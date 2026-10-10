@@ -14,9 +14,9 @@ import pytest
 import torch
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-import arith  # noqa: E402
-import patterns  # noqa: E402
-import screen  # noqa: E402
+from chip_integrity import arith  # noqa: E402
+from chip_integrity import patterns  # noqa: E402
+from chip_integrity import screen  # noqa: E402
 
 SMALL = "64x64x64,16x128x48"
 

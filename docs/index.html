@@ -619,30 +619,19 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <section id="run">
 <div class="kicker">TAKE PART</div>
 <h2>Run it on your chip</h2>
-<p class="lede">Ten commands, ten result files, one pull request. Works on CUDA, Apple MPS and CPU today.</p>
-<pre><span class="c"># once</span>
-git clone https://github.com/tech4biz-yasha/ai-chip-integrity.git &amp;&amp; cd ai-chip-integrity
-pip install -r requirements.txt
+<p class="lede">One command, ten result files, one pull request. Works on CUDA, Apple MPS and CPU today.</p>
+<pre><span class="c"># install once</span>
+pip install ai-chip-integrity
 
-<span class="c"># probe 1, compute, and its self-test</span>
-python screen.py --out NAME_clean.jsonl
-python screen.py --inject 5 --out NAME_inject.jsonl
+<span class="c"># a one-minute smoke test: every probe and its self-test at small sizes</span>
+chip-integrity run --quick
 
-<span class="c"># probe 2, memory, and its self-test</span>
-python memcheck.py --out NAME_memcheck.jsonl
-python memcheck.py --inject 5 --out NAME_memcheck_inject.jsonl
+<span class="c"># the full run: every probe and its self-test, ten OCP result files</span>
+chip-integrity run --name NAME
 
-<span class="c"># probe 3, transformer kernels, and its self-test</span>
-python kernels.py --out NAME_kernels.jsonl
-python kernels.py --inject 3 --out NAME_kernels_inject.jsonl
-
-<span class="c"># probe 6, checksum-protected matrix multiply, and its self-test</span>
-python abft.py --out NAME_abft.jsonl
-python abft.py --inject 3 --out NAME_abft_inject.jsonl
-
-<span class="c"># probe 9, data patterns, and its self-test</span>
-python patterns.py --out NAME_patterns.jsonl
-python patterns.py --inject 3 --out NAME_patterns_inject.jsonl</pre>
+<span class="c"># or, on an NVIDIA GPU host with Docker, with nothing else installed</span>
+docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.4.0 run --name NAME --out-dir /results</pre>
+<p class="note">The same ten files come from running each probe by hand from a clone of the repository, for example <code>python screen.py --out NAME_clean.jsonl</code> and then <code>python screen.py --inject 5 --out NAME_inject.jsonl</code> for its self-test. The README lists all ten commands.</p>
 <ol class="steps">
 <li><b>Open a pull request</b> with the ten files, the device name, driver version and PyTorch version.</li>
 <li><b>Rows are added only from attached files.</b> The table is regenerated from them, so a row cannot say more than its file does.</li>
