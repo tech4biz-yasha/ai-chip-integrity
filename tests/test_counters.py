@@ -181,7 +181,7 @@ def test_site_keeps_the_counter_step_out_of_precisions_and_shows_it(tmp_path, mo
     nvml.corrected += 1
     scripted(monkeypatch, before, counters.snapshot(torch.device("cuda", 0)))
     _, _, out = run_screen(tmp_path)
-    compute, _, _, _ = build_site.summarise([build_site.parse(str(out))])
+    compute, _, _, _, _ = build_site.summarise([build_site.parse(str(out))])
     assert compute[0]["precisions"] == ["fp32"]
     html = build_site.compute_rows(compute)
     assert "hardware corrected errors during the run" in html and 'class="ok"' in html

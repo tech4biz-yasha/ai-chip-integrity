@@ -29,7 +29,7 @@ def test_newer_version_replaces_older_row(tmp_path):
     make_kernel_file(old, "0.1.0", "softmax,gelu")
     make_kernel_file(new, kernels.VERSION, ",".join(kernels.KERNELS))
     for order in ([old, new], [new, old]):
-        _, _, rows, _ = build_site.summarise([build_site.parse(str(p)) for p in order])
+        _, _, rows, _, _ = build_site.summarise([build_site.parse(str(p)) for p in order])
         assert len(rows) == 1
         row = rows[0]
         assert row["version"] == kernels.VERSION
@@ -42,7 +42,7 @@ def test_kernel_row_renders_rope_and_attention_sizes(tmp_path):
     inj = tmp_path / "k_inject.jsonl"
     make_kernel_file(clean, kernels.VERSION, ",".join(kernels.KERNELS))
     make_kernel_file(inj, kernels.VERSION, ",".join(kernels.KERNELS), inject=2)
-    _, _, rows, _ = build_site.summarise([build_site.parse(str(p)) for p in (clean, inj)])
+    _, _, rows, _, _ = build_site.summarise([build_site.parse(str(p)) for p in (clean, inj)])
     html = build_site.kernel_rows(rows)
     assert "rope 32×128" in html and "attention 8×8×128" in html
     assert f'{2 * len(kernels.KERNELS) * 3} of {2 * len(kernels.KERNELS) * 3}' in html
@@ -53,8 +53,19 @@ def test_pattern_rows_render_with_flush_policy(tmp_path):
     clean, inj = tmp_path / "p.jsonl", tmp_path / "p_inject.jsonl"
     patterns.main(["--device", "cpu", "--shapes", "32x64x32", "--iters", "3", "--out", str(clean)])
     patterns.main(["--device", "cpu", "--shapes", "32x64x32", "--iters", "3", "--inject", "1", "--out", str(inj)])
-    _, _, _, rows = build_site.summarise([build_site.parse(str(p)) for p in (clean, inj)])
+    _, _, _, rows, _ = build_site.summarise([build_site.parse(str(p)) for p in (clean, inj)])
     assert len(rows) == 1 and rows[0]["patterns"] == build_site.PATTERN_ORDER
     html = build_site.pattern_rows(rows)
     steps = sum(len(v) for v in patterns.APPLIES.values())
     assert f"{steps} of {steps}" in html and ">kept<" in html and "no-silent-errors" in html
+
+
+def test_checksum_rows_render(tmp_path):
+    import abft
+    clean, inj = tmp_path / "a.jsonl", tmp_path / "a_inject.jsonl"
+    abft.main(["--device", "cpu", "--shapes", "32x64x24", "--iters", "3", "--out", str(clean)])
+    abft.main(["--device", "cpu", "--shapes", "32x64x24", "--iters", "4", "--inject", "2", "--out", str(inj)])
+    *_, rows = build_site.summarise([build_site.parse(str(p)) for p in (clean, inj)])
+    assert len(rows) == 1 and rows[0]["precisions"] == ["fp32", "fp16", "bf16"] and rows[0]["missed"] == 0
+    html = build_site.checksum_rows(rows)
+    assert "6 of 6" in html and "no-silent-errors" in html

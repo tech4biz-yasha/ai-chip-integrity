@@ -36,7 +36,7 @@
       "programmingLanguage": "Python",
       "license": "https://opensource.org/licenses/MIT",
       "author": {"@id": "https://chipintegrity.org/#person"},
-      "description": "Five probes for AI accelerators: a compute probe that checks matrix multiplies against a proven float64 error bound and bit-for-bit repeatability, a memory probe that writes six patterns into every word of most of device memory and reads them back, a kernel probe that checks softmax, layer norm, GELU, rotary embeddings and attention the same two ways, a data pattern probe that drives the matrix multiply with inputs built to reach particular bits, and an error counter cross-check that records whether the chip's own counters noticed. Output follows the OCP Test and Validation spec."
+      "description": "Six probes for AI accelerators: a compute probe that checks matrix multiplies against a proven float64 error bound and bit-for-bit repeatability, a memory probe that writes six patterns into every word of most of device memory and reads them back, a kernel probe that checks softmax, layer norm, GELU, rotary embeddings and attention the same two ways, a data pattern probe that drives the matrix multiply with inputs built to reach particular bits, a checksum-protected matrix multiply that detects and locates a wrong element with proven thresholds, and an error counter cross-check that records whether the chip's own counters noticed. Output follows the OCP Test and Validation spec."
     },
     {
       "@type": "Dataset",
@@ -265,7 +265,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <section id="method">
 <div class="kicker">LEARN, PART 3 OF 5</div>
 <h2>How a chip is tested here</h2>
-<p class="lede">Five probes so far, numbered as on the roadmap. Probe 1 makes the chip multiply matrices and judges every output element. Probe 2 fills the chip's memory with known values and reads every one back. Probe 3 checks the other kernels inside a transformer the same way as probe 1. Probe 9 feeds the matrix multiply inputs built to reach particular bits. Probe 11 reads the chip's own error counters around every run and asks whether the hardware noticed. Each probe has two independent checks, so a fault has to hide from both.</p>
+<p class="lede">Six probes so far, numbered as on the roadmap. Probe 1 makes the chip multiply matrices and judges every output element. Probe 2 fills the chip's memory with known values and reads every one back. Probe 3 checks the other kernels inside a transformer the same way as probe 1. Probe 6 has the chip compute checksums inside the same multiply, so a wrong element can be caught and located without any reference. Probe 9 feeds the matrix multiply inputs built to reach particular bits. Probe 11 reads the chip's own error counters around every run and asks whether the hardware noticed. Each probe has two independent checks, so a fault has to hide from both.</p>
 
 <h3>Probe 1: compute</h3>
 <p>The chip multiplies two fixed matrices, A and B, fifty times at each of three shapes and four precisions, plus FP8. Two checks run on every output.</p>
@@ -330,6 +330,10 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <div class="panel" style="grid-column:1/-1"><h3>Attention</h3><p>softmax(QK<sup>T</sup>/&radic;d)V through the device's fused attention kernel. The bound carries the tensor-core error of QK<sup>T</sup> through the softmax, allows for the running rescale fused kernels apply block by block, and for P being held in fp16 or bf16. That is why it is the widest.</p></div>
 </div>
 <p>Every bound on this site follows from one written arithmetic model, recorded in every result file: FP32 arithmetic rounds to nearest, tensor cores accumulate faithfully in FP32, exp, divide and square roots stay within eight ulps, and erf, sin and cos within 2<sup>&minus;20</sup> absolute, which admits the shortcut erf that PyTorch uses on ARM processors. Each step also measures the device's own exp, erf, sin and cos on its inputs, so a loose function library can be told apart from a faulty unit. CUDA's own math library documents errors well inside that. A device that breaks the model, or that substitutes an approximate GELU, shows as outside-error-bound on every run, and the message says so. Below the smallest normal value of the output type the bound becomes an absolute floor, because fp16 cannot represent a probability of 10<sup>&minus;8</sup> and no chip should be blamed for that.</p>
+<h3>Probe 6: checksum-protected matrix multiply</h3>
+<p>Huang and Abraham showed in 1984 that a multiply can check itself. Append to A a row holding its column sums, append to B a column holding its row sums, and one multiply returns C together with C's own row sums and column sums, computed by the same hardware in the same pass. A wrong element breaks exactly one row check and one column check, and where they cross is the element. No reference answer is needed, so the check can run inside real work for the cost of one extra row and column, and it is the design that later becomes a block in silicon.</p>
+<div class="formula">A' = [ A ; 2⁻ˢ·(column sums of A) ]<br>B' = [ B , 2⁻ˢ·(row sums of B) ]<br>A'·B' = [ C , 2⁻ˢ·(row sums of C) ;<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2⁻ˢ·(column sums of C) , … ]</div>
+<p>In floating point, rounding makes a correct row sum differ slightly from its checksum, so everything depends on the threshold. Here each threshold is derived element by element from the same arithmetic model as every other bound, and the host removes the known rounding of the checksums exactly, so a correct chip can never cross it. The power of two 2⁻ˢ keeps the checksums from overflowing near the top of the range. The probe also measures its own blind spot: a rectangle of four errors that cancel in every row and column sum is invisible to checksums, so any run the reference check fails while the checksums hold is counted, never passed.</p>
 <h3>Probe 9: data patterns</h3>
 <p>Some faults only fire on particular bit patterns, and uniform random inputs almost never produce them. The data pattern probe runs the same matrix multiply, with the same two checks and the same proven or exact reference, on inputs built to reach specific parts of the arithmetic. Every input set is scaled by a power of two where needed, so no partial sum in any order can overflow.</p>
 <div class="verdict">
@@ -351,7 +355,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <div class="kicker">LEARN, PART 4 OF 5</div>
 <h2>Reading a verdict</h2>
 <p class="lede">Every step ends in one of these words. They are chosen so a reader can tell a chip fault from a software quirk without opening the file.</p>
-<h3>Compute, kernel and data pattern probes</h3>
+<h3>Compute, kernel, checksum and data pattern probes</h3>
 <div class="verdict">
 <div class="v">no-silent-errors</div><div>Every run inside the bound and bit-identical to run 0. The baseline.</div>
 <div class="v bad">silent-data-corruption</div><div>Some runs differ from run 0. An intermittent fault, the kind a fleet scanner exists to find.</div>
@@ -394,7 +398,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <dt>reference bound</dt><dd>The largest error that correct rounding can produce for a given computation and precision. Anything larger is a wrong answer. The bound used here is the standard componentwise bound for inner products from Higham.</dd>
 <dt>fault injection</dt><dd>Deliberately corrupting a value to confirm the checks notice. Used here as a self-test on every published row.</dd>
 <dt>dwell</dt><dd>The pause between writing memory and reading it back. Weak cells lose their value over time, so a longer dwell catches more of them.</dd>
-<dt>OCP Test and Validation</dt><dd>The Open Compute Project's open format for hardware diagnostic output, used by cloud operators so that any test's results can be read by any fleet tool. All five probes write it.</dd>
+<dt>OCP Test and Validation</dt><dd>The Open Compute Project's open format for hardware diagnostic output, used by cloud operators so that any test's results can be read by any fleet tool. All six probes write it.</dd>
 </dl>
 </section>
 
@@ -413,6 +417,12 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <tbody>{{KERNEL_ROWS}}</tbody>
 </table></div>
 <p class="note">Worst error over bound is the largest measured error on the device divided by the bound at that element, across every kernel and precision. Values near 1 at fp16 and bf16 are expected: there the bound is dominated by the single rounding of the output, so there is almost nothing to spare. A value above 1 is a failed run.</p>
+<h3>Checksum probe</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Device</th><th>Date</th><th>Shapes</th><th>Precisions</th><th>Runs</th><th>Silent faults</th><th>Blind-spot runs</th><th>Threshold / typical value</th><th>Injected located</th><th>Verdict</th><th>Files</th></tr></thead>
+<tbody>{{CHECKSUM_ROWS}}</tbody>
+</table></div>
+<p class="note">Threshold over typical value is how large an error must be, compared with a typical element of C, before a proven checksum is guaranteed to see it, at the worst precision and shape. It is small in fp32 and grows in fp16 and bf16, where the reference and repeat checks carry the smaller faults. Blind-spot runs are runs the reference check failed while every checksum held.</p>
 <h3>Data pattern probe</h3>
 <div class="tablewrap"><table>
 <thead><tr><th>Device</th><th>Date</th><th>Patterns</th><th>Precisions</th><th>Runs</th><th>Silent faults</th><th>Injected caught</th><th>Subnormal inputs</th><th>Verdict</th><th>Files</th></tr></thead>
@@ -441,7 +451,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <div class="kicker">EVIDENCE</div>
 <h2>What a PASS means, and does not</h2>
 <ul class="plain">
-<li><b>It means:</b> no silent error appeared in these matrix multiplies, these data patterns, these transformer kernels and this memory sweep, in these runs, on this device, on this day.</li>
+<li><b>It means:</b> no silent error appeared in these matrix multiplies, these checksums, these data patterns, these transformer kernels and this memory sweep, in these runs, on this device, on this day.</li>
 <li><b>It does not mean:</b> the chip is healthy. Faults that depend on specific data, on heat, or on hours of load are not yet exercised. The next probes add them.</li>
 <li><b>Arithmetic model:</b> every bound assumes FP32 arithmetic that rounds to nearest, tensor cores that accumulate faithfully in FP32, exp, divide and square roots within eight ulps, and erf, sin and cos within 2<sup>&minus;20</sup> absolute. A device that breaks the model shows as outside-error-bound on every run, and the message says so.</li>
 <li><b>One device per run:</b> links between chips are not yet tested.</li>
@@ -452,7 +462,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <section id="run">
 <div class="kicker">TAKE PART</div>
 <h2>Run it on your chip</h2>
-<p class="lede">Eight commands, eight result files, one pull request. Works on CUDA, Apple MPS and CPU today.</p>
+<p class="lede">Ten commands, ten result files, one pull request. Works on CUDA, Apple MPS and CPU today.</p>
 <pre><span class="c"># once</span>
 git clone https://github.com/tech4biz-yasha/ai-chip-integrity.git &amp;&amp; cd ai-chip-integrity
 pip install -r requirements.txt
@@ -469,11 +479,15 @@ python memcheck.py --inject 5 --out NAME_memcheck_inject.jsonl
 python kernels.py --out NAME_kernels.jsonl
 python kernels.py --inject 3 --out NAME_kernels_inject.jsonl
 
+<span class="c"># probe 6, checksum-protected matrix multiply, and its self-test</span>
+python abft.py --out NAME_abft.jsonl
+python abft.py --inject 3 --out NAME_abft_inject.jsonl
+
 <span class="c"># probe 9, data patterns, and its self-test</span>
 python patterns.py --out NAME_patterns.jsonl
 python patterns.py --inject 3 --out NAME_patterns_inject.jsonl</pre>
 <ol class="steps">
-<li><b>Open a pull request</b> with the eight files, the device name, driver version and PyTorch version.</li>
+<li><b>Open a pull request</b> with the ten files, the device name, driver version and PyTorch version.</li>
 <li><b>Rows are added only from attached files.</b> The table is regenerated from them, so a row cannot say more than its file does.</li>
 <li><b>Found a fault?</b> Open an issue with the file. A real finding on real hardware is the most useful thing anyone can contribute.</li>
 </ol>
@@ -483,14 +497,14 @@ python patterns.py --inject 3 --out NAME_patterns_inject.jsonl</pre>
 <section id="roadmap">
 <div class="kicker">TAKE PART</div>
 <h2>Roadmap</h2>
-<p class="lede">Twelve probes, each aimed at one part of the chip. Five are built: 1, 2, 3, 9 and 11.</p>
+<p class="lede">Twelve probes, each aimed at one part of the chip. Six are built: 1, 2, 3, 6, 9 and 11.</p>
 <div class="road">
 <div class="r done"><b>1. Matrix multiply</b><span>Three shapes, four precisions plus FP8, a proven or exact reference and a bit-exact repeat check. Done. FP4 once a Blackwell card is measured.</span></div>
 <div class="r done"><b>2. Memory pattern sweep</b><span>Six patterns over most of device memory, exact read-back, address and bit mask on every miss. Done. On-chip SRAM next.</span></div>
 <div class="r done"><b>3. Transformer kernels</b><span>Softmax, layer norm, GELU, rotary embeddings and the fused attention kernel against a float64 reference with derived bounds. Done.</span></div>
 <div class="r now"><b>4. Full model forward pass</b><span>A small LLM, every layer checked against a CPU float64 reference. Each layer is fed the device's own input, so its bound stays as tight as a single kernel's.</span></div>
 <div class="r"><b>5. Reductions, all-reduce and copy engines</b><span>Sums across threads, blocks and then GPUs over NVLink and PCIe, with checksums that must agree at both ends, plus copies of known patterns between host and device.</span></div>
-<div class="r"><b>6. Checksum-protected matrix multiply</b><span>Huang and Abraham's row and column checksums, which detect and locate a wrong element inside the multiply itself.</span></div>
+<div class="r done"><b>6. Checksum-protected matrix multiply</b><span>Huang and Abraham's row and column checksums, which detect and locate a wrong element inside the multiply itself, with proven thresholds and the blind spot measured. Done.</span></div>
 <div class="r"><b>7. Hours under load</b><span>The same probes for hours at full power, with temperature and clocks logged next to every result.</span></div>
 <div class="r"><b>8. Clock and voltage margin sweep</b><span>Lower the margin step by step where the driver allows it and record where each unit starts to fail. Likely needs bare-metal access.</span></div>
 <div class="r done"><b>9. Data pattern library</b><span>Wide exponents, full mantissas, cancellation, alternating signs, sparsity, subnormals with flush detection, near-overflow and int8 extremes, for the matrix multiply. Done. Patterns for the transformer kernels next.</span></div>
@@ -509,11 +523,12 @@ python patterns.py --inject 3 --out NAME_patterns_inject.jsonl</pre>
 <li><b>Zheng et al., OSDI 2026.</b> SDCs in the Wild: characterising and diagnosing SDC-defective GPUs in production LLM training. The source of the finding that microbenchmark screening misses most faulty units. <a href="https://www.usenix.org/conference/osdi26/presentation/zheng">usenix.org</a></li>
 <li><b>Lei et al., OSDI 2026.</b> Safeguarding LLM Training at Scale: online SDC detection and insights from 35 million GPU hours. <a href="https://www.usenix.org/conference/osdi26/presentation/lei">usenix.org</a></li>
 <li><b>Higham, Accuracy and Stability of Numerical Algorithms.</b> The componentwise rounding error bound for inner products used by the reference check.</li>
+<li><b>Huang and Abraham, 1984.</b> Algorithm-based fault tolerance for matrix operations, IEEE Transactions on Computers. The row and column checksums behind probe 6.</li>
 <li><b>Fasi, Higham, Mikaitis and Pranesh, 2021.</b> Numerical behavior of NVIDIA tensor cores. The measurement that tensor cores accumulate with truncation, which sets the fp16 and bf16 bound. <a href="https://peerj.com/articles/cs-330">peerj.com</a></li>
 <li><b>DeepSeek-AI, 2024.</b> DeepSeek-V3 technical report. Reports that Hopper's FP8 tensor cores keep 14 bits when they add, which is why the FP8 inputs here are chosen so every sum fits in 13. <a href="https://arxiv.org/abs/2412.19437">arxiv.org</a></li>
 <li><b>Valpey and Pai, 2025.</b> Modeling three generations of tensor cores. A formal model of rounding and accumulation order on Volta, Turing and Ampere. <a href="https://arxiv.org/abs/2502.15999">arxiv.org</a></li>
 <li><b>Huang and Abraham, 1984.</b> Algorithm-based fault tolerance for matrix operations. The original idea of checking a matrix result against a cheap independent computation.</li>
-<li><b>OCP Test and Validation.</b> The open diagnostic output format and reference implementation all five probes write to. <a href="https://github.com/opencomputeproject/ocp-diag-core">ocp-diag-core</a></li>
+<li><b>OCP Test and Validation.</b> The open diagnostic output format and reference implementation all six probes write to. <a href="https://github.com/opencomputeproject/ocp-diag-core">ocp-diag-core</a></li>
 </ul>
 </section>
 

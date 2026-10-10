@@ -11,7 +11,7 @@ import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 README = (ROOT / "README.md").read_text()
-PROBES = ["screen.py", "memcheck.py", "kernels.py", "patterns.py"]
+PROBES = ["screen.py", "memcheck.py", "kernels.py", "patterns.py", "abft.py"]
 VERSIONED = PROBES + ["counters.py"]
 
 
