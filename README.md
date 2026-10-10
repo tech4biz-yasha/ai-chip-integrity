@@ -18,57 +18,72 @@ Every row comes from a run of this code with the result files in [`results/`](re
 
 **Compute probe (`screen.py`)**
 
-| Device | Date | Tool | Shapes (MxKxN) | Runs per step | fp32 | fp16 | bf16 | int8 | Injected faults caught | Verdict |
-|---|---|---|---|---|---|---|---|---|---|---|
-| NVIDIA H200, PyTorch 2.8.0+cu128, rented pod | 2026-10-08 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | 60 of 60 | no-silent-errors |
-| NVIDIA A100-SXM4-80GB, PyTorch 2.8.0+cu128, rented pod | 2026-10-07 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | 60 of 60 | no-silent-errors |
-| NVIDIA H100 80GB HBM3 (SXM), driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-07 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | 60 of 60 | no-silent-errors |
-| Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-07 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | skipped, no int8 matmul on MPS | 45 of 45 | no-silent-errors |
-| Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-07 | v0.1.0 | 1024x1024x1024 | 50 | PASS, 1.6 s | PASS, 1.1 s | not run | not run | 10 of 10 | no-silent-errors |
+| Device | Date | Tool | Shapes (MxKxN) | Runs per step | fp32 | fp16 | bf16 | int8 | FP8 | Injected faults caught | Verdict |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| NVIDIA H100 80GB HBM3 (SXM), driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-10 | v0.3.2 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | PASS, exact with full and fast accumulation | 90 of 90 | no-silent-errors |
+| NVIDIA H200, PyTorch 2.8.0+cu128, rented pod | 2026-10-08 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | not in v0.2.0 | 60 of 60 | no-silent-errors |
+| NVIDIA A100-SXM4-80GB, PyTorch 2.8.0+cu128, rented pod | 2026-10-07 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | not in v0.2.0 | 60 of 60 | no-silent-errors |
+| NVIDIA H100 80GB HBM3 (SXM), driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-07 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | not in v0.2.0 | 60 of 60 | no-silent-errors |
+| Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-07 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | skipped, no int8 matmul on MPS | not in v0.2.0 | 45 of 45 | no-silent-errors |
+| Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-07 | v0.1.0 | 1024x1024x1024 | 50 | PASS, 1.6 s | PASS, 1.1 s | not run | not run | not run | 10 of 10 | no-silent-errors |
 
 **Kernel probe (`kernels.py`)**
 
 | Device | Date | Tool | Kernels | Size | Runs per step | fp32 | fp16 | bf16 | Injected faults caught | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
+| NVIDIA H100 80GB HBM3 (SXM), driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-10 | v0.2.2 | softmax, layer norm, GELU, RoPE, attention | 4096x4096; RoPE 4096 positions x 128; attention 8 heads x 1024 tokens x 128 | 25 | PASS | PASS | PASS | 45 of 45 | no-silent-errors |
 | Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-10 | v0.2.0 | softmax, layer norm, GELU, RoPE, attention | 4096x4096; RoPE 4096 positions x 128; attention 8 heads x 1024 tokens x 128 | 25 | PASS | PASS | PASS | 45 of 45 | no-silent-errors |
 | Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-08 | v0.1.0 | softmax, layer norm, GELU, attention | 4096x4096; attention 8 heads x 1024 tokens x 128 | 25 | PASS | PASS | PASS | 36 of 36 | no-silent-errors |
 
-Notes on the Apple rows: in the v0.2.0 run all 375 results across 15 steps were inside the bound and bit-for-bit identical to their first run, including RoPE with angles up to 4095 radians; result files `results/mac_kernels_v020.jsonl` and `results/mac_kernels_v020_inject.jsonl`. The v0.1.0 run (300 results across 12 steps, all clean, 36 of 36 faults caught) is kept as `results/mac_kernels.jsonl` and `results/mac_kernels_inject.jsonl`; the site shows the newest version per device. Data centre GPU rows are next.
+Notes on the Apple rows: in the v0.2.0 run all 375 results across 15 steps were inside the bound and bit-for-bit identical to their first run, including RoPE with angles up to 4095 radians; result files `results/mac_kernels_v020.jsonl` and `results/mac_kernels_v020_inject.jsonl`. The v0.1.0 run (300 results across 12 steps, all clean, 36 of 36 faults caught) is kept as `results/mac_kernels.jsonl` and `results/mac_kernels_inject.jsonl`; the site shows the newest version per device.
+
+Notes on the H100 row: all 375 results across 15 steps were inside the bound and bit-for-bit identical to their first run. Attention ran on FlashAttention in fp16 and bf16 and on the memory-efficient kernel in fp32, each chosen and recorded by the probe. The 16-bit kernels sit closest to their bounds (up to 0.999 for fp16 softmax), as expected where the single rounding of the output dominates the bound; fp32 stays at or below 0.162. The GPU's own functions were well inside the 2^-20 allowance: exp within 1.5e-7 relative, erf within 6.1e-8 and sin and cos within 8.4e-8 absolute. Result files: `results/h100_kernels_v022.jsonl` and `results/h100_kernels_v022_inject.jsonl`.
 
 **Checksum probe (`abft.py`)**
 
 | Device | Date | Tool | Shapes (MxKxN) | Runs per step | fp32 | fp16 | bf16 | Blind-spot runs | Injected errors located | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
+| NVIDIA H100 80GB HBM3 (SXM), driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-10 | v0.1.0 | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | 0 | 18 of 18 | no-silent-errors |
 | Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-10 | v0.1.0 | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | 0 | 18 of 18 | no-silent-errors |
 
 Notes on the Apple row: all 120 runs across 6 steps had every row and column checksum consistent, sat inside the reference bound and were bit-for-bit identical to their first run, and every injected error was located to its exact row and column. Result files: `results/mac_abft.jsonl` and `results/mac_abft_inject.jsonl`.
+
+Notes on the H100 row: all 120 runs had every checksum consistent, and every injected error was located to its exact row and column. The proven threshold over a typical value was 2.3 for fp32, 9.8 for fp16 and 14.1 for bf16 at 1024x1024x1024, and 193, 780 and 827 at 32x4096x11008, so at the decode shape the checksums alone can only guarantee to catch errors hundreds of times larger than a typical output; the reference and repeat checks carry the rest. The largest residual seen used under 4% of its threshold (bf16) and about 0.004% (fp32), the margin a statistical threshold would trade for proof. The fp16 checksum at the decode shape was scaled by 2^-2 to stay in range. Result files: `results/h100_abft.jsonl` and `results/h100_abft_inject.jsonl`.
 
 **Data pattern probe (`patterns.py`)**
 
 | Device | Date | Tool | Patterns | Shapes (MxKxN) | Runs per step | fp32 | fp16 | bf16 | int8 | FP8 | Subnormal inputs | Injected faults caught | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| NVIDIA H100 80GB HBM3 (SXM), driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-10 | v0.1.2 | wide, mantissa, cancel, alternate, sparse, subnormal, near_max, extremes | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | PASS, exact | PASS, exact with full and fast accumulation | kept in fp32, fp16 and bf16 | 168 of 168 | no-silent-errors |
 | Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-10 | v0.1.0 | wide, mantissa, cancel, alternate, sparse, subnormal, near_max | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | skipped, no int8 matmul on MPS | skipped, no FP8 on MPS | flushed in fp32 and bf16, kept in fp16 | 126 of 126 | no-silent-errors |
 
 Notes on the Apple row: all 840 results across 42 steps were inside the bound and bit-for-bit identical to their first run. The Apple GPU's matrix multiply flushes subnormal inputs to zero in fp32 and bf16 and keeps them in fp16; each precision was checked against the exact model that matches. Result files: `results/mac_patterns.jsonl` and `results/mac_patterns_inject.jsonl`.
 
-**Memory sweep (`memcheck.py` v0.1.0)**
+Notes on the H100 row: all 1,120 results across 56 steps were inside the bound or exact, and bit-for-bit identical to their first run; the worst error over bound was 0.93 (bf16, sparse, 1024x1024x1024). The H100 keeps subnormal inputs in fp32, fp16 and bf16 at both shapes, measured at each step's own shape. The same multiply flushes them on the Apple GPU in fp32 and bf16, and the pod's own host CPU (Xeon Platinum 8480+) flushed bf16 subnormals in its AMX kernels while keeping them at 16x16, so identical inputs can legitimately give different answers on different chips. Result files: `results/h100_patterns.jsonl` and `results/h100_patterns_inject.jsonl`.
+
+**Memory sweep (`memcheck.py`)**
 
 | Device | Date | Memory tested | Patterns | Dwell | Bad words | Injected flips located | Verdict |
 |---|---|---|---|---|---|---|---|
 | NVIDIA H200, 139.8 GiB total, rented pod | 2026-10-08 | 111.25 GiB (29,863,444,480 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
 | NVIDIA A100-SXM4-80GB, 79.3 GiB total, rented pod | 2026-10-07 | 63.00 GiB (16,911,433,728 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
-| NVIDIA H100 80GB HBM3 (SXM), 79.2 GiB total, rented pod | 2026-10-07 | 62.75 GiB (16,844,324,864 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
+| NVIDIA H100 80GB HBM3 (SXM), 79.2 GiB total, rented pod, v0.1.1 with error counters | 2026-10-10 | 62.75 GiB (16,844,324,864 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
+| NVIDIA H100 80GB HBM3 (SXM), 79.2 GiB total, rented pod, v0.1.0 | 2026-10-07 | 62.75 GiB (16,844,324,864 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
 | Apple GPU via MPS, MacBook Pro (arm64), 11.8 GiB recommended max | 2026-10-07 | 5.50 GiB (1,476,395,008 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
 
-The H200 sweep took 24.8 s for 111.25 GiB, the A100 sweep took 28.3 s, the H100 sweep took 21.6 s both clean and with injection, so about 17 GiB/s of write, read and compare at HBM speed; the Mac sweep took 69 s clean and 85 s with injection. Result files: `results/h200_memcheck.jsonl`, `results/h200_memcheck_inject.jsonl`, `results/a100_memcheck.jsonl`, `results/a100_memcheck_inject.jsonl`, `results/h100_memcheck.jsonl`, `results/h100_memcheck_inject.jsonl`, `results/mac_memcheck.jsonl` and `results/mac_memcheck_inject.jsonl`.
+The H200 sweep took 24.8 s for 111.25 GiB, the A100 sweep took 28.3 s, the H100 sweep took 21.6 s both clean and with injection (21.8 s and 21.7 s in the v0.1.1 run, with every error counter quiet), so about 17 GiB/s of write, read and compare at HBM speed; the Mac sweep took 69 s clean and 85 s with injection. Result files: `results/h200_memcheck.jsonl`, `results/h200_memcheck_inject.jsonl`, `results/a100_memcheck.jsonl`, `results/a100_memcheck_inject.jsonl`, `results/h100_memcheck.jsonl`, `results/h100_memcheck_inject.jsonl`, `results/h100_memcheck_v011.jsonl`, `results/h100_memcheck_v011_inject.jsonl`, `results/mac_memcheck.jsonl` and `results/mac_memcheck_inject.jsonl`.
 
-The rows above were measured with v0.2.0, before the FP8 steps existed; FP8 rows come with the next data centre runs.
+The H200, A100 and first H100 rows were measured with v0.2.0, before the FP8 steps existed.
+
+Notes on the H100 v0.3.2 row: all 900 results across 18 steps were inside the bound or exact, and bit-for-bit identical to their first run. FP8 was exact on every element with both full and fast accumulation at all three shapes, including K = 4096. The worst error over bound was 0.0053 for fp32, 0.21 for fp16 and 0.66 for bf16. Result files: `results/h100_v032.jsonl` and `results/h100_v032_inject.jsonl`.
+
+**Error counters (`counters.py`), first real cross-check.** On the H100, every clean run of the five probes ended `counters-quiet`. ECC was on, the volatile corrected and uncorrected ECC counts read 0 before and after each run, no memory rows were remapped, and nothing was pending or failed. During the compute run the GPU went from 31 to 34 C, from 345 to 1980 MHz and from 69.7 to 118.9 W. Apple rows read `counters-unavailable`, as designed.
 
 Notes on the H200 row: all 600 results across 12 steps were bit-for-bit identical to their first run and int8 was exact on every element. Result files: `results/h200_clean.jsonl` and `results/h200_inject.jsonl`.
 
 Notes on the A100 row: all 600 results across 12 steps were bit-for-bit identical to their first run and int8 was exact on every element, the same as the H100. Result files: `results/a100_clean.jsonl` and `results/a100_inject.jsonl`.
 
-Notes on the H100 row: all 600 results across 12 steps were bit-for-bit identical to their first run, with TF32 and reduced-precision reductions disabled and cuBLAS set deterministic. int8 ran through the tensor cores and matched the exact int64 reference on every element. Wall time per step (56 to 59 s at 4096x4096x4096) is dominated by the CPU-side checking of 16.8 million elements per run, not by the GPU. Result files: `results/h100_clean.jsonl` and `results/h100_inject.jsonl`.
+Notes on the H100 v0.2.0 row: all 600 results across 12 steps were bit-for-bit identical to their first run, with TF32 and reduced-precision reductions disabled and cuBLAS set deterministic. int8 ran through the tensor cores and matched the exact int64 reference on every element. Wall time per step (56 to 59 s at 4096x4096x4096) is dominated by the CPU-side checking of 16.8 million elements per run, not by the GPU. Result files: `results/h100_clean.jsonl` and `results/h100_inject.jsonl`.
 
 Notes on the Apple rows: in the v0.2.0 run all 450 results across 9 steps were bit-for-bit identical to their first run, so the matrix multiply on this chip is deterministic, and fp16 and bf16 stayed inside the FP32-accumulation error bound at every shape. The 4096x4096x4096 steps took 23 to 30 s each for 50 runs. The fault column is the self-test described below (software injected, not a property of the chip). Result files: `results/mac_v020.jsonl` and `results/mac_v020_inject.jsonl`.
 
@@ -175,7 +190,7 @@ A wrong element breaks exactly one row check and one column check, and their cro
 
 **Thresholds.** In floating point a correct row sum differs from its checksum by rounding, so the threshold decides everything. Each one is derived per row and per column from the arithmetic model in `arith.py`: the bounds of every element in the row and of the checksum element, the float64 host sum, and the rounding of the checksum vectors to the input type, which the host knows exactly and removes. A correct device cannot cross it. The powers of two `2^-sc` and `2^-sr` keep the checksums inside the input type, the output type and an FP32 accumulator, because a checksum is a sum of m or n values and would otherwise overflow near the top of the range; they are recorded as `checksum_scale_power_of_two`.
 
-**What a proven threshold costs.** `threshold_over_typical_value` reports how large an error must be, compared with a typical element of C, before the checksums are guaranteed to see it. On CPU it is about 0.07 in fp32 at 256x256x256 and between 1.5 and 9 in bf16; smaller faults are left to the reference check and the bit-for-bit repeat check, which run on every run as in the compute probe.
+**What a proven threshold costs.** `threshold_over_typical_value` reports how large an error must be, compared with a typical element of C, before the checksums are guaranteed to see it. On CPU it is about 0.07 in fp32 at 256x256x256 and between 1.5 and 9 in bf16. Because the threshold adds up the worst-case rounding of every element in a row, it grows with the row length and the inner dimension: on the H100 it was 2.3 in fp32 at 1024x1024x1024 and 193 at 32x4096x11008. Smaller faults are left to the reference check and the bit-for-bit repeat check, which run on every run as in the compute probe.
 
 **The blind spot, measured.** Four errors in a rectangle, +d, -d, -d, +d, cancel in every row and column sum, so checksums cannot see them. Every run the reference check fails while every checksum holds is counted as `checksum_missed_runs` and named in the verdict message, never passed.
 
@@ -233,7 +248,7 @@ python patterns.py               # data pattern probe; 8 patterns through the ma
 python patterns.py --inject 3    # data pattern self-test
 python memcheck.py               # memory probe; 6 patterns over most of the device memory
 python memcheck.py --inject 5    # memory self-test
-python -m pytest -q              # 159 tests on CPU; 6 more validate the output against OCP's schema
+python -m pytest -q              # 160 tests on CPU; 6 more validate the output against OCP's schema
 ```
 
 Options for `memcheck.py`:
@@ -324,13 +339,13 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 
 ## Tests
 
-`python -m pytest -q` runs 159 tests on the CPU in a few seconds; 6 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set. On CPUs whose matrix multiply ignores flush-to-zero, such as Apple silicon, the two flushing tests in `tests/test_patterns.py` skip themselves, giving 157 passed.
+`python -m pytest -q` runs 160 tests on the CPU in a few seconds; 6 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set. On CPUs whose matrix multiply ignores flush-to-zero, such as Apple silicon, the two flushing tests in `tests/test_patterns.py` skip themselves, giving 158 passed.
 
 1. `tests/test_screen.py` (37): every verdict path, every bit position caught by the self-test, NaN handling, int8 and FP8 off-by-one, FP8 inputs exact and K above 4096 skipped, rectangular shapes, bound tightness.
 2. `tests/test_kernels.py` (23): all kernels and precisions, the self-test on six seeds, intermittent and systematic faults, a one-ulp change, internal fp16 arithmetic and tanh-GELU both caught as outside the bound, NaN handling, fp32 bound tightness, a sin that is off by 1e-4 caught in RoPE, RoPE angles reaching every position, the device's own exp, erf, sin and cos measured, and the CUDA attention path forced onto the CPU: a batch dimension added with the same shape and values back, the kernel that ran recorded, fused kernels only for fp16 and bf16, and a loud refusal when no kernel fits.
 3. `tests/test_memcheck.py` (8): a stuck bit reported with its offset, a dead row counted word by word, injected flips located, the patterns themselves.
 4. `tests/test_arith.py` (19): the model checked against simulations of the hardware it claims to cover. A simulated tensor core that truncates, at block widths 1 to 32, stays inside the bound; a constructed case breaks the old v0.2.0 bound by almost 2x and stays inside the new one; a FlashAttention-2 style kernel emulated op by op stays inside the attention bound; PyTorch's ARM CPU erf and GELU, emulated op by op, stay inside the GELU bound; and FP8 sums of {-1, 0, 1} stay exact in a 13-bit accumulator while a 9-bit one loses them.
-5. `tests/test_build_site.py` (5): a newer tool version replaces the older row for the same device on the site, kernel sizes render from the files, data pattern rows render with the flushing behaviour, a mixed policy is shown as such, and checksum rows render with their located self-test count.
+5. `tests/test_build_site.py` (6): a newer tool version replaces the older row for the same device on the site, kernel sizes render from the files, data pattern rows render with the flushing behaviour, a mixed policy is shown as such, checksum rows render with their located self-test count, and the attention kernel that ran is named.
 6. `tests/test_patterns.py` (17): every pattern passes on CPU, each input set really has its pattern and stays clear of overflow, FP8 and int8 inputs stay exact, flushing is detected and judging a flushing device against the wrong model fails, the policy is measured at each step's own shape (a library that picks its kernel by shape), a kernel that keeps in some places and flushes in others passes with and without injected flips, a fault four times the bound is caught on the cancelling pattern, injected flips are caught on every pattern, and the output matches the OCP schema.
 7. `tests/test_abft.py` (25): clean runs in every precision, injected errors located to their exact row and column on several seeds, a single error pointing at its element, a fault in a checksum flagging only its line, no false alarm on the same-sign, wide, near-maximum and cancelling patterns in every precision, checksums scaled to stay in range, the rectangle fault counted as a blind spot, NaN, and the OCP schema.
 8. `tests/test_counters.py` (17): with a simulated NVIDIA management library, every cross-check verdict; unsupported counters left out rather than zeroed; no counters on CPU and Apple devices; corrected errors reported without failing a run; uncorrected errors failing it; a wrong answer with quiet counters confirmed silent; the site keeping the counter step out of the precision list; and the OCP schema.

@@ -416,7 +416,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <thead><tr><th>Device</th><th>Date</th><th>Kernels</th><th>Precisions</th><th>Runs</th><th>Worst error / bound</th><th>Silent faults</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
 <tbody>{{KERNEL_ROWS}}</tbody>
 </table></div>
-<p class="note">Worst error over bound is the largest measured error on the device divided by the bound at that element, across every kernel and precision. Values near 1 at fp16 and bf16 are expected: there the bound is dominated by the single rounding of the output, so there is almost nothing to spare. A value above 1 is a failed run.</p>
+<p class="note">Worst error over bound is the largest measured error on the device divided by the bound at that element, across every kernel and precision. Values near 1 at fp16 and bf16 are expected: there the bound is dominated by the single rounding of the output, so there is almost nothing to spare. A value above 1 is a failed run. On NVIDIA GPUs the row also names the fused attention kernel that ran in each precision: flash, cuDNN or memory-efficient.</p>
 <h3>Checksum probe</h3>
 <div class="tablewrap"><table>
 <thead><tr><th>Device</th><th>Date</th><th>Shapes</th><th>Precisions</th><th>Runs</th><th>Silent faults</th><th>Blind-spot runs</th><th>Threshold / typical value</th><th>Injected located</th><th>Verdict</th><th>Files</th></tr></thead>

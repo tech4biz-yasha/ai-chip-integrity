@@ -101,3 +101,9 @@ def test_mixed_subnormal_policy_is_shown(tmp_path, monkeypatch):
                    "--patterns", "subnormal,alternate", "--out", str(out)])
     *_, rows, _ = build_site.summarise([build_site.parse(str(out))])
     assert rows[0]["mixed"] == ["fp32"] and "mixed: fp32" in build_site.pattern_rows(rows)
+
+
+def test_attention_kernel_is_shown_when_chosen():
+    assert build_site.attention_note({"attention": {"default": ["fp32", "fp16", "bf16"]}}) == ""
+    note = build_site.attention_note({"attention": {"flash": ["bf16", "fp16"], "efficient": ["fp32"]}})
+    assert note == " · attention: efficient (fp32); flash (fp16, bf16)"

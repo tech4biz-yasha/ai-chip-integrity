@@ -134,6 +134,10 @@ def summarise(runs):
                 row["precisions"] = sorted({n.split("_")[1] for n, s in r["steps"].items() if "_skipped" not in s},
                                            key=["fp32", "fp16", "bf16"].index)
                 row["size"] = r["params"].get("size", "")
+                row["attention"] = {}
+                for n, s in r["steps"].items():
+                    if n.startswith("attention_") and "attention_backend" in s:
+                        row["attention"].setdefault(s["attention_backend"], []).append(n.split("_")[1])
                 row["ratio"] = max(s.get("worst_error_over_bound_ratio", 0) for s in live)
                 row["ref_fail"] = sum(s.get("reference_check_failed_runs", 0) for s in live)
                 row["rep_fail"] = sum(s.get("repeat_check_failed_runs", 0) for s in live)
@@ -328,6 +332,15 @@ def kernel_sizes(r):
     return "; ".join(parts)
 
 
+def attention_note(r):
+    """Which fused attention kernel ran, per precision, when the probe chose it (CUDA); empty otherwise."""
+    att = {k: v for k, v in (r.get("attention") or {}).items() if k != "default"}
+    if not att:
+        return ""
+    order = lambda p: PRECISION_ORDER.index(p) if p in PRECISION_ORDER else 99
+    return " · attention: " + "; ".join(f"{k} ({', '.join(sorted(v, key=order))})" for k, v in sorted(att.items()))
+
+
 def kernel_rows(rows):
     out = []
     for r in rows:
@@ -343,7 +356,7 @@ def kernel_rows(rows):
         out.append(f"""<tr>
 <td>{esc(r['device'])}<span class="sub">PyTorch {esc(r['torch'])} · tool v{esc(r['version'])}{counters_note(r)[0]}</span></td>
 <td class="date">{esc(min(r['dates']))}</td>
-<td>{esc(", ".join(r['kernels']))}<span class="sub">{kernel_sizes(r)}</span></td>
+<td>{esc(", ".join(r['kernels']))}<span class="sub">{kernel_sizes(r)}{esc(attention_note(r))}</span></td>
 <td>{esc(prec)}</td>
 <td>{r['runs']:,}</td>
 <td>{math.floor(r['ratio'] * 1000) / 1000:.3f}</td>
