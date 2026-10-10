@@ -48,16 +48,29 @@ def test_kernel_row_renders_rope_and_attention_sizes(tmp_path):
     assert f'{2 * len(kernels.KERNELS) * 3} of {2 * len(kernels.KERNELS) * 3}' in html
 
 
-def test_pattern_rows_render_with_flush_policy(tmp_path):
+def test_pattern_rows_render_with_flush_policy(tmp_path, monkeypatch):
+    """The subnormal cell shows what was measured. bf16 is made to flush on every host, because hosts differ:
+    CPUs with AMX or AVX-512 BF16 flush bf16 subnormals in their larger kernels, other CPUs keep them."""
     import patterns
+    import screen
+    import torch
+    real = screen.matmul
+
+    def bf16_flushes(a, b, fast_accum=False):
+        if a.dtype == torch.bfloat16:
+            a = torch.where(a.abs() < torch.finfo(a.dtype).tiny, torch.zeros_like(a), a)
+        return real(a, b, fast_accum)
+    monkeypatch.setattr(screen, "matmul", bf16_flushes)
     clean, inj = tmp_path / "p.jsonl", tmp_path / "p_inject.jsonl"
     patterns.main(["--device", "cpu", "--shapes", "32x64x32", "--iters", "3", "--out", str(clean)])
     patterns.main(["--device", "cpu", "--shapes", "32x64x32", "--iters", "3", "--inject", "1", "--out", str(inj)])
     _, _, _, rows, _ = build_site.summarise([build_site.parse(str(p)) for p in (clean, inj)])
-    assert len(rows) == 1 and rows[0]["patterns"] == build_site.PATTERN_ORDER
+    assert len(rows) == 1 and rows[0]["patterns"] == build_site.PATTERN_ORDER and "bf16" in rows[0]["flushed"]
     html = build_site.pattern_rows(rows)
     steps = sum(len(v) for v in patterns.APPLIES.values())
-    assert f"{steps} of {steps}" in html and ">kept<" in html and "no-silent-errors" in html
+    assert f"{steps} of {steps}" in html and "no-silent-errors" in html
+    assert "<td>flushed: " + ", ".join(rows[0]["flushed"]) + "</td>" in html
+    assert "<td>kept</td>" in build_site.pattern_rows([dict(rows[0], flushed=[], mixed=[])])
 
 
 def test_checksum_rows_render(tmp_path):
