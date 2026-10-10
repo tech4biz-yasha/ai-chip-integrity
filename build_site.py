@@ -58,15 +58,35 @@ def parse(path):
     }
 
 
+KERNEL_ORDER = ["softmax", "layernorm", "gelu", "rope", "attention"]
+
+
+def vkey(version):
+    return tuple(int(p) for p in re.findall(r"\d+", str(version))[:3])
+
+
+def row_for(table, r, **base):
+    """One row per device and probe. A newer tool version replaces the row; an older one is left out of the
+    table (its files stay in results/ and in the git history)."""
+    key = r["device"]
+    row = table.get(key)
+    if row is None or vkey(r["version"]) > vkey(row["version"]):
+        row = table[key] = dict(device=key, dates=set(), version=r["version"], **base)
+    elif vkey(r["version"]) < vkey(row["version"]):
+        return None
+    row["dates"].add(r["date"])
+    return row
+
+
 def summarise(runs):
     """Group runs by device and probe into table rows."""
     compute, memory, kernel = {}, {}, {}
     for r in runs:
         inject = int(r["params"].get("inject", 0)) > 0
-        key = r["device"]
         if r["run"] == "ai-chip-integrity-screen":
-            row = compute.setdefault(key, {"device": key, "torch": r["torch"], "dates": set(), "version": r["version"]})
-            row["dates"].add(r["date"])
+            row = row_for(compute, r, torch=r["torch"])
+            if row is None:
+                continue
             if inject:
                 row["injected"] = sum(s.get("injected_runs", 0) for s in r["steps"].values())
                 row["caught"] = sum(s.get("injected_runs_detected", 0) for s in r["steps"].values())
@@ -84,8 +104,9 @@ def summarise(runs):
                 row["verdicts"] = sorted({s["_verdict"] for s in live})
                 row["clean_file"] = r["file"]
         elif r["run"] == "ai-chip-integrity-kernels":
-            row = kernel.setdefault(key, {"device": key, "torch": r["torch"], "dates": set(), "version": r["version"]})
-            row["dates"].add(r["date"])
+            row = row_for(kernel, r, torch=r["torch"])
+            if row is None:
+                continue
             if inject:
                 row["injected"] = sum(s.get("injected_runs", 0) for s in r["steps"].values())
                 row["caught"] = sum(s.get("injected_runs_detected", 0) for s in r["steps"].values())
@@ -95,7 +116,7 @@ def summarise(runs):
                 row["runs"] = sum(s.get("runs", 0) for s in live)
                 row["skipped"] = sum(1 for s in r["steps"].values() if "_skipped" in s)
                 row["kernels"] = sorted({n.split("_")[0] for n, s in r["steps"].items() if "_skipped" not in s},
-                                        key=["softmax", "layernorm", "gelu", "attention"].index)
+                                        key=lambda n: (KERNEL_ORDER.index(n) if n in KERNEL_ORDER else 99, n))
                 row["precisions"] = sorted({n.split("_")[1] for n, s in r["steps"].items() if "_skipped" not in s},
                                            key=["fp32", "fp16", "bf16"].index)
                 row["size"] = r["params"].get("size", "")
@@ -105,8 +126,9 @@ def summarise(runs):
                 row["verdicts"] = sorted({s["_verdict"] for s in live})
                 row["clean_file"] = r["file"]
         elif r["run"] == "ai-chip-integrity-memcheck":
-            row = memory.setdefault(key, {"device": key, "dates": set(), "version": r["version"]})
-            row["dates"].add(r["date"])
+            row = row_for(memory, r)
+            if row is None:
+                continue
             s = next(iter(r["steps"].values()))
             if inject:
                 row["injected"] = sum(v for k, v in s.items() if k.startswith("injected_") and "detected" not in k)
@@ -160,6 +182,16 @@ def compute_rows(rows):
     return "\n".join(out)
 
 
+def kernel_sizes(r):
+    n = int(r["size"]) if str(r["size"]).isdigit() else 0
+    parts = [f"{n}×{n}"]
+    if "rope" in r["kernels"]:
+        parts.append(f"rope {n}×128")
+    if "attention" in r["kernels"]:
+        parts.append(f"attention 8×{n // 4}×128")
+    return "; ".join(parts)
+
+
 def kernel_rows(rows):
     out = []
     for r in rows:
@@ -175,7 +207,7 @@ def kernel_rows(rows):
         out.append(f"""<tr>
 <td>{esc(r['device'])}<span class="sub">PyTorch {esc(r['torch'])} · tool v{esc(r['version'])}</span></td>
 <td class="date">{esc(min(r['dates']))}</td>
-<td>{esc(", ".join(r['kernels']))}<span class="sub">{r['size']}×{r['size']}; attention 8×{int(r['size']) // 4}×128</span></td>
+<td>{esc(", ".join(r['kernels']))}<span class="sub">{kernel_sizes(r)}</span></td>
 <td>{esc(prec)}</td>
 <td>{r['runs']:,}</td>
 <td>{math.floor(r['ratio'] * 1000) / 1000:.3f}</td>

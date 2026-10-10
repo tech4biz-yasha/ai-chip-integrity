@@ -52,7 +52,7 @@ def test_all_kernels_all_precisions_pass(tmp_path):
     rc = kernels.main(BASE + ["--out", str(out)])
     diag, meas = by_step(strict_load(out))
     assert rc == 0
-    assert len(diag) == 12
+    assert len(diag) == 15
     for name, v in diag.items():
         assert v == "no-silent-errors", name
         assert meas[name]["reference_check_failed_runs"] == 0
@@ -158,6 +158,40 @@ def test_nan_output_is_flagged(tmp_path):
     assert rc == 1
     assert meas["attention_fp32"]["worst_nonfinite_values"] == 1
     assert diag["attention_fp32"] == "silent-data-corruption"
+
+
+def test_inaccurate_sin_is_outside_bound(tmp_path):
+    """A fast sin with 1e-4 error, as fast-math libraries have at large angles, must not pass as a correct RoPE."""
+    def hook(i, c):
+        (x, theta), _, _ = kernels.case_rope(128, torch.float32, 1234)
+        half = kernels.ROPE_DIM // 2
+        emb = torch.cat((theta, theta), dim=-1)
+        rot = torch.cat((-x[:, half:], x[:, :half]), dim=-1)
+        c.copy_(x * emb.cos() + rot * (emb.sin() + 1e-4))
+    kernels._FAULT_HOOK = hook
+    out = tmp_path / "k.jsonl"
+    rc = kernels.main(BASE + ["--kernels", "rope", "--dtypes", "fp32", "--out", str(out)])
+    diag, _ = by_step(strict_load(out))
+    assert rc == 1
+    assert diag["rope_fp32"] == "outside-error-bound"
+
+
+def test_rope_angles_reach_every_position():
+    """Angles are position times frequency, so the largest is rows - 1 radians: range reduction is exercised."""
+    (_, theta), _, _ = kernels.case_rope(4096, torch.float32, 1)
+    assert theta.dtype == torch.float32
+    assert float(theta.max()) == 4095.0
+
+
+def test_function_check_measures_the_device_library(tmp_path):
+    for name in ("softmax", "gelu", "rope"):
+        args = kernels.make_case(name, torch.float32, 1, 128)[0]
+        label, err, allowance = kernels.function_check(name, args, torch.device("cpu"))
+        assert 0.0 <= err < allowance, (name, label, err)
+    out = tmp_path / "k.jsonl"
+    kernels.main(BASE + ["--kernels", "rope", "--dtypes", "fp32", "--out", str(out)])
+    _, meas = by_step(strict_load(out))
+    assert "device_sincos_abs_worst_error" in meas["rope_fp32"]
 
 
 def test_bad_args_rejected(tmp_path):

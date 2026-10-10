@@ -4,7 +4,7 @@ An open tester for silent computation errors in AI chips.
 
 It runs a fixed calculation on a GPU, NPU or CPU many times and proves, element by element, whether the chip returned the right answer every time. Results come out in the Open Compute Project Test and Validation format, so they drop straight into fleet tooling.
 
-**Status: early.** Three probes so far: `screen.py` v0.2.1 (matrix multiply across several shapes and four precisions), `kernels.py` v0.1.0 (softmax, layer norm, GELU and fused attention) and `memcheck.py` v0.1.0 (a sweep of most of the device memory). One device at a time, four measured chips. Read the limits section before relying on a PASS.
+**Status: early.** Three probes so far: `screen.py` v0.2.1 (matrix multiply across several shapes and four precisions), `kernels.py` v0.2.0 (softmax, layer norm, GELU, rotary embeddings and fused attention) and `memcheck.py` v0.1.0 (a sweep of most of the device memory). One device at a time, four measured chips. Read the limits section before relying on a PASS.
 
 ## Why this exists
 
@@ -26,13 +26,14 @@ Every row comes from a run of this code with the result files in [`results/`](re
 | Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-07 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | skipped, no int8 matmul on MPS | 45 of 45 | no-silent-errors |
 | Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-07 | v0.1.0 | 1024x1024x1024 | 50 | PASS, 1.6 s | PASS, 1.1 s | not run | not run | 10 of 10 | no-silent-errors |
 
-**Kernel probe (`kernels.py` v0.1.0)**
+**Kernel probe (`kernels.py`)**
 
-| Device | Date | Kernels | Size | Runs per step | fp32 | fp16 | bf16 | Injected faults caught | Verdict |
-|---|---|---|---|---|---|---|---|---|---|
-| Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-08 | softmax, layer norm, GELU, attention | 4096x4096; attention 8 heads x 1024 tokens x 128 | 25 | PASS | PASS | PASS | 36 of 36 | no-silent-errors |
+| Device | Date | Tool | Kernels | Size | Runs per step | fp32 | fp16 | bf16 | Injected faults caught | Verdict |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-10 | v0.2.0 | softmax, layer norm, GELU, RoPE, attention | 4096x4096; RoPE 4096 positions x 128; attention 8 heads x 1024 tokens x 128 | 25 | PASS | PASS | PASS | 45 of 45 | no-silent-errors |
+| Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-08 | v0.1.0 | softmax, layer norm, GELU, attention | 4096x4096; attention 8 heads x 1024 tokens x 128 | 25 | PASS | PASS | PASS | 36 of 36 | no-silent-errors |
 
-Notes on the Apple row: all 300 results across 12 steps were inside the bound and bit-for-bit identical to their first run. In the clean run, steps took 1.2 to 16.0 s for 25 runs, mostly the CPU-side check. Result files: `results/mac_kernels.jsonl` and `results/mac_kernels_inject.jsonl`. Data centre GPU rows are next.
+Notes on the Apple rows: in the v0.2.0 run all 375 results across 15 steps were inside the bound and bit-for-bit identical to their first run, including RoPE with angles up to 4095 radians; result files `results/mac_kernels_v020.jsonl` and `results/mac_kernels_v020_inject.jsonl`. The v0.1.0 run (300 results across 12 steps, all clean, 36 of 36 faults caught) is kept as `results/mac_kernels.jsonl` and `results/mac_kernels_inject.jsonl`; the site shows the newest version per device. Data centre GPU rows are next.
 
 **Memory sweep (`memcheck.py` v0.1.0)**
 
@@ -92,13 +93,14 @@ For int8 the device returns int32 and the reference is computed exactly in int64
 
 ## Probe 2: transformer kernels (`kernels.py`)
 
-Matrix multiply exercises the multiply-accumulate units. A transformer block also runs exponentials, divisions, square roots and error functions, which run on different hardware, and faults are data dependent. This probe runs four kernels through the device's own implementations and checks every output element against a float64 reference on the CPU, with the same two checks as the compute probe.
+Matrix multiply exercises the multiply-accumulate units. A transformer block also runs exponentials, divisions, square roots and error functions, which run on different hardware, and faults are data dependent. This probe runs five kernels through the device's own implementations and checks every output element against a float64 reference on the CPU, with the same two checks as the compute probe.
 
 | Kernel | Default input | Operations exercised |
 |---|---|---|
 | `softmax` | 4096 x 4096 logits, N(0, 3) | exp, sum reduction, divide |
 | `layernorm` | 4096 x 4096 activations, N(2, 1.5), random weight and bias | mean, variance, reciprocal square root, scale, shift |
 | `gelu` | 4096 x 4096, N(0, 3), erf form | erf, multiply |
+| `rope` | 4096 positions x 128 (one head), base 10000, FP32 angles up to 4095 rad | sin and cos with large-angle argument reduction, multiply, add |
 | `attention` | 8 heads x 1024 tokens x 128, `scaled_dot_product_attention` | QK^T, softmax, PV through the fused kernel |
 
 Precisions: fp32, fp16, bf16. 25 runs per kernel and precision by default.
@@ -108,17 +110,18 @@ Precisions: fp32, fp16, bf16. 25 runs per kernel and precision by default.
 1. softmax: the relative error of each exponential, `EPS_FN + u|x_i - max| + u`, carried through the sum (`gamma_n`) and the quotient.
 2. layer norm: error of the mean, of each deviation, of the variance (sized to cover the two-pass, Welford and `E[x^2] - mean^2` methods), of the reciprocal square root, then of scale and shift.
 3. GELU: argument scaling, erf, `1 + erf`, the product and the output rounding.
-4. attention: the matrix-unit error of every logit from QK^T, propagated through softmax as `expm1(2 * max logit error)`; the exp of each weight and of every online-softmax rescale (at most one per block of 16 keys); the row sum; P rounded to the input precision, with an absolute allowance where P is subnormal; and the matrix-unit error of PV.
+4. rope: cos and sin of the FP32 angles (2^-20 absolute), their cast to the test type, then two products and a sum, each rounded in the test type, as eager PyTorch does.
+5. attention: the matrix-unit error of every logit from QK^T, propagated through softmax as `expm1(2 * max logit error)`; the exp of each weight and of every online-softmax rescale (at most one per block of 16 keys); the row sum; P rounded to the input precision, with an absolute allowance where P is subnormal; and the matrix-unit error of PV.
 
 Every bound adds the output rounding of the test precision and an absolute floor of half the subnormal spacing of the output type, the most that rounding to nearest can lose below the smallest normal number.
 
 **Stated assumptions**, the arithmetic model in [`arith.py`](arith.py), recorded in every result file:
 
 1. Scalar FP32 arithmetic rounds to nearest; matrix units accumulate faithfully (truncation allowed).
-2. exp, divide, square root and reciprocal square root are within `EPS_FN = 2^-20` relative error, eight FP32 ulps anywhere in a binade. erf is within `2^-20` absolute, which admits the absolutely accurate approximations vector libraries use (PyTorch's ARM CPU erf is Abramowitz and Stegun 7.1.26: up to 5.4e-7 absolute error, but up to 100% relative near zero).
+2. exp, divide, square root and reciprocal square root are within `EPS_FN = 2^-20` relative error, eight FP32 ulps anywhere in a binade. erf, sin and cos are within `2^-20` absolute, which admits the absolutely accurate approximations vector libraries use (PyTorch's ARM CPU erf is Abramowitz and Stegun 7.1.26: up to 5.4e-7 absolute error, but up to 100% relative near zero).
 3. Fused attention keeps logits and softmax in FP32 and holds P in the input precision. On CUDA, fp16 and bf16 attention may only use the fused kernels (flash, memory-efficient, cuDNN), so the unfused path, which rounds logits to the input precision, cannot stand in silently.
 
-A device that breaks any of them, or that substitutes the tanh approximation for GELU, shows as `outside-error-bound` on every run and the message says so. At the test default, the fp32 bounds sit within 3e-5 of the output scale for softmax, layer norm and GELU, and within 1e-3 for attention, whose bound carries worst-case matrix-unit accumulation through the softmax (`tests/test_kernels.py::test_bounds_are_tight_for_fp32`).
+A device that breaks any of them, or that substitutes the tanh approximation for GELU, shows as `outside-error-bound` on every run and the message says so. To tell a faulty unit from a loose function library, every softmax, GELU and RoPE step also measures the device's own exp, erf, sin and cos on that step's inputs and records the worst error; when it exceeds the allowance, the verdict message says the library is outside the model. At the test default, the fp32 bounds sit within 3e-5 of the output scale for softmax, layer norm and GELU, and within 1e-3 for attention, whose bound carries worst-case matrix-unit accumulation through the softmax (`tests/test_kernels.py::test_bounds_are_tight_for_fp32`).
 
 Verdicts and the `--inject N` self-test are the same as the compute probe.
 
@@ -144,11 +147,11 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python screen.py                 # compute probe; auto picks cuda, then mps, then cpu; 3 shapes x 4 precisions
 python screen.py --inject 5      # compute self-test
-python kernels.py                # kernel probe; softmax, layer norm, GELU, attention x fp32, fp16, bf16
+python kernels.py                # kernel probe; softmax, layer norm, GELU, RoPE, attention x fp32, fp16, bf16
 python kernels.py --inject 3     # kernel self-test
 python memcheck.py               # memory probe; 6 patterns over most of the device memory
 python memcheck.py --inject 5    # memory self-test
-python -m pytest -q              # 72 tests on CPU; 3 more validate the output against OCP's schema
+python -m pytest -q              # 77 tests on CPU; 3 more validate the output against OCP's schema
 ```
 
 Options for `memcheck.py`:
@@ -183,9 +186,9 @@ Options for `kernels.py`:
 | Option | Default | Meaning |
 |---|---|---|
 | `--device` | `auto` | `cpu`, `mps`, `cuda` or `cuda:N` |
-| `--size` | `4096` | rows and columns for softmax, layer norm and GELU; attention uses 8 heads x size/4 tokens x 128 |
+| `--size` | `4096` | rows and columns for softmax, layer norm and GELU, positions for RoPE (head dimension 128); attention uses 8 heads x size/4 tokens x 128 |
 | `--iters` | `25` | runs per kernel and precision |
-| `--kernels` | `softmax,layernorm,gelu,attention` | comma list of kernels |
+| `--kernels` | `softmax,layernorm,gelu,rope,attention` | comma list of kernels |
 | `--dtypes` | `fp32,fp16,bf16` | comma list from `fp32`, `fp16`, `bf16` |
 | `--seed` | `1234` | input seed |
 | `--inject` | `0` | bit flips to inject per step (self-test) |
@@ -205,18 +208,19 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 | `kernels.py` | Probe 2, transformer kernels |
 | `memcheck.py` | Probe 3, memory sweep |
 | `arith.py` | The arithmetic model every bound is derived from, with its id written into each result file |
-| `build_site.py` | Builds `docs/index.html` (chipintegrity.org) from `docs/template.html` and every file in `results/`, so the published tables can never say more than the files do. Run `python build_site.py` after adding result files |
+| `build_site.py` | Builds `docs/index.html` (chipintegrity.org) from `docs/template.html` and every file in `results/`, so the published tables can never say more than the files do. One row per device and probe; a newer tool version replaces the older row. Run `python build_site.py` after adding result files |
 | `results/` | Every published result file, in OCP format |
 | `tests/` | The test suite below |
 
 ## Tests
 
-`python -m pytest -q` runs 72 tests on the CPU in a few seconds; 3 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set.
+`python -m pytest -q` runs 77 tests on the CPU in a few seconds; 3 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set.
 
 1. `tests/test_screen.py` (33): every verdict path, every bit position caught by the self-test, NaN handling, int8 off-by-one, rectangular shapes, bound tightness.
-2. `tests/test_kernels.py` (16): all kernels and precisions, the self-test on six seeds, intermittent and systematic faults, a one-ulp change, internal fp16 arithmetic and tanh-GELU both caught as outside the bound, NaN handling, fp32 bound tightness.
+2. `tests/test_kernels.py` (19): all kernels and precisions, the self-test on six seeds, intermittent and systematic faults, a one-ulp change, internal fp16 arithmetic and tanh-GELU both caught as outside the bound, NaN handling, fp32 bound tightness, a sin that is off by 1e-4 caught in RoPE, RoPE angles reaching every position, and the device's own exp, erf, sin and cos measured.
 3. `tests/test_memcheck.py` (8): a stuck bit reported with its offset, a dead row counted word by word, injected flips located, the patterns themselves.
 4. `tests/test_arith.py` (18): the model checked against simulations of the hardware it claims to cover. A simulated tensor core that truncates, at block widths 1 to 32, stays inside the bound; a constructed case breaks the old v0.2.0 bound by almost 2x and stays inside the new one; a FlashAttention-2 style kernel emulated op by op stays inside the attention bound; PyTorch's ARM CPU erf and GELU, emulated op by op, stay inside the GELU bound.
+5. `tests/test_build_site.py` (2): a newer tool version replaces the older row for the same device on the site, and kernel sizes render from the files.
 
 ## Output format
 
@@ -227,14 +231,14 @@ All three probes write one JSON object per line following the [OCP Test and Vali
 - a `diagnosis` per step with the verdict above
 - `testRunEnd` with the overall PASS or FAIL
 
-`kernels.py` writes one step per kernel and precision, named `<kernel>_<precision>` (for example `attention_bf16`), with `runs`, `size`, `elements`, `seconds`, `assumed_fn_rel_error`, `reference_check_failed_runs`, `repeat_check_failed_runs`, `worst_error_over_bound_ratio`, `worst_abs_error`, `worst_nonfinite_values`, the self-test counts, and a diagnosis with the verdict. Its run parameters also record `assumed_fn_rel_error` and `attention_kernels` (which attention kernels were allowed).
+`kernels.py` writes one step per kernel and precision, named `<kernel>_<precision>` (for example `attention_bf16`), with `runs`, `size`, `elements`, `seconds`, `assumed_fn_rel_error`, `reference_check_failed_runs`, `repeat_check_failed_runs`, `worst_error_over_bound_ratio`, `worst_abs_error`, `worst_nonfinite_values`, `device_exp_rel_worst_error`, `device_erf_abs_worst_error` or `device_sincos_abs_worst_error` (softmax, GELU and RoPE steps), the self-test counts, and a diagnosis with the verdict. Its run parameters also record `assumed_fn_rel_error` and `attention_kernels` (which attention kernels were allowed).
 
 `memcheck.py` writes one step per pass (`memory_sweep_pass1`, ...) with `bytes_tested`, `device_memory_bytes`, `coverage_fraction`, `dwell_seconds`, `seconds`, one `bad_words_<pattern>` per pattern (validated to be zero outside self-test), a warning log line per failing pattern with the first byte offsets and the bad-bit mask, and in self-test mode `injected_<pattern>` and `injected_detected_<pattern>`.
 
 ## Assumptions and limits
 
 1. Every bound follows from the arithmetic model in `arith.py`: FP32 scalar arithmetic rounds to nearest, matrix units accumulate faithfully in FP32 (truncation allowed), exp, divide and square roots stay within eight ulps, and erf within 2^-20 absolute. TF32 is switched off on CUDA. A device that accumulates below FP32 or breaks the model in another way shows up as `outside-error-bound` on every run, and the message says so. That was not the case on any chip measured above.
-2. These are three probes. A PASS means "no silent error in these matrix multiplies, these transformer kernels and this memory sweep, in these runs, on this device today". It is not a certificate of a healthy chip. The OSDI 2026 results above show that defects depend on the data, the kernel, temperature and age; this version sweeps shapes, precisions, four transformer kernels and memory, but not the rest.
+2. These are three probes. A PASS means "no silent error in these matrix multiplies, these transformer kernels and this memory sweep, in these runs, on this device today". It is not a certificate of a healthy chip. The OSDI 2026 results above show that defects depend on the data, the kernel, temperature and age; this version sweeps shapes, precisions, five transformer kernels and memory, but not the rest.
 3. Runs take seconds, not hours, so thermal and aging effects are not exercised.
 4. One device per run. Multi-device comparison is on the roadmap.
 5. In the compute and kernel probes the injected faults are applied to the output on the CPU side, so they test the checker, not the chip. The memory probe injects into device memory itself.
@@ -243,11 +247,11 @@ All three probes write one JSON object per line following the [OCP Test and Vali
 
 Twelve probes, each aimed at one part of the chip. The first three are built.
 
-1. **Matrix multiply** (`screen.py`). Done.
-2. **Memory pattern sweep** (`memcheck.py`). Done.
-3. **Transformer kernels** (`kernels.py`). Done.
+1. **Matrix multiply** (`screen.py`). Done for fp32, fp16, bf16 and int8. FP8 is next; FP4 follows once a Blackwell card is measured.
+2. **Memory pattern sweep** (`memcheck.py`). Done for device memory. On-chip SRAM (shared memory and L2) is next, NVIDIA GPUs only.
+3. **Transformer kernels** (`kernels.py`). Done, with rotary embeddings (sin and cos) added in v0.2.0.
 4. **Full model forward pass.** A small LLM with every layer checked against a CPU float64 reference. Each layer is fed the device's own input to that layer, so its bound stays as tight as a single kernel's; one bound carried through the whole model would be too loose to catch anything.
-5. **Reductions and all-reduce.** Sums across threads, blocks and then GPUs over NVLink and PCIe, checked with checksums that must agree at both ends.
+5. **Reductions, all-reduce and copy engines.** Sums across threads, blocks and then GPUs over NVLink and PCIe, checked with checksums that must agree at both ends, and host-to-device and device-to-device copies of known patterns.
 6. **Checksum-protected matrix multiply** (algorithm-based fault tolerance, Huang and Abraham 1984). Row and column checksums that detect and locate a wrong element inside the multiply itself.
 7. **Hours under load.** The same probes repeated for hours at full power, with temperature and clocks logged next to every result.
 8. **Clock and voltage margin sweep.** Lower the margin step by step where the driver allows it and record where each unit starts to fail. Likely needs bare-metal access, since container pods rarely allow clock control.

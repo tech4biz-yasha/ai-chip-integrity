@@ -20,10 +20,10 @@ written into every result file.
 
   FN      exp, exp2, divide, square root and reciprocal square root are within EPS_FN of the true
           value, relative. EPS_FN = 2^-20 covers eight FP32 ulps anywhere in a binade (an ulp is at
-          most 2^-23 of the value). erf is within EPS_FN absolute: since |erf| <= 1 that includes every
-          relatively accurate erf, and it also admits the absolutely accurate approximations that
-          vector libraries use (Abramowitz and Stegun 7.1.26 on PyTorch's ARM CPU path errs by up to
-          5.4e-7 absolute, but by up to 100% relative near zero).
+          most 2^-23 of the value). erf, sin and cos are within EPS_FN absolute: their values are at
+          most 1 in size, so this includes every relatively accurate implementation, and it also admits
+          the absolutely accurate approximations vector libraries use (Abramowitz and Stegun 7.1.26 on
+          PyTorch's ARM CPU path errs by up to 5.4e-7 absolute, but by up to 100% relative near zero).
 
   OUT     Conversion of an FP32 result to fp16 or bf16 rounds to nearest and keeps subnormal results,
           as IEEE 754 requires, so below the smallest normal number the error is at most half a
@@ -38,7 +38,7 @@ import math
 
 import torch
 
-MODEL_ID = "arith-v1: ieee u=2^-24; matrix faithful gamma(2n) u=2^-23, fp32 products 2^-20; fn 2^-20 (erf absolute); out rn"
+MODEL_ID = "arith-v1: ieee u=2^-24; matrix faithful gamma(2n) u=2^-23, fp32 products 2^-20; fn 2^-20 (erf, sin, cos absolute); out rn"
 
 U_RN = 2.0 ** -24
 U_TC = 2.0 ** -23

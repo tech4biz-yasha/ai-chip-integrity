@@ -1,6 +1,6 @@
 # Chip Integrity
 
-> An open, MIT-licensed tester for silent computation errors in AI chips. It runs a compute probe (matrix multiplies at three shapes and four precisions, every output element checked against a float64 reference with Higham's rounding bound, widened for tensor-core truncation at fp16 and bf16, and against run 0 bit for bit) a kernel probe (softmax, layer norm, GELU and fused attention, checked the same two ways against derived bounds) and a memory probe (six patterns written into every 32-bit word of device memory and read back exactly). Results are written in the Open Compute Project Test and Validation format, and every published row links to its result file. Maintained by Yasha Khandelwal, Bengaluru, India.
+> An open, MIT-licensed tester for silent computation errors in AI chips. It runs a compute probe (matrix multiplies at three shapes and four precisions, every output element checked against a float64 reference with Higham's rounding bound, widened for tensor-core truncation at fp16 and bf16, and against run 0 bit for bit) a kernel probe (softmax, layer norm, GELU, rotary embeddings and fused attention, checked the same two ways against derived bounds) and a memory probe (six patterns written into every 32-bit word of device memory and read back exactly). Results are written in the Open Compute Project Test and Validation format, and every published row links to its result file. Maintained by Yasha Khandelwal, Bengaluru, India.
 
 Site: https://chipintegrity.org/
 Code: https://github.com/tech4biz-yasha/ai-chip-integrity (MIT)
@@ -12,7 +12,7 @@ Compute probe (screen.py): C = A @ B, 50 runs per shape and precision. Shapes 10
 
 Memory probe (memcheck.py): fills most of the device memory, writes all zeros, all ones, 0xAAAAAAAA, 0x55555555, an address hash and its inverse into every word, waits 2 seconds, reads back and compares exactly. Verdicts: no-memory-errors, memory-errors, with byte offsets and bad-bit masks logged.
 
-Kernel probe (kernels.py): softmax, layer norm, GELU (erf form) and scaled dot product attention through the device's own kernels, 25 runs per kernel and precision, fp32, fp16 and bf16. Bounds derived by rounding-error analysis under one written arithmetic model (arith.py): FP32 rounds to nearest, tensor cores accumulate faithfully in FP32 with truncation allowed, exp, divide and square roots stay within eight ulps, and erf within 2^-20 absolute. The model id is recorded in every result file. Same verdicts as the compute probe.
+Kernel probe (kernels.py): softmax, layer norm, GELU (erf form), rotary position embeddings (sin and cos of FP32 angles up to 4095 rad) and scaled dot product attention through the device's own kernels, 25 runs per kernel and precision, fp32, fp16 and bf16. Bounds derived by rounding-error analysis under one written arithmetic model (arith.py): FP32 rounds to nearest, tensor cores accumulate faithfully in FP32 with truncation allowed, exp, divide and square roots stay within eight ulps, and erf, sin and cos within 2^-20 absolute. The model id is recorded in every result file. Same verdicts as the compute probe.
 
 Self-test: every row is paired with an injection run that flips random bits and must catch all of them.
 

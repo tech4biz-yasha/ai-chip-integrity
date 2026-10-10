@@ -48,14 +48,16 @@ import arith  # noqa: E402
 
 from screen import FileWriter, pick_device, device_label, lock_down_math, flip_bit, NONDET_SHARE, NONDET_MIN  # noqa: E402
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 U_RN, U_TC, EPS_FN = arith.U_RN, arith.U_TC, arith.EPS_FN
 DTYPES = {
     "fp32": (torch.float32, torch.int32, 32),
     "fp16": (torch.float16, torch.int16, 16),
     "bf16": (torch.bfloat16, torch.int16, 16),
 }
-KERNELS = ["softmax", "layernorm", "gelu", "attention"]
+KERNELS = ["softmax", "layernorm", "gelu", "rope", "attention"]
+ROPE_DIM, ROPE_BASE = 128, 10000.0   # head dimension and base of the rotary embedding, as in Llama-style models
+FN_ROWS = 256                        # rows used to measure the device's own exp and erf (each row spans the full range)
 MIN_KEY_BLOCK = 16          # fused attention rescales its running sums at most once per block of this many keys
 _FAULT_HOOK = None          # tests only: callable(run_index, cpu_tensor) that corrupts an output in place
 
@@ -147,6 +149,34 @@ def gelu_error(x64, a, erf, y):
     return (0.5 * x64.abs()) * e_erf * (1.0 + 2.0 * U_RN) + 2.0 * U_RN * y.abs()
 
 
+def case_rope(rows, dtype, seed):
+    """Rotary position embedding on `rows` positions of one 128-wide head. The angles are position times
+    frequency, handed to the device as FP32 values (as models compute them), so every position up to
+    rows - 1 radians is exercised and the reference takes sin and cos of exactly the angles the device sees."""
+    g = torch.Generator().manual_seed(seed)
+    half = ROPE_DIM // 2
+    x = torch.randn(rows, ROPE_DIM, generator=g, dtype=torch.float64).to(dtype)
+    inv = ROPE_BASE ** (-torch.arange(half, dtype=torch.float64) * 2.0 / ROPE_DIM)
+    theta = (torch.arange(rows, dtype=torch.float64)[:, None] * inv[None, :]).to(torch.float32)
+    x64, t64 = x.to(torch.float64), theta.to(torch.float64)
+    emb = torch.cat((t64, t64), dim=-1)
+    c, s = torch.cos(emb), torch.sin(emb)
+    r = torch.cat((-x64[:, half:], x64[:, :half]), dim=-1)
+    y = x64 * c + r * s
+    return (x, theta), y, finish(rope_error(x64, r, c, s, dtype), y, dtype)
+
+
+def rope_error(x64, r, c, s, dtype):
+    """x * cos + rotate_half(x) * sin. cos and sin are computed in FP32 (allowed EPS_FN absolute, like erf) and
+    cast to the test type; the two products are each rounded in the test type, the final sum in finish()."""
+    u, _, half_sub = arith.OUT[dtype]
+    e_c = EPS_FN + u * (c.abs() + EPS_FN) + half_sub
+    e_s = EPS_FN + u * (s.abs() + EPS_FN) + half_sub
+    e1 = x64.abs() * e_c + u * x64.abs() * (c.abs() + e_c) + half_sub
+    e2 = r.abs() * e_s + u * r.abs() * (s.abs() + e_s) + half_sub
+    return (e1 + e2) * (1.0 + 2.0 * U_RN)
+
+
 def case_attention(heads, L, dim, dtype, seed):
     g = torch.Generator().manual_seed(seed)
     q, k, v = (torch.randn(heads, L, dim, generator=g, dtype=torch.float64).to(dtype) for _ in range(3))
@@ -192,9 +222,21 @@ def run_kernel(name, args):
         return F.layer_norm(x, (x.shape[1],), weight=w, bias=b, eps=eps)
     if name == "gelu":
         return F.gelu(args[0])
+    if name == "rope":
+        return rope(*args)
     if name == "attention":
         return attention(*args)
     raise ValueError(name)
+
+
+def rope(x, theta):
+    """The standard rotary embedding: cos and sin of FP32 angles, cast to the model type, then
+    x * cos + rotate_half(x) * sin."""
+    half = x.shape[-1] // 2
+    emb = torch.cat((theta, theta), dim=-1)
+    cos, sin = emb.cos().to(x.dtype), emb.sin().to(x.dtype)
+    rot = torch.cat((-x[..., half:], x[..., :half]), dim=-1)
+    return x * cos + rot * sin
 
 
 def attention(q, k, v):
@@ -224,9 +266,34 @@ def make_case(name, dtype, seed, size):
         return case_layernorm(rows, cols, dtype, seed)
     if name == "gelu":
         return case_gelu(rows, cols, dtype, seed)
+    if name == "rope":
+        return case_rope(rows, dtype, seed)
     if name == "attention":
         return case_attention(8, size // 4, 128, dtype, seed)
     raise ValueError(name)
+
+
+def function_check(kernel, args, dev):
+    """Measure the device's own transcendental function on this step's inputs, so an outside-bound verdict can
+    say whether the function library or the arithmetic is to blame. Returns (label, worst error, allowance)."""
+    if kernel == "rope":
+        t = args[1]
+        t64, td = t.to(torch.float64), t.to(dev)
+        err = max(float((torch.cos(td).cpu().double() - torch.cos(t64)).abs().max()),
+                  float((torch.sin(td).cpu().double() - torch.sin(t64)).abs().max()))
+        return "sincos_abs", err, EPS_FN
+    if kernel == "gelu":
+        a = args[0][:FN_ROWS].to(torch.float32) * math.sqrt(0.5)   # the FP32 argument the device's erf sees
+        err = float((torch.erf(a.to(dev)).cpu().double() - torch.erf(a.double())).abs().max())
+        return "erf_abs", err, EPS_FN
+    if kernel == "softmax":
+        x = args[0][:FN_ROWS].to(torch.float32)
+        z = x - x.max(dim=1, keepdim=True).values               # the FP32 arguments of the row's exponentials
+        ref = torch.exp(z.double())
+        keep = ref > 2.0 ** -126
+        got = torch.exp(z.to(dev)).cpu().double()
+        return "exp_rel", float(((got - ref).abs()[keep] / ref[keep]).max()), EPS_FN
+    return None
 
 
 # ---------------------------------------------------------------- probe
@@ -280,6 +347,10 @@ def probe(step, dev, kernel, dname, size, iters, seed, inject, rng, hw):
             caught += 1
 
     secs = time.time() - t0
+    try:
+        fn = function_check(kernel, args, dev)       # a diagnostic only: never let it cost the step
+    except (RuntimeError, TypeError, NotImplementedError):
+        fn = None
     eq0 = [tv.Validator(type=tv.ValidatorType.EQUAL, value=0)]
     step.add_measurement(name="runs", value=iters, hardware_info=hw)
     step.add_measurement(name="size", value=size, hardware_info=hw)
@@ -293,6 +364,8 @@ def probe(step, dev, kernel, dname, size, iters, seed, inject, rng, hw):
     step.add_measurement(name="worst_error_over_bound_ratio", value=worst_ratio, hardware_info=hw)
     step.add_measurement(name="worst_abs_error", value=worst_abs, hardware_info=hw)
     step.add_measurement(name="worst_nonfinite_values", value=worst_nonfinite, hardware_info=hw)
+    if fn is not None:
+        step.add_measurement(name=f"device_{fn[0]}_worst_error", value=fn[1], hardware_info=hw)
 
     if inject:
         step.add_measurement(name="injected_runs", value=injected, hardware_info=hw)
@@ -315,7 +388,11 @@ def probe(step, dev, kernel, dname, size, iters, seed, inject, rng, hw):
         ok, verdict = False, "outside-error-bound"
         msg = (f"all runs agree but {len(ref_bad)} runs sit outside the bound (a faulty unit, or the device breaking "
                f"the arithmetic model: intermediates below FP32, TF32 used for fp32, exp/divide/rsqrt worse than "
-               f"{arith.ulps(EPS_FN):.0f} ulps, erf worse than 2^-20 absolute, or an approximate kernel such as tanh-GELU)")
+               f"{arith.ulps(EPS_FN):.0f} ulps, erf, sin or cos worse than 2^-20 absolute, or an approximate kernel such "
+               f"as tanh-GELU)")
+        if fn is not None and fn[1] > fn[2]:
+            msg += (f"; the device's own {fn[0].split('_')[0]} measured {fn[1]:.2e} against an allowance of {fn[2]:.2e}, "
+                    f"so its function library is outside the model")
 
     step.add_diagnosis(tv.DiagnosisType.PASS if ok else tv.DiagnosisType.FAIL,
                        verdict=verdict, message=msg, hardware_info=hw)
@@ -325,9 +402,9 @@ def probe(step, dev, kernel, dname, size, iters, seed, inject, rng, hw):
 def main(argv=None):
     p = argparse.ArgumentParser(description="AI Chip Integrity Suite transformer kernel probe")
     p.add_argument("--device", default="auto", help="auto, cpu, mps, cuda or cuda:N")
-    p.add_argument("--size", type=int, default=4096, help="rows and columns for softmax/layernorm/gelu; attention uses 8 heads x size/4 tokens x 128")
+    p.add_argument("--size", type=int, default=4096, help="rows and columns for softmax/layernorm/gelu, positions for rope (head dim 128); attention uses 8 heads x size/4 tokens x 128")
     p.add_argument("--iters", type=int, default=25, help="runs per kernel and precision")
-    p.add_argument("--kernels", default=",".join(KERNELS), help="comma list from softmax,layernorm,gelu,attention")
+    p.add_argument("--kernels", default=",".join(KERNELS), help="comma list from softmax,layernorm,gelu,rope,attention")
     p.add_argument("--dtypes", default="fp32,fp16,bf16", help="comma list from fp32,fp16,bf16")
     p.add_argument("--seed", type=int, default=1234)
     p.add_argument("--inject", type=int, default=0, help="bit flips to inject per step (self-test)")

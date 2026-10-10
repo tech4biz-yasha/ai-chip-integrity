@@ -36,7 +36,7 @@
       "programmingLanguage": "Python",
       "license": "https://opensource.org/licenses/MIT",
       "author": {"@id": "https://chipintegrity.org/#person"},
-      "description": "Three probes for AI accelerators: a compute probe that checks matrix multiplies against a proven float64 error bound and bit-for-bit repeatability, a kernel probe that does the same for softmax, layer norm, GELU and attention, and a memory probe that writes six patterns into every word of device memory and reads them back. Output follows the OCP Test and Validation spec."
+      "description": "Three probes for AI accelerators: a compute probe that checks matrix multiplies against a proven float64 error bound and bit-for-bit repeatability, a kernel probe that does the same for softmax, layer norm, GELU, rotary embeddings and attention, and a memory probe that writes six patterns into every word of device memory and reads them back. Output follows the OCP Test and Validation spec."
     },
     {
       "@type": "Dataset",
@@ -299,14 +299,15 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 </div>
 
 <h3>Probe 2: transformer kernels</h3>
-<p>Matrix multiply uses the multiply-accumulate units. A transformer block also runs exponentials, divisions, square roots and error functions, which live on different silicon, and the research says faults are data-dependent: a unit that multiplies correctly can still get a softmax wrong. The kernel probe runs four of them with the device's own fused kernels, including its attention kernel, and judges every output element the same two ways.</p>
+<p>Matrix multiply uses the multiply-accumulate units. A transformer block also runs exponentials, divisions, square roots, error functions, sines and cosines, which live on different silicon, and the research says faults are data-dependent: a unit that multiplies correctly can still get a softmax wrong. The kernel probe runs five of them with the device's own kernels, including its attention kernel, and judges every output element the same two ways.</p>
 <div class="grid2">
 <div class="panel"><h3>Softmax</h3><p>Rows of logits. Exercises exp, a sum reduction and a divide. The bound follows the error of each exponential through the sum and the quotient.</p></div>
 <div class="panel"><h3>Layer norm</h3><p>Mean, variance, reciprocal square root, scale and shift. The variance allowance is sized for the two-pass, Welford and E[x²]&minus;&mu;² methods, so a correct implementation of any of them passes.</p></div>
 <div class="panel"><h3>GELU</h3><p>The erf form, elementwise. The bound comes from the argument scaling, the erf itself and three roundings.</p></div>
-<div class="panel"><h3>Attention</h3><p>softmax(QK<sup>T</sup>/&radic;d)V through the device's fused attention kernel. The bound carries the tensor-core error of QK<sup>T</sup> through the softmax, allows for the running rescale fused kernels apply block by block, and for P being held in fp16 or bf16. That is why it is the widest.</p></div>
+<div class="panel"><h3>Rotary embeddings</h3><p>How most current language models encode token position. The device takes sin and cos of real angles, up to 4,095 radians at the default size, then rotates each pair of values. Large angles test the argument reduction inside sin and cos.</p></div>
+<div class="panel" style="grid-column:1/-1"><h3>Attention</h3><p>softmax(QK<sup>T</sup>/&radic;d)V through the device's fused attention kernel. The bound carries the tensor-core error of QK<sup>T</sup> through the softmax, allows for the running rescale fused kernels apply block by block, and for P being held in fp16 or bf16. That is why it is the widest.</p></div>
 </div>
-<p>Every bound on this site follows from one written arithmetic model, recorded in every result file: FP32 arithmetic rounds to nearest, tensor cores accumulate faithfully in FP32, exp, divide and square roots stay within eight ulps, and erf within 2<sup>&minus;20</sup> absolute, which admits the shortcut erf that PyTorch uses on ARM processors. CUDA's own math library documents errors well inside that. A device that breaks the model, or that substitutes an approximate GELU, shows as outside-error-bound on every run, and the message says so. Below the smallest normal value of the output type the bound becomes an absolute floor, because fp16 cannot represent a probability of 10<sup>&minus;8</sup> and no chip should be blamed for that.</p>
+<p>Every bound on this site follows from one written arithmetic model, recorded in every result file: FP32 arithmetic rounds to nearest, tensor cores accumulate faithfully in FP32, exp, divide and square roots stay within eight ulps, and erf, sin and cos within 2<sup>&minus;20</sup> absolute, which admits the shortcut erf that PyTorch uses on ARM processors. Each step also measures the device's own exp, erf, sin and cos on its inputs, so a loose function library can be told apart from a faulty unit. CUDA's own math library documents errors well inside that. A device that breaks the model, or that substitutes an approximate GELU, shows as outside-error-bound on every run, and the message says so. Below the smallest normal value of the output type the bound becomes an absolute floor, because fp16 cannot represent a probability of 10<sup>&minus;8</sup> and no chip should be blamed for that.</p>
 <h3>Probe 3: memory</h3>
 <p>The matrix multiply touches a few megabytes. Most of an 80 GB chip is memory, and a bad row or a stuck bit there corrupts whatever lands on it. The memory probe fills most of the device memory, writes a known value into every 32-bit word, waits, and reads every word back.</p>
 <div class="fig">
@@ -360,6 +361,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <dl class="gl">
 <dt>silent error, silent data corruption, SDC</dt><dd>A wrong result from a chip with no crash, no error flag and no log entry. The chip does not know it happened.</dd>
 <dt>bit flip</dt><dd>One binary digit changing value. In a floating point number a flipped high bit can change the value by orders of magnitude; a flipped low bit changes it by less than one part in a million.</dd>
+<dt>rotary embedding (RoPE)</dt><dd>The way most current language models tell the model where a token sits: each pair of values in an attention head is rotated by an angle proportional to the position, computed with sin and cos.</dd>
 <dt>ECC</dt><dd>Error-correcting code. Extra bits stored with memory that let the hardware detect and usually correct a single flipped bit. ECC covers memory, not the arithmetic units, and not every chip has it on all memory.</dd>
 <dt>HBM</dt><dd>High bandwidth memory, the stacked memory next to a data centre GPU die. An H100 has 80 GB of it.</dd>
 <dt>tensor core</dt><dd>A unit on NVIDIA GPUs that multiplies small matrices in one step. fp16, bf16 and int8 matrix multiplies run through tensor cores; fp32 runs through the regular floating point units.</dd>
@@ -412,7 +414,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <ul class="plain">
 <li><b>It means:</b> no silent error appeared in these matrix multiplies, these transformer kernels and this memory sweep, in these runs, on this device, on this day.</li>
 <li><b>It does not mean:</b> the chip is healthy. Faults that depend on specific data, on heat, or on hours of load are not yet exercised. The next probes add them.</li>
-<li><b>Arithmetic model:</b> every bound assumes FP32 arithmetic that rounds to nearest, tensor cores that accumulate faithfully in FP32, exp, divide and square roots within eight ulps, and erf within 2<sup>&minus;20</sup> absolute. A device that breaks the model shows as outside-error-bound on every run, and the message says so.</li>
+<li><b>Arithmetic model:</b> every bound assumes FP32 arithmetic that rounds to nearest, tensor cores that accumulate faithfully in FP32, exp, divide and square roots within eight ulps, and erf, sin and cos within 2<sup>&minus;20</sup> absolute. A device that breaks the model shows as outside-error-bound on every run, and the message says so.</li>
 <li><b>One device per run:</b> links between chips are not yet tested.</li>
 <li><b>Self-test scope:</b> the compute injection corrupts the output after it leaves the device, so it proves the checker, not the chip. The memory injection corrupts device memory itself.</li>
 </ul>
@@ -450,11 +452,11 @@ python memcheck.py --inject 5 --out NAME_memcheck_inject.jsonl</pre>
 <h2>Roadmap</h2>
 <p class="lede">Twelve probes, each aimed at one part of the chip. The first three are built.</p>
 <div class="road">
-<div class="r done"><b>1. Matrix multiply</b><span>Three shapes, four precisions, a proven bound and a bit-exact repeat check. Done.</span></div>
-<div class="r done"><b>2. Memory pattern sweep</b><span>Six patterns over most of device memory, exact read-back, address and bit mask on every miss. Done.</span></div>
-<div class="r done"><b>3. Transformer kernels</b><span>Softmax, layer norm, GELU and the fused attention kernel against a float64 reference with derived bounds. Done.</span></div>
+<div class="r done"><b>1. Matrix multiply</b><span>Three shapes, four precisions, a proven bound and a bit-exact repeat check. Done. FP8 next, and FP4 once a Blackwell card is measured.</span></div>
+<div class="r done"><b>2. Memory pattern sweep</b><span>Six patterns over most of device memory, exact read-back, address and bit mask on every miss. Done. On-chip SRAM next.</span></div>
+<div class="r done"><b>3. Transformer kernels</b><span>Softmax, layer norm, GELU, rotary embeddings and the fused attention kernel against a float64 reference with derived bounds. Done.</span></div>
 <div class="r now"><b>4. Full model forward pass</b><span>A small LLM, every layer checked against a CPU float64 reference. Each layer is fed the device's own input, so its bound stays as tight as a single kernel's.</span></div>
-<div class="r"><b>5. Reductions and all-reduce</b><span>Sums across threads, blocks and then GPUs over NVLink and PCIe, with checksums that must agree at both ends.</span></div>
+<div class="r"><b>5. Reductions, all-reduce and copy engines</b><span>Sums across threads, blocks and then GPUs over NVLink and PCIe, with checksums that must agree at both ends, plus copies of known patterns between host and device.</span></div>
 <div class="r"><b>6. Checksum-protected matrix multiply</b><span>Huang and Abraham's row and column checksums, which detect and locate a wrong element inside the multiply itself.</span></div>
 <div class="r"><b>7. Hours under load</b><span>The same probes for hours at full power, with temperature and clocks logged next to every result.</span></div>
 <div class="r"><b>8. Clock and voltage margin sweep</b><span>Lower the margin step by step where the driver allows it and record where each unit starts to fail. Likely needs bare-metal access.</span></div>
