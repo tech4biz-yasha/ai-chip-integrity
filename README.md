@@ -1,5 +1,7 @@
 # ai-chip-integrity
 
+[![CI](https://github.com/tech4biz-yasha/ai-chip-integrity/actions/workflows/ci.yml/badge.svg)](https://github.com/tech4biz-yasha/ai-chip-integrity/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/ai-chip-integrity)](https://pypi.org/project/ai-chip-integrity/) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23285189.svg)](https://doi.org/10.5281/zenodo.23285189)
+
 An open tester for silent computation errors in AI chips.
 
 It runs a fixed calculation on a GPU, NPU or CPU many times and proves, element by element, whether the chip returned the right answer every time. Results come out in the Open Compute Project Test and Validation format, so they drop straight into fleet tooling.
@@ -278,7 +280,7 @@ python patterns.py               # data pattern probe; 8 patterns through the ma
 python patterns.py --inject 3    # data pattern self-test
 python memcheck.py               # memory probe; 6 patterns over most of the device memory
 python memcheck.py --inject 5    # memory self-test
-python -m pytest -q              # 175 tests on CPU; 6 more validate the output against OCP's schema
+python -m pytest -q              # 176 tests on CPU; 6 more validate the output against OCP's schema
 ```
 
 Options for `memcheck.py`:
@@ -374,7 +376,7 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 
 ## Tests
 
-`python -m pytest -q` runs 175 tests on the CPU in under a minute; 6 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set. On CPUs whose matrix multiply ignores flush-to-zero, such as Apple silicon, the two flushing tests in `tests/test_patterns.py` skip themselves, giving 173 passed.
+`python -m pytest -q` runs 176 tests on the CPU in under a minute; 6 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set. On CPUs whose matrix multiply ignores flush-to-zero, such as Apple silicon, the two flushing tests in `tests/test_patterns.py` skip themselves, giving 174 passed.
 
 1. `tests/test_screen.py` (37): every verdict path, every bit position caught by the self-test, NaN handling, int8 and FP8 off-by-one, FP8 inputs exact and K above 4096 skipped, rectangular shapes, bound tightness.
 2. `tests/test_kernels.py` (23): all kernels and precisions, the self-test on six seeds, intermittent and systematic faults, a one-ulp change, internal fp16 arithmetic and tanh-GELU both caught as outside the bound, NaN handling, fp32 bound tightness, a sin that is off by 1e-4 caught in RoPE, RoPE angles reaching every position, the device's own exp, erf, sin and cos measured, and the CUDA attention path forced onto the CPU: a batch dimension added with the same shape and values back, the kernel that ran recorded, fused kernels only for fp16 and bf16, and a loud refusal when no kernel fits.
@@ -384,7 +386,7 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 6. `tests/test_patterns.py` (17): every pattern passes on CPU, each input set really has its pattern and stays clear of overflow, FP8 and int8 inputs stay exact, flushing is detected and judging a flushing device against the wrong model fails, the policy is measured at each step's own shape (a library that picks its kernel by shape), a kernel that keeps in some places and flushes in others passes with and without injected flips, a fault four times the bound is caught on the cancelling pattern, injected flips are caught on every pattern, and the output matches the OCP schema.
 7. `tests/test_abft.py` (25): clean runs in every precision, injected errors located to their exact row and column on several seeds, a single error pointing at its element, a fault in a checksum flagging only its line, no false alarm on the same-sign, wide, near-maximum and cancelling patterns in every precision, checksums scaled to stay in range, the rectangle fault counted as a blind spot, NaN, and the OCP schema.
 8. `tests/test_counters.py` (17): with a simulated NVIDIA management library, every cross-check verdict; unsupported counters left out rather than zeroed; no counters on CPU and Apple devices; corrected errors reported without failing a run; uncorrected errors failing it; a wrong answer with quiet counters confirmed silent; the site keeping the counter step out of the precision list; and the OCP schema.
-9. `tests/test_readme.py` (16): this README carries every probe's version, every option and its default, every option of `chip-integrity run`, every result file, every script and test file, and the citation version, and the package version matches the citation, so neither can drift from the code without a test failing.
+9. `tests/test_readme.py` (17): this README carries every probe's version, every option and its default, every option of `chip-integrity run`, every result file, every script and test file, and the citation version and DOI, and the package version matches the citation, so neither can drift from the code without a test failing.
 10. `tests/test_cli.py` (13): `chip-integrity run` executes exactly the ten probe commands in this README with the same file names and self-test strength, `--quick` only adds small sizes, `--skip` leaves whole probes out, a failing step fails the run without stopping the others, a quick run is never offered as a row, bad names and unknown probes are refused before anything runs, one probe runs with its own options, the old `python screen.py` paths still work, and a real quick run writes its files.
 
 ## Output format
@@ -443,6 +445,7 @@ If you use this in research, please cite it as
 
 ```
 Yasha Khandelwal. ai-chip-integrity: an open tester for silent computation errors in AI chips. Version 0.4.0, 2026.
+https://doi.org/10.5281/zenodo.23285189
 https://github.com/tech4biz-yasha/ai-chip-integrity
 ```
 

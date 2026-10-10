@@ -5,6 +5,7 @@
 Site: https://chipintegrity.org/
 Code: https://github.com/tech4biz-yasha/ai-chip-integrity (MIT)
 Install: pip install ai-chip-integrity, then chip-integrity run (every probe and its self-test, ten OCP result files). Docker: ghcr.io/tech4biz-yasha/ai-chip-integrity
+Cite: Yasha Khandelwal, ai-chip-integrity, version 0.4.0, 2026, https://doi.org/10.5281/zenodo.23285189
 Contact: yasha.khandelwal@tech4biz.io
 
 ## What it measures

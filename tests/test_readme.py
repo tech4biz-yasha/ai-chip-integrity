@@ -78,6 +78,11 @@ def test_citation_version_matches_citation_file():
     assert f"Version {version}, 2026." in README
 
 
+def test_doi_matches_citation_file():
+    doi = re.search(r"^doi: (\S+)", (ROOT / "CITATION.cff").read_text(), re.M).group(1)
+    assert f"https://doi.org/{doi}" in README, f"README does not cite the DOI in CITATION.cff ({doi})"
+
+
 def test_package_version_matches_citation_file():
     cff = re.search(r"^version: ([\d.]+)", (ROOT / "CITATION.cff").read_text(), re.M).group(1)
     package = re.search(r'^__version__ = "([\d.]+)"', (PKG / "__init__.py").read_text(), re.M).group(1)
