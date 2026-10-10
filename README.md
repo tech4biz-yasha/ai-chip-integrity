@@ -392,7 +392,7 @@ Twelve probes, each aimed at one part of the chip. Six are built: 1, 2, 3, 6, 9 
 8. **Clock and voltage margin sweep.** Lower the margin step by step where the driver allows it and record where each unit starts to fail. Likely needs bare-metal access, since container pods rarely allow clock control.
 9. **Data pattern library** (`patterns.py`). Done for the matrix multiply: wide exponents, full mantissas, cancellation, alternating signs, sparsity, subnormals with flush detection, near-overflow and int8 extremes. Patterns for the transformer kernels are next.
 10. **Fault injection inside the computation.** Flip bits in registers during the multiply (NVBit on NVIDIA) to measure how often a flip becomes a wrong answer. The basis for a space radiation column.
-11. **ECC and error counters** (`counters.py`). Done: every run of every probe reads the chip's counters before and after and records whether the hardware noticed what the probe noticed. Its first real test is on the next NVIDIA run.
+11. **ECC and error counters** (`counters.py`). Done: every run of every probe reads the chip's counters before and after and records whether the hardware noticed what the probe noticed. Its first real test was the H100 run on 10 October 2026, with every ECC and row-remap counter quiet.
 12. **Recovery.** After a detected fault, reset and rerun on the same card to see whether the fault clears. Likely needs bare-metal access, since a GPU reset needs root on the host.
 
 Around the probes: a fleet mode that runs every probe across many devices and collects the files, side by side runs against vendor diagnostics on the same device, and a rulebook for submitting rows to the public table.
