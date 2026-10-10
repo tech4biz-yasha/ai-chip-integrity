@@ -1,8 +1,8 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 title: "ai-chip-integrity: an open tester for silent computation errors in AI chips"
-version: 0.3.0
-date-released: 2026-10-08
+version: 0.4.0
+date-released: 2026-10-10
 license: MIT
 repository-code: "https://github.com/tech4biz-yasha/ai-chip-integrity"
 authors:

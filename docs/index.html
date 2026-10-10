@@ -539,7 +539,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <div class="kicker">EVIDENCE</div>
 <h2>What a PASS means, and does not</h2>
 <ul class="plain">
-<li><b>It means:</b> no silent error appeared in these matrix multiplies, these transformer kernels and this memory sweep, in these runs, on this device, on this day.</li>
+<li><b>It means:</b> no silent error appeared in these matrix multiplies, these data patterns, these transformer kernels and this memory sweep, in these runs, on this device, on this day.</li>
 <li><b>It does not mean:</b> the chip is healthy. Faults that depend on specific data, on heat, or on hours of load are not yet exercised. The next probes add them.</li>
 <li><b>Arithmetic model:</b> every bound assumes FP32 arithmetic that rounds to nearest, tensor cores that accumulate faithfully in FP32, exp, divide and square roots within eight ulps, and erf, sin and cos within 2<sup>&minus;20</sup> absolute. A device that breaks the model shows as outside-error-bound on every run, and the message says so.</li>
 <li><b>One device per run:</b> links between chips are not yet tested.</li>
@@ -550,24 +550,28 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <section id="run">
 <div class="kicker">TAKE PART</div>
 <h2>Run it on your chip</h2>
-<p class="lede">Six commands, six result files, one pull request. Works on CUDA, Apple MPS and CPU today.</p>
+<p class="lede">Eight commands, eight result files, one pull request. Works on CUDA, Apple MPS and CPU today.</p>
 <pre><span class="c"># once</span>
 git clone https://github.com/tech4biz-yasha/ai-chip-integrity.git &amp;&amp; cd ai-chip-integrity
 pip install -r requirements.txt
 
-<span class="c"># compute probe and its self-test</span>
+<span class="c"># probe 1, compute, and its self-test</span>
 python screen.py --out NAME_clean.jsonl
 python screen.py --inject 5 --out NAME_inject.jsonl
 
-<span class="c"># kernel probe and its self-test</span>
+<span class="c"># probe 2, memory, and its self-test</span>
+python memcheck.py --out NAME_memcheck.jsonl
+python memcheck.py --inject 5 --out NAME_memcheck_inject.jsonl
+
+<span class="c"># probe 3, transformer kernels, and its self-test</span>
 python kernels.py --out NAME_kernels.jsonl
 python kernels.py --inject 3 --out NAME_kernels_inject.jsonl
 
-<span class="c"># memory probe and its self-test</span>
-python memcheck.py --out NAME_memcheck.jsonl
-python memcheck.py --inject 5 --out NAME_memcheck_inject.jsonl</pre>
+<span class="c"># probe 9, data patterns, and its self-test</span>
+python patterns.py --out NAME_patterns.jsonl
+python patterns.py --inject 3 --out NAME_patterns_inject.jsonl</pre>
 <ol class="steps">
-<li><b>Open a pull request</b> with the six files, the device name, driver version and PyTorch version.</li>
+<li><b>Open a pull request</b> with the eight files, the device name, driver version and PyTorch version.</li>
 <li><b>Rows are added only from attached files.</b> The table is regenerated from them, so a row cannot say more than its file does.</li>
 <li><b>Found a fault?</b> Open an issue with the file. A real finding on real hardware is the most useful thing anyone can contribute.</li>
 </ol>
@@ -616,7 +620,7 @@ python memcheck.py --inject 5 --out NAME_memcheck_inject.jsonl</pre>
 <h2>About and cite</h2>
 <p>Chip Integrity is maintained by Yasha Khandelwal, Bengaluru. The code is MIT licensed. The project stays vendor neutral: the same tests run on every chip, and a row is published only with its result file.</p>
 <pre>Yasha Khandelwal. ai-chip-integrity: an open tester for silent computation errors in AI chips.
-Version 0.3.0, 2026. https://github.com/tech4biz-yasha/ai-chip-integrity</pre>
+Version 0.4.0, 2026. https://github.com/tech4biz-yasha/ai-chip-integrity</pre>
 <p>Questions, rows and findings: <a href="mailto:yasha.khandelwal@tech4biz.io">yasha.khandelwal@tech4biz.io</a> or an issue on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</p>
 </section>
 

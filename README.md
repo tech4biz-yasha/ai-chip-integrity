@@ -187,7 +187,7 @@ python patterns.py               # data pattern probe; 8 patterns through the ma
 python patterns.py --inject 3    # data pattern self-test
 python memcheck.py               # memory probe; 6 patterns over most of the device memory
 python memcheck.py --inject 5    # memory self-test
-python -m pytest -q              # 96 tests on CPU; 4 more validate the output against OCP's schema
+python -m pytest -q              # 107 tests on CPU; 4 more validate the output against OCP's schema
 ```
 
 Options for `memcheck.py`:
@@ -264,7 +264,7 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 
 ## Tests
 
-`python -m pytest -q` runs 96 tests on the CPU in a few seconds; 4 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set.
+`python -m pytest -q` runs 107 tests on the CPU in a few seconds; 4 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set. On CPUs whose matrix multiply ignores flush-to-zero, such as Apple silicon, the two flushing tests in `tests/test_patterns.py` skip themselves, giving 105 passed.
 
 1. `tests/test_screen.py` (37): every verdict path, every bit position caught by the self-test, NaN handling, int8 and FP8 off-by-one, FP8 inputs exact and K above 4096 skipped, rectangular shapes, bound tightness.
 2. `tests/test_kernels.py` (19): all kernels and precisions, the self-test on six seeds, intermittent and systematic faults, a one-ulp change, internal fp16 arithmetic and tanh-GELU both caught as outside the bound, NaN handling, fp32 bound tightness, a sin that is off by 1e-4 caught in RoPE, RoPE angles reaching every position, and the device's own exp, erf, sin and cos measured.
@@ -272,6 +272,7 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 4. `tests/test_arith.py` (19): the model checked against simulations of the hardware it claims to cover. A simulated tensor core that truncates, at block widths 1 to 32, stays inside the bound; a constructed case breaks the old v0.2.0 bound by almost 2x and stays inside the new one; a FlashAttention-2 style kernel emulated op by op stays inside the attention bound; PyTorch's ARM CPU erf and GELU, emulated op by op, stay inside the GELU bound; and FP8 sums of {-1, 0, 1} stay exact in a 13-bit accumulator while a 9-bit one loses them.
 5. `tests/test_build_site.py` (3): a newer tool version replaces the older row for the same device on the site, kernel sizes render from the files, and data pattern rows render with the flushing behaviour.
 6. `tests/test_patterns.py` (14): every pattern passes on CPU, each input set really has its pattern and stays clear of overflow, FP8 and int8 inputs stay exact, flushing is detected and judging a flushing device against the wrong model fails, a fault four times the bound is caught on the cancelling pattern, injected flips are caught on every pattern, and the output matches the OCP schema.
+7. `tests/test_readme.py` (11): this README carries every probe's version, every option and its default, every result file, every script and test file, and the citation version, so it cannot drift from the code without a test failing.
 
 ## Output format
 
@@ -324,7 +325,7 @@ Run `python screen.py`, `python screen.py --inject 5`, `python memcheck.py`, `py
 If you use this in research, please cite it as
 
 ```
-Yasha Khandelwal. ai-chip-integrity: an open tester for silent computation errors in AI chips. Version 0.3.0, 2026.
+Yasha Khandelwal. ai-chip-integrity: an open tester for silent computation errors in AI chips. Version 0.4.0, 2026.
 https://github.com/tech4biz-yasha/ai-chip-integrity
 ```
 
