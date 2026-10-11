@@ -1,6 +1,6 @@
 # ai-chip-integrity
 
-[![CI](https://github.com/tech4biz-yasha/ai-chip-integrity/actions/workflows/ci.yml/badge.svg)](https://github.com/tech4biz-yasha/ai-chip-integrity/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/ai-chip-integrity)](https://pypi.org/project/ai-chip-integrity/) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23285189.svg)](https://doi.org/10.5281/zenodo.23285189)
+[![CI](https://github.com/tech4biz-yasha/ai-chip-integrity/actions/workflows/ci.yml/badge.svg)](https://github.com/tech4biz-yasha/ai-chip-integrity/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/ai-chip-integrity)](https://pypi.org/project/ai-chip-integrity/) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23302804.svg)](https://doi.org/10.5281/zenodo.23302804)
 
 An open tester for silent computation errors in AI chips.
 
@@ -465,7 +465,7 @@ If you use this in research, please cite it as
 
 ```
 Yasha Khandelwal. ai-chip-integrity: an open tester for silent computation errors in AI chips. Version 0.4.1, 2026.
-https://doi.org/10.5281/zenodo.23285189
+https://doi.org/10.5281/zenodo.23302804
 https://github.com/tech4biz-yasha/ai-chip-integrity
 ```
 
