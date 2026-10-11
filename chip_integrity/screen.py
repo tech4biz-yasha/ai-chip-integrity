@@ -43,7 +43,7 @@ import ocptv.output as tv  # noqa: E402
 from chip_integrity import arith  # noqa: E402
 from chip_integrity import counters  # noqa: E402
 
-VERSION = "0.3.2"
+VERSION = "0.3.3"
 
 FP8 = getattr(torch, "float8_e4m3fn", None)   # E4M3, the FP8 format inference engines run on
 
@@ -116,12 +116,12 @@ def make_case(m, k, n, dtype, seed):
     if dtype == FP8:
         a = torch.randint(-1, 2, (m, k), generator=g, dtype=torch.int8)
         b = torch.randint(-1, 2, (k, n), generator=g, dtype=torch.int8)
-        ref = (a.to(torch.int64) @ b.to(torch.int64)).to(torch.float64)   # exact
+        ref = arith.exact_int_matmul(a, b)   # exact: whole numbers, every sum far below 2^53
         return a.to(torch.float32).to(FP8), b.to(torch.float32).to(FP8), ref, torch.zeros_like(ref)
     if dtype == torch.int8:
         a = torch.randint(-16, 16, (m, k), generator=g, dtype=torch.int8)
         b = torch.randint(-16, 16, (k, n), generator=g, dtype=torch.int8)
-        ref = (a.to(torch.int64) @ b.to(torch.int64)).to(torch.float64)   # exact, |value| < 2^31
+        ref = arith.exact_int_matmul(a, b)   # exact, |value| < 2^31
         return a, b, ref, torch.zeros_like(ref)
     a = (torch.rand(m, k, generator=g, dtype=torch.float64) * 2 - 1).to(dtype)
     b = (torch.rand(k, n, generator=g, dtype=torch.float64) * 2 - 1).to(dtype)

@@ -68,7 +68,18 @@ COUNTER_NOTES = {
     "silent-error-confirmed": "error counters stayed quiet while answers were wrong",
     "hardware-noticed": "error counters moved with the wrong answers",
     "counters-unavailable": "no error counters",
+    "ecc-off": "ECC off, so the error counters cannot see memory errors",
 }
+
+
+def counter_verdict(step):
+    """Probe 11's verdict for one run. Files from counters 0.1.0 said counters-quiet even with ECC off, when the
+    counters cannot move at all; they are shown as ecc-off, the verdict counters 0.1.1 records for that case."""
+    if not step:
+        return None
+    if step.get("_verdict") == "counters-quiet" and step.get("ecc_enabled") is False:
+        return "ecc-off"
+    return step.get("_verdict")
 KERNEL_ORDER = ["softmax", "layernorm", "gelu", "rope", "attention"]
 PRECISION_ORDER = ["fp32", "fp16", "bf16", "int8", "fp8", "fp8fast"]
 PATTERN_ORDER = ["wide", "mantissa", "cancel", "alternate", "sparse", "subnormal", "near_max", "extremes"]
@@ -116,7 +127,7 @@ def summarise(runs):
                 row["rep_fail"] = sum(s.get("repeat_check_failed_runs", 0) for s in live)
                 row["verdicts"] = sorted({s["_verdict"] for s in live})
                 row["clean_file"] = r["file"]
-                row["counters"] = (r.get("counters") or {}).get("_verdict")
+                row["counters"] = counter_verdict(r.get("counters"))
         elif r["run"] == "ai-chip-integrity-kernels":
             row = row_for(kernel, r, torch=r["torch"])
             if row is None:
@@ -143,7 +154,7 @@ def summarise(runs):
                 row["rep_fail"] = sum(s.get("repeat_check_failed_runs", 0) for s in live)
                 row["verdicts"] = sorted({s["_verdict"] for s in live})
                 row["clean_file"] = r["file"]
-                row["counters"] = (r.get("counters") or {}).get("_verdict")
+                row["counters"] = counter_verdict(r.get("counters"))
         elif r["run"] == "ai-chip-integrity-patterns":
             row = row_for(pattern, r, torch=r["torch"])
             if row is None:
@@ -169,7 +180,7 @@ def summarise(runs):
                 row["rep_fail"] = sum(s.get("repeat_check_failed_runs", 0) for s in live.values())
                 row["verdicts"] = sorted({s["_verdict"] for s in live.values()})
                 row["clean_file"] = r["file"]
-                row["counters"] = (r.get("counters") or {}).get("_verdict")
+                row["counters"] = counter_verdict(r.get("counters"))
         elif r["run"] == "ai-chip-integrity-abft":
             row = row_for(checksum, r, torch=r["torch"])
             if row is None:
@@ -192,7 +203,7 @@ def summarise(runs):
                 row["thr_ratio"] = max((s.get("threshold_over_typical_value", 0) for s in live.values()), default=0)
                 row["verdicts"] = sorted({s["_verdict"] for s in live.values()})
                 row["clean_file"] = r["file"]
-                row["counters"] = (r.get("counters") or {}).get("_verdict")
+                row["counters"] = counter_verdict(r.get("counters"))
         elif r["run"] == "ai-chip-integrity-memcheck":
             row = row_for(memory, r)
             if row is None:
@@ -211,7 +222,7 @@ def summarise(runs):
                 row["seconds"] = s.get("seconds")
                 row["verdict"] = s["_verdict"]
                 row["clean_file"] = r["file"]
-                row["counters"] = (r.get("counters") or {}).get("_verdict")
+                row["counters"] = counter_verdict(r.get("counters"))
     order = lambda d: (0 if "H100" in d else 1 if "A100" in d else 2 if "NVIDIA" in d else 3, d)
     return ([compute[k] for k in sorted(compute, key=order)], [memory[k] for k in sorted(memory, key=order)],
             [kernel[k] for k in sorted(kernel, key=order)], [pattern[k] for k in sorted(pattern, key=order)],

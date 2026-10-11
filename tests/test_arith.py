@@ -171,3 +171,35 @@ def test_fp8_ternary_sums_need_13_bits_and_no_more():
 def test_model_id_is_recorded_constants():
     assert "2^-23" in arith.MODEL_ID and "2^-20" in arith.MODEL_ID
     assert arith.ulps(arith.EPS_FN) == 8.0
+
+
+@pytest.mark.parametrize("lo, hi, m, k, n", [
+    (-16, 16, 37, 300, 29),      # the compute probe's int8 inputs
+    (-1, 2, 16, 4096, 16),       # the FP8 inputs, at the largest K the FP8 check allows
+    (-128, 128, 8, 4096, 8),     # the int8 extremes pattern
+])
+def test_exact_int_matmul_matches_int64_bit_for_bit(lo, hi, m, k, n):
+    g = torch.Generator().manual_seed(k)
+    a = torch.randint(lo, hi, (m, k), generator=g, dtype=torch.int8)
+    b = torch.randint(lo, hi, (k, n), generator=g, dtype=torch.int8)
+    want = (a.to(torch.int64) @ b.to(torch.int64)).to(torch.float64)
+    got = arith.exact_int_matmul(a, b)
+    assert got.dtype == torch.float64 and torch.equal(got, want)
+    assert torch.equal(arith.exact_int_matmul(a.to(torch.float32), b.to(torch.float32)), want)
+
+
+def test_exact_int_matmul_worst_case_sum_is_exact():
+    a = torch.full((4, 4096), -128, dtype=torch.int8)
+    b = torch.full((4096, 4), -128, dtype=torch.int8)
+    assert torch.equal(arith.exact_int_matmul(a, b), torch.full((4, 4), 128.0 * 128 * 4096, dtype=torch.float64))
+
+
+def test_exact_int_matmul_falls_back_beyond_2_to_the_53():
+    a = torch.tensor([[2 ** 53 + 1, 1]], dtype=torch.int64)     # not a float64 value: the fallback must use int64
+    b = torch.tensor([[1], [1]], dtype=torch.int64)
+    assert arith.exact_int_matmul(a, b).item() == float((2 ** 53 + 1) + 1)
+
+
+def test_exact_int_matmul_refuses_fractions():
+    with pytest.raises(ValueError):
+        arith.exact_int_matmul(torch.tensor([[0.5]]), torch.tensor([[1.0]]))

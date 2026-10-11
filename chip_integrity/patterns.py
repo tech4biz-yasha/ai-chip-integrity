@@ -39,7 +39,7 @@ from chip_integrity import arith
 from chip_integrity import counters
 from chip_integrity import screen
 
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 FLOAT_PATTERNS = ["wide", "mantissa", "cancel", "alternate", "sparse", "subnormal", "near_max"]
 APPLIES = {
     "fp32": FLOAT_PATTERNS, "fp16": FLOAT_PATTERNS, "bf16": FLOAT_PATTERNS,
@@ -193,7 +193,7 @@ def make_pattern_case(name, pattern, m, k, n, seed, flushed=False):
         raise RuntimeError("this PyTorch build has no float8_e4m3fn type")
     if dtype == torch.int8 or dtype == screen.FP8:
         a, b = int8_inputs(pattern, m, k, n, g) if dtype == torch.int8 else fp8_inputs(pattern, m, k, n, g)
-        ref = (a.to(torch.float32).to(torch.int64) @ b.to(torch.float32).to(torch.int64)).to(torch.float64)
+        ref = arith.exact_int_matmul(a.to(torch.float32), b.to(torch.float32))   # exact for these whole numbers
         return (a, b, ref, torch.zeros_like(ref)), 0
     a, b, shift = float_inputs(pattern, m, k, n, dtype, out_dtype, g)
     a64, b64 = a.to(torch.float64), b.to(torch.float64)

@@ -102,3 +102,24 @@ def ulps(rel):
 
 
 assert math.isclose(ulps(EPS_FN), 8.0)
+
+
+def exact_int_matmul(a, b):
+    """A @ B for whole-number inputs, returned in float64 and exact.
+
+    Every product and partial sum is a whole number no larger in size than max|A| * max|B| * K. Below 2^53 each
+    of them is a float64 integer, so a float64 matrix multiply returns the exact answer in whatever order it adds,
+    and on a CPU it runs many times faster than an int64 matmul. Otherwise the int64 matmul is used, starting
+    from the original tensors so that no large value is rounded on the way. Floating-point inputs must hold whole
+    numbers, because neither path would be exact for anything else."""
+    for t in (a, b):
+        if t.is_floating_point() and not torch.equal(t, t.round()):
+            raise ValueError("exact_int_matmul needs whole-number inputs")
+    a64, b64 = a.to(torch.float64), b.to(torch.float64)
+    largest = 0.0
+    if a64.numel() and b64.numel():
+        # Rounding is monotonic and 2^53 is a float64, so a rounded product below 2^53 means the true one is too.
+        largest = float(a64.abs().max()) * float(b64.abs().max()) * a64.shape[-1]
+    if largest < 2.0 ** 53:
+        return a64 @ b64
+    return (a.to(torch.int64) @ b.to(torch.int64)).to(torch.float64)

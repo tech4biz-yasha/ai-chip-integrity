@@ -6,7 +6,7 @@ An open tester for silent computation errors in AI chips.
 
 It runs a fixed calculation on a GPU, NPU or CPU many times and proves, element by element, whether the chip returned the right answer every time. Results come out in the Open Compute Project Test and Validation format, so they drop straight into fleet tooling.
 
-**Status: early.** Six probes so far, numbered as on the roadmap below: `screen.py` v0.3.2 (probe 1, matrix multiply across several shapes, four precisions and exact FP8), `memcheck.py` v0.1.1 (probe 2, a sweep of most of the device memory), `kernels.py` v0.2.2 (probe 3, softmax, layer norm, GELU, rotary embeddings and fused attention), `abft.py` v0.1.0 (probe 6, checksum-protected matrix multiply with proven thresholds), `patterns.py` v0.1.2 (probe 9, data patterns that drive the matrix multiply) and `counters.py` v0.1.0 (probe 11, the chip's own error counters, read around every run of the other five). One device at a time, four measured chips. Read the limits section before relying on a PASS.
+**Status: early.** Six probes so far, numbered as on the roadmap below: `screen.py` v0.3.3 (probe 1, matrix multiply across several shapes, four precisions and exact FP8), `memcheck.py` v0.1.1 (probe 2, a sweep of most of the device memory), `kernels.py` v0.2.2 (probe 3, softmax, layer norm, GELU, rotary embeddings and fused attention), `abft.py` v0.1.0 (probe 6, checksum-protected matrix multiply with proven thresholds), `patterns.py` v0.1.3 (probe 9, data patterns that drive the matrix multiply) and `counters.py` v0.1.1 (probe 11, the chip's own error counters, read around every run of the other five). One device at a time, six measured chips. Read the limits section before relying on a PASS.
 
 ## Quick start
 
@@ -41,6 +41,8 @@ Every row comes from a run of this code with the result files in [`results/`](re
 
 | Device | Date | Tool | Shapes (MxKxN) | Runs per step | fp32 | fp16 | bf16 | int8 | FP8 | Injected faults caught | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|---|
+| NVIDIA GeForce RTX 4090, driver 580.159.04, PyTorch 2.8.0+cu128, rented pod, ECC off | 2026-10-11 | v0.3.2 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | PASS, exact with full and fast accumulation | 90 of 90 | no-silent-errors |
+| NVIDIA RTX A5000, driver 580.159.04, PyTorch 2.8.0+cu128, rented pod, ECC off | 2026-10-11 | v0.3.2 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | skipped, no FP8 on this card (compute capability 8.6) | 60 of 60 | no-silent-errors |
 | NVIDIA H100 80GB HBM3 (SXM), driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-10 | v0.3.2 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | PASS, exact with full and fast accumulation | 90 of 90 | no-silent-errors |
 | NVIDIA H200, PyTorch 2.8.0+cu128, rented pod | 2026-10-08 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | not in v0.2.0 | 60 of 60 | no-silent-errors |
 | NVIDIA A100-SXM4-80GB, PyTorch 2.8.0+cu128, rented pod | 2026-10-07 | v0.2.0 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | not in v0.2.0 | 60 of 60 | no-silent-errors |
@@ -52,6 +54,8 @@ Every row comes from a run of this code with the result files in [`results/`](re
 
 | Device | Date | Tool | Kernels | Size | Runs per step | fp32 | fp16 | bf16 | Injected faults caught | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
+| NVIDIA GeForce RTX 4090, driver 580.159.04, PyTorch 2.8.0+cu128, rented pod, ECC off | 2026-10-11 | v0.2.2 | softmax, layer norm, GELU, RoPE, attention | 4096x4096; RoPE 4096 positions x 128; attention 8 heads x 1024 tokens x 128 | 25 | PASS | PASS | PASS | 45 of 45 | no-silent-errors |
+| NVIDIA RTX A5000, driver 580.159.04, PyTorch 2.8.0+cu128, rented pod, ECC off | 2026-10-11 | v0.2.2 | softmax, layer norm, GELU, RoPE, attention | 4096x4096; RoPE 4096 positions x 128; attention 8 heads x 1024 tokens x 128 | 25 | PASS | PASS | PASS | 45 of 45 | no-silent-errors |
 | NVIDIA H100 80GB HBM3 (SXM), driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-10 | v0.2.2 | softmax, layer norm, GELU, RoPE, attention | 4096x4096; RoPE 4096 positions x 128; attention 8 heads x 1024 tokens x 128 | 25 | PASS | PASS | PASS | 45 of 45 | no-silent-errors |
 | Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-10 | v0.2.0 | softmax, layer norm, GELU, RoPE, attention | 4096x4096; RoPE 4096 positions x 128; attention 8 heads x 1024 tokens x 128 | 25 | PASS | PASS | PASS | 45 of 45 | no-silent-errors |
 | Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-08 | v0.1.0 | softmax, layer norm, GELU, attention | 4096x4096; attention 8 heads x 1024 tokens x 128 | 25 | PASS | PASS | PASS | 36 of 36 | no-silent-errors |
@@ -64,6 +68,8 @@ Notes on the H100 row: all 375 results across 15 steps were inside the bound and
 
 | Device | Date | Tool | Shapes (MxKxN) | Runs per step | fp32 | fp16 | bf16 | Blind-spot runs | Injected errors located | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
+| NVIDIA GeForce RTX 4090, driver 580.159.04, PyTorch 2.8.0+cu128, rented pod, ECC off | 2026-10-11 | v0.1.0 | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | 0 | 18 of 18 | no-silent-errors |
+| NVIDIA RTX A5000, driver 580.159.04, PyTorch 2.8.0+cu128, rented pod, ECC off | 2026-10-11 | v0.1.0 | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | 0 | 18 of 18 | no-silent-errors |
 | NVIDIA H100 80GB HBM3 (SXM), driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-10 | v0.1.0 | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | 0 | 18 of 18 | no-silent-errors |
 | Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-10 | v0.1.0 | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | 0 | 18 of 18 | no-silent-errors |
 
@@ -75,6 +81,8 @@ Notes on the H100 row: all 120 runs had every checksum consistent, and every inj
 
 | Device | Date | Tool | Patterns | Shapes (MxKxN) | Runs per step | fp32 | fp16 | bf16 | int8 | FP8 | Subnormal inputs | Injected faults caught | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| NVIDIA GeForce RTX 4090, driver 580.159.04, PyTorch 2.8.0+cu128, rented pod, ECC off | 2026-10-11 | v0.1.2 | wide, mantissa, cancel, alternate, sparse, subnormal, near_max, extremes | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | PASS, exact | PASS, exact with full and fast accumulation | kept in fp32, fp16 and bf16 | 168 of 168 | no-silent-errors |
+| NVIDIA RTX A5000, driver 580.159.04, PyTorch 2.8.0+cu128, rented pod, ECC off | 2026-10-11 | v0.1.2 | wide, mantissa, cancel, alternate, sparse, subnormal, near_max, extremes | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | PASS, exact | skipped, no FP8 on this card | kept in fp32, fp16 and bf16 | 144 of 144 | no-silent-errors |
 | NVIDIA H100 80GB HBM3 (SXM), driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-10 | v0.1.2 | wide, mantissa, cancel, alternate, sparse, subnormal, near_max, extremes | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | PASS, exact | PASS, exact with full and fast accumulation | kept in fp32, fp16 and bf16 | 168 of 168 | no-silent-errors |
 | Apple GPU via MPS, MacBook Pro (arm64) | 2026-10-10 | v0.1.0 | wide, mantissa, cancel, alternate, sparse, subnormal, near_max | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | skipped, no int8 matmul on MPS | skipped, no FP8 on MPS | flushed in fp32 and bf16, kept in fp16 | 126 of 126 | no-silent-errors |
 
@@ -86,6 +94,8 @@ Notes on the H100 row: all 1,120 results across 56 steps were inside the bound o
 
 | Device | Date | Memory tested | Patterns | Dwell | Bad words | Injected flips located | Verdict |
 |---|---|---|---|---|---|---|---|
+| NVIDIA GeForce RTX 4090, 23.5 GiB total, rented pod, ECC off | 2026-10-11 | 18.50 GiB (4,966,055,936 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
+| NVIDIA RTX A5000, 23.5 GiB total, rented pod, ECC off | 2026-10-11 | 18.50 GiB (4,966,055,936 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
 | NVIDIA H200, 139.8 GiB total, rented pod | 2026-10-08 | 111.25 GiB (29,863,444,480 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
 | NVIDIA A100-SXM4-80GB, 79.3 GiB total, rented pod | 2026-10-07 | 63.00 GiB (16,911,433,728 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
 | NVIDIA H100 80GB HBM3 (SXM), 79.2 GiB total, rented pod, v0.1.1 with error counters | 2026-10-10 | 62.75 GiB (16,844,324,864 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
@@ -99,6 +109,10 @@ The H200, A100 and first H100 rows were measured with v0.2.0, before the FP8 ste
 Notes on the H100 v0.3.2 row: all 900 results across 18 steps were inside the bound or exact, and bit-for-bit identical to their first run. FP8 was exact on every element with both full and fast accumulation at all three shapes, including K = 4096. The worst error over bound was 0.0053 for fp32, 0.21 for fp16 and 0.66 for bf16. Result files: `results/h100_v032.jsonl` and `results/h100_v032_inject.jsonl`.
 
 **Error counters (`counters.py`), first real cross-check.** On the H100, every clean run of the five probes ended `counters-quiet`. ECC was on, the volatile corrected and uncorrected ECC counts read 0 before and after each run, no memory rows were remapped, and nothing was pending or failed. During the compute run the GPU went from 31 to 34 C, from 345 to 1980 MHz and from 69.7 to 118.9 W. Apple rows read `counters-unavailable`, as designed.
+
+Notes on the RTX 4090 rows: measured on 11 October 2026 on a rented pod, the same way as the RTX A5000. All 2,515 runs across the five probes were inside their bound or exact, and bit-for-bit identical to their first run, and all 351 planted faults were caught or located. FP8 was exact on every element with both full and fast accumulation at all three shapes, including K = 4096, on this consumer card (compute capability 8.9). The worst error over bound was 0.0053 for fp32, 0.21 for fp16 and 0.66 for bf16 in the compute probe, 0.999 for fp16 softmax in the kernel probe and 0.93 for bf16 sparse in the pattern probe. Attention ran on FlashAttention in fp16 and bf16 and on the memory-efficient kernel in fp32. The card keeps subnormal inputs in fp32, fp16 and bf16. ECC was off, with the same counters as the RTX A5000, so the cross-check proves nothing for this card either. The compute run took 3,567 s, and the timestamps in its file show why: 3,002 s of it went on building three exact references on the pod's CPU, outside the timed GPU runs, for int8, FP8 and fast-accumulation FP8 at 4096x4096x4096 (1,021 s, 996 s and 985 s). From v0.4.1 the probes build those references with a float64 matrix multiply, which gives the same answer bit for bit because every sum is a whole number far below 2^53. The memory sweep took 20.8 s for 18.50 GiB. Result files: `results/rtx4090_clean.jsonl`, `results/rtx4090_inject.jsonl`, `results/rtx4090_kernels.jsonl`, `results/rtx4090_kernels_inject.jsonl`, `results/rtx4090_abft.jsonl`, `results/rtx4090_abft_inject.jsonl`, `results/rtx4090_patterns.jsonl`, `results/rtx4090_patterns_inject.jsonl`, `results/rtx4090_memcheck.jsonl` and `results/rtx4090_memcheck_inject.jsonl`.
+
+Notes on the RTX A5000 rows: measured on 11 October 2026 on a rented pod, installed with `pip install ai-chip-integrity` (v0.4.0) and run with `chip-integrity run`, on Python 3.12.3. All 2,055 runs across the five probes were inside their bound or exact, and bit-for-bit identical to their first run, and all 297 planted faults were caught or located. The worst error over bound was 0.0024 for fp32, 0.21 for fp16 and 0.66 for bf16 in the compute probe, 0.999 for fp16 softmax in the kernel probe and 0.93 for bf16 sparse in the pattern probe. Attention ran on FlashAttention in fp16 and bf16 and on the memory-efficient kernel in fp32. The card keeps subnormal inputs in fp32, fp16 and bf16. Its compute capability is 8.6, below the 8.9 that FP8 needs, so the FP8 steps are recorded as skipped, not passed. ECC was off on this pod. NVML reported no ECC counts, only the remapped-row counters, and rows are only remapped after ECC detects errors, so those counters could not move and the cross-check proves nothing for this card. The v0.4.0 files say `counters-quiet`; the site shows them as ECC off, the verdict `counters.py` v0.1.1 records in this case. The memory sweep took 23.7 s for 18.50 GiB. Result files: `results/rtxa5000_clean.jsonl`, `results/rtxa5000_inject.jsonl`, `results/rtxa5000_kernels.jsonl`, `results/rtxa5000_kernels_inject.jsonl`, `results/rtxa5000_abft.jsonl`, `results/rtxa5000_abft_inject.jsonl`, `results/rtxa5000_patterns.jsonl`, `results/rtxa5000_patterns_inject.jsonl`, `results/rtxa5000_memcheck.jsonl` and `results/rtxa5000_memcheck_inject.jsonl`.
 
 Notes on the H200 row: all 600 results across 12 steps were bit-for-bit identical to their first run and int8 was exact on every element. Result files: `results/h200_clean.jsonl` and `results/h200_inject.jsonl`.
 
@@ -240,7 +254,7 @@ The bound for every float step adds two terms the compute probe also carries fro
 
 ## Probe 11: error counters (`counters.py`)
 
-Every run of the other four probes reads the chip's own error counters at its start and its end, and records them in one more step, `device_error_counters`. Then it asks the question a silent error raises: did the hardware notice?
+Every run of the other five probes reads the chip's own error counters at its start and its end, and records them in one more step, `device_error_counters`. Then it asks the question a silent error raises: did the hardware notice?
 
 | Verdict | Meaning |
 |---|---|
@@ -251,8 +265,9 @@ Every run of the other four probes reads the chip's own error counters at its st
 | `uncorrected-during-run` | An uncorrected-error counter moved, or row remapping failed: a hardware fault even if the answers held. The run fails |
 | `self-test-run` | Faults were planted in software, so no cross-check is drawn; the counters are still recorded |
 | `counters-unavailable` | No NVIDIA management library, or a device without these counters (Apple GPU, CPU). Never fails a run |
+| `ecc-off` | ECC is switched off on the device, so its memory error counters cannot move and their silence proves nothing. The probes' own checks still stand. Never fails a run |
 
-On NVIDIA GPUs the counters come from NVML through the `nvidia-ml-py` package (installed on Linux by `requirements.txt`): volatile ECC counts since the driver loaded, corrected and uncorrected; remapped memory rows with their pending and failure flags (A100 and newer); and retired pages (older parts). Temperature, SM clock and power are recorded beside them for context. A counter the device does not support is left out of the file, never reported as zero. The device is matched to NVML by UUID, because CUDA and NVML can number devices differently.
+On NVIDIA GPUs the counters come from NVML through the `nvidia-ml-py` package (installed on Linux by `requirements.txt`): volatile ECC counts since the driver loaded, corrected and uncorrected; remapped memory rows with their pending and failure flags (A100 and newer); and retired pages (older parts). Temperature, SM clock and power are recorded beside them for context. A counter the device does not support is left out of the file, never reported as zero. When the device reports ECC switched off, the verdict is `ecc-off` rather than `counters-quiet`: remapped rows and retired pages are driven by ECC detections, so with ECC off no counter can register a memory error (added in v0.1.1 after the RTX A5000 run). The device is matched to NVML by UUID, because CUDA and NVML can number devices differently.
 
 ## Run it
 
@@ -396,7 +411,7 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 
 ## Output format
 
-All four probes write one JSON object per line following the [OCP Test and Validation output spec](https://github.com/opencomputeproject/ocp-diag-core/tree/main/json_spec), version 2.0, written through the official `ocptv` library:
+All five probes write one JSON object per line following the [OCP Test and Validation output spec](https://github.com/opencomputeproject/ocp-diag-core/tree/main/json_spec), version 2.0, written through the official `ocptv` library:
 
 - `testRunStart` with the parameters used (for `screen.py` and `kernels.py` these include `bound_model`, the id of the arithmetic model in `arith.py`), the host name as DUT id, the device as a hardware component, and the `torch` and `python` versions as software components
 - one test step per shape and precision, named `gemm_<precision>_<MxKxN>` (for example `gemm_fp16_4096x4096x4096`), carrying the measurements `runs`, `shape_mkn`, `exact_check`, `accumulation_factor` (the `g` used in the bound, float precisions only), `seconds`, `reference_check_failed_runs`, `repeat_check_failed_runs`, `worst_error_over_bound_ratio` (float precisions only), `worst_abs_error`, `worst_nonfinite_values`, and in self-test mode `injected_runs` and `injected_runs_detected`, with validators on the counts that must be zero or equal to the injected count

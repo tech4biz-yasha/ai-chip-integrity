@@ -204,3 +204,44 @@ def test_counter_step_matches_official_ocp_schema(tmp_path, monkeypatch, nvml):
     _, _, out = run_screen(tmp_path)
     for obj in load(out):
         validator.validate(obj)
+
+
+# What NVML reported on an RTX A5000 and an RTX 4090 with ECC disabled (11 October 2026): ECC mode off, no ECC
+# counts, and remapped-row counters at zero that cannot move, because rows are only remapped on ECC detections.
+ECC_OFF = {"ecc_enabled": False, "remapped_rows_corrected": 0, "remapped_rows_uncorrected": 0,
+           "remap_pending": False, "remap_failure": False}
+
+
+@pytest.mark.parametrize("probe_ok", [True, False])
+def test_ecc_off_counters_prove_nothing_and_never_fail_a_run(probe_ok):
+    verdict, ok, msg, _ = counters.judge(dict(ECC_OFF), dict(ECC_OFF), probe_ok, False)
+    assert (verdict, ok) == ("ecc-off", True)
+    assert "ECC is off" in msg and ("wrong answers" in msg) == (not probe_ok)
+
+
+def test_ecc_off_still_reports_a_counter_that_moves():
+    after = dict(ECC_OFF, remapped_rows_uncorrected=1)
+    assert counters.judge(dict(ECC_OFF), after, True, False)[:2] == ("uncorrected-during-run", False)
+
+
+def test_ecc_off_self_test_stays_a_self_test():
+    assert counters.judge(dict(ECC_OFF), dict(ECC_OFF), True, True)[0] == "self-test-run"
+
+
+def test_ecc_off_run_is_labelled_on_the_site_old_files_included(tmp_path, monkeypatch, nvml):
+    def no_ecc_counts(h, kind, counter):
+        raise RuntimeError("NVML_ERROR_NOT_SUPPORTED")
+    monkeypatch.setattr(nvml, "nvmlDeviceGetEccMode", lambda h: [0, 0])
+    monkeypatch.setattr(nvml, "nvmlDeviceGetTotalEccErrors", no_ecc_counts)
+    snap = counters.snapshot(torch.device("cuda", 0))
+    assert snap["ecc_enabled"] is False and "ecc_corrected_volatile" not in snap
+    scripted(monkeypatch, snap, dict(snap))
+    rc, _, out = run_screen(tmp_path)
+    assert rc == 0
+    r = build_site.parse(str(out))
+    assert r["counters"]["_verdict"] == "ecc-off"
+    note = "ECC off, so the error counters cannot see memory errors"
+    assert note in build_site.compute_rows(build_site.summarise([r])[0])
+    r["counters"]["_verdict"] = "counters-quiet"          # what counters 0.1.0 wrote in the same situation
+    html = build_site.compute_rows(build_site.summarise([r])[0])
+    assert note in html and "error counters quiet" not in html

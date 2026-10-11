@@ -1,5 +1,5 @@
 """
-counters.py  -  AI Chip Integrity Suite, error counter cross-check (probe 11) v0.1.0
+counters.py  -  AI Chip Integrity Suite, error counter cross-check (probe 11) v0.1.1
 
 Every probe reads the chip's own error counters at the start and the end of its run and records them in an
 extra step, device_error_counters. Then it asks the question a silent error raises: did the hardware notice?
@@ -12,6 +12,9 @@ extra step, device_error_counters. Then it asks the question a silent error rais
                              something, which on a healthy chip is worth watching
   uncorrected-during-run     an uncorrected-error counter moved: a hardware fault even if the answers held
   self-test-run              faults were planted in software, so no cross-check is drawn; counters still kept
+  ecc-off                    ECC is switched off on this device, so its memory error counters cannot move and
+                             their silence proves nothing (most consumer cards ship this way); the probes' own
+                             checks still stand
   counters-unavailable       no NVIDIA management library, or a device without these counters (Apple, CPU)
 
 On NVIDIA GPUs the counters come from NVML (the nvidia-ml-py package): volatile ECC counts since the driver
@@ -24,7 +27,7 @@ import importlib
 
 import ocptv.output as tv
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 STEP_NAME = "device_error_counters"
 DELTA_KEYS = ["ecc_corrected_volatile", "ecc_uncorrected_volatile", "remapped_rows_corrected",
               "remapped_rows_uncorrected", "retired_pages_single_bit", "retired_pages_double_bit"]
@@ -105,6 +108,12 @@ def judge(before, after, probe_ok, injected):
     if injected:
         return "self-test-run", True, "faults were planted in software, so no cross-check is drawn" + (
             f"; counters moved: {summary}" if summary else "; no counter moved"), deltas
+    if not moved and not flags and after.get("ecc_enabled") is False:
+        # Remapped rows and retired pages are driven by ECC detections, so with ECC off nothing can register.
+        msg = "ECC is off on this device, so its memory error counters cannot record errors"
+        if not probe_ok:
+            msg += "; the probes found wrong answers that the hardware had no way to notice"
+        return "ecc-off", True, msg, deltas
     if any(k in UNCORRECTED_KEYS for k in moved) or "remap_failure" in flags:
         return "uncorrected-during-run", False, f"the hardware recorded uncorrected errors during the run: {summary}", deltas
     if not probe_ok and not moved and not flags:
@@ -139,7 +148,7 @@ def record(run, hw, before, after, probe_ok, injected):
                 if k in snap:
                     step.add_measurement(name=f"{k}_{when}", value=snap[k], hardware_info=hw)
     kind = tv.DiagnosisType.PASS if ok else tv.DiagnosisType.FAIL
-    if verdict == "counters-unavailable":
+    if verdict in ("counters-unavailable", "ecc-off"):
         kind = tv.DiagnosisType.UNKNOWN
     step.add_diagnosis(kind, verdict=verdict, message=msg, hardware_info=hw)
     step.end(status=tv.TestStatus.COMPLETE)
