@@ -24,7 +24,7 @@ On many Macs the built-in `python3` is version 3.9, and pip then reports "No mat
 On an NVIDIA GPU host with Docker and the NVIDIA container toolkit, with nothing else installed:
 
 ```
-docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.4.0
+docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.4.1
 ```
 
 ## Why this exists
@@ -464,7 +464,7 @@ Run `chip-integrity run --name NAME` on your device, or the ten probe commands i
 If you use this in research, please cite it as
 
 ```
-Yasha Khandelwal. ai-chip-integrity: an open tester for silent computation errors in AI chips. Version 0.4.0, 2026.
+Yasha Khandelwal. ai-chip-integrity: an open tester for silent computation errors in AI chips. Version 0.4.1, 2026.
 https://doi.org/10.5281/zenodo.23285189
 https://github.com/tech4biz-yasha/ai-chip-integrity
 ```
