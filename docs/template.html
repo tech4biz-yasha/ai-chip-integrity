@@ -34,7 +34,7 @@
       "name": "ai-chip-integrity",
       "codeRepository": "https://github.com/tech4biz-yasha/ai-chip-integrity",
       "identifier": "https://doi.org/10.5281/zenodo.23285189",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "programmingLanguage": "Python",
       "license": "https://opensource.org/licenses/MIT",
       "author": {"@id": "https://chipintegrity.org/#person"},
@@ -44,7 +44,7 @@
       "@type": "Dataset",
       "@id": "https://chipintegrity.org/#results",
       "name": "Chip Integrity measured results",
-      "description": "Silent computation error measurements for AI chips (NVIDIA H200, NVIDIA H100, NVIDIA A100, Apple GPU) from the compute, kernel, checksum, data pattern, memory and error counter probes, each row backed by an OCP Test and Validation result file.",
+      "description": "Silent computation error measurements for AI chips (NVIDIA H200, NVIDIA H100, NVIDIA A100, NVIDIA GeForce RTX 4090, NVIDIA RTX A5000, Apple GPU) from the compute, kernel, checksum, data pattern, memory and error counter probes, each row backed by an OCP Test and Validation result file.",
       "url": "https://chipintegrity.org/#results",
       "license": "https://opensource.org/licenses/MIT",
       "creator": {"@id": "https://chipintegrity.org/#person"},
@@ -350,7 +350,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 </div>
 <p>FP8 keeps its inputs in {&minus;1, 0, 1} so its answers stay exact, so it runs the alternate and sparse patterns only.</p>
 <h3>Probe 11: error counters</h3>
-<p>A silent error is one the chip does not notice. So every run of the other probes reads the chip's own error counters at its start and its end: ECC counts, remapped memory rows and retired pages, with temperature, clock and power beside them. Then it asks whether the hardware noticed what the probe noticed. Wrong answers with every counter quiet are a silent error in the strict sense, the case ECC and the error logs cannot see. The counters come from NVIDIA's management library, so on other chips the probe records that none are available.</p>
+<p>A silent error is one the chip does not notice. So every run of the other probes reads the chip's own error counters at its start and its end: ECC counts, remapped memory rows and retired pages, with temperature, clock and power beside them. Then it asks whether the hardware noticed what the probe noticed. Wrong answers with every counter quiet are a silent error in the strict sense, the case ECC and the error logs cannot see. The counters come from NVIDIA's management library, so on other chips the probe records that none are available. On a card with ECC switched off, as on the RTX 4090 and RTX A5000 measured here, the counters cannot record memory errors at all, and the probe says so instead of calling them quiet.</p>
 </section>
 
 <section id="verdicts">
@@ -371,6 +371,8 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <div class="v bad">hardware-noticed</div><div>Wrong answers, and a counter moved too.</div>
 <div class="v warn">corrected-during-run</div><div>Every answer was right, but the hardware corrected errors during the run. Worth watching on a healthy chip.</div>
 <div class="v bad">uncorrected-during-run</div><div>The hardware recorded uncorrected errors. A fault even if the answers held.</div>
+<div class="v warn">ecc-off</div><div>ECC is switched off on the device, so its memory error counters cannot move and their silence proves nothing. The probes' own checks still stand.</div>
+<div class="v">counters-unavailable</div><div>The device has no error counters to read, such as an Apple GPU or a CPU. Never fails a run.</div>
 </div>
 <h3>Memory probe</h3>
 <div class="verdict">
@@ -476,7 +478,7 @@ chip-integrity run --quick
 chip-integrity run --name NAME
 
 <span class="c"># or, on an NVIDIA GPU host with Docker, with nothing else installed</span>
-docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.4.0 run --name NAME --out-dir /results</pre>
+docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.4.1 run --name NAME --out-dir /results</pre>
 <p class="note">On many Macs the built-in <code>python3</code> is version 3.9, which pip skips. Install a newer Python from python.org or with Homebrew first, then create the environment with its versioned command, for example <code>python3.12 -m venv chip-env</code>.</p>
 <p class="note">The same ten files come from running each probe by hand from a clone of the repository, for example <code>python screen.py --out NAME_clean.jsonl</code> and then <code>python screen.py --inject 5 --out NAME_inject.jsonl</code> for its self-test. The README lists all ten commands.</p>
 <ol class="steps">
@@ -502,7 +504,7 @@ docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-int
 <div class="r"><b>8. Clock and voltage margin sweep</b><span>Lower the margin step by step where the driver allows it and record where each unit starts to fail. Likely needs bare-metal access.</span></div>
 <div class="r done"><b>9. Data pattern library</b><span>Wide exponents, full mantissas, cancellation, alternating signs, sparsity, subnormals with flush detection, near-overflow and int8 extremes, for the matrix multiply. Done. Patterns for the transformer kernels next.</span></div>
 <div class="r"><b>10. Fault injection inside the computation</b><span>Flip bits in registers during the multiply to measure how often a flip becomes a wrong answer. The basis for a space radiation column.</span></div>
-<div class="r done"><b>11. ECC and error counters</b><span>Every run of every probe reads the chip's counters before and after and records whether the hardware noticed what the probe noticed. Done. First real test on the H100 on 10 October 2026: every ECC and row-remap counter quiet.</span></div>
+<div class="r done"><b>11. ECC and error counters</b><span>Every run of every probe reads the chip's counters before and after and records whether the hardware noticed what the probe noticed. Done. First real test on the H100 on 10 October 2026: every ECC and row-remap counter quiet. On 11 October the RTX 4090 and RTX A5000 ran with ECC off, which added the ecc-off verdict.</span></div>
 <div class="r"><b>12. Recovery</b><span>After a detected fault, reset and rerun on the same card to see whether the fault clears. Likely needs bare-metal access.</span></div>
 <div class="r"><b>Fleet mode</b><span>Run every probe across many devices automatically and collect the files. Fault rates are per thousand units, so volume is how they get found.</span></div>
 <div class="r"><b>Vendor comparison</b><span>Run NVIDIA DCGM and AMD AGFHC on the same device and record what each catches.</span></div>
