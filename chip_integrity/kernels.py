@@ -24,8 +24,9 @@ run on fused kernels so the unfused path cannot stand in silently.
 A device that breaks the model shows up as outside-error-bound on every run,
 and the message says so.
 
---inject N flips one random bit in N chosen runs (never the first) to prove
-the checks catch corruption. Output: OCP Test & Validation JSON to --out.
+--inject N plants a fault in N chosen runs (never the first) to prove the
+checks catch corruption; --inject-model chooses the fault as in the compute
+probe. Output: OCP Test & Validation JSON to --out.
 """
 
 import argparse
@@ -47,9 +48,10 @@ import ocptv.output as tv  # noqa: E402
 from chip_integrity import arith  # noqa: E402
 from chip_integrity import counters  # noqa: E402
 
-from chip_integrity.screen import FileWriter, pick_device, device_label, lock_down_math, flip_bit, NONDET_SHARE, NONDET_MIN  # noqa: E402
+from chip_integrity.screen import (FileWriter, pick_device, device_label, lock_down_math, fault_models,  # noqa: E402
+                                   plant_fault, INJECT_MODELS, NONDET_SHARE, NONDET_MIN)
 
-VERSION = "0.2.2"
+VERSION = "0.2.3"
 U_RN, U_TC, EPS_FN = arith.U_RN, arith.U_TC, arith.EPS_FN
 DTYPES = {
     "fp32": (torch.float32, torch.int32, 32),
@@ -323,7 +325,7 @@ def function_check(kernel, args, dev):
 
 # ---------------------------------------------------------------- probe
 
-def probe(step, dev, kernel, dname, size, iters, seed, inject, rng, hw):
+def probe(step, dev, kernel, dname, size, iters, seed, inject, rng, hw, inject_model="mixed"):
     dtype, int_view, bits = DTYPES[dname]
     args, ref, bound = make_case(kernel, dtype, seed, size)
     dev_args = tuple(a.to(dev) if torch.is_tensor(a) else a for a in args)
@@ -331,9 +333,10 @@ def probe(step, dev, kernel, dname, size, iters, seed, inject, rng, hw):
         dev_args = (dev_args[0], dev_args[1], dev_args[2], args[3])
 
     inject_runs = set(rng.sample(range(1, iters), min(inject, iters - 1))) if inject else set()
+    models = fault_models(inject_runs, inject_model)
     first_bits = None
     ref_bad, rep_bad = [], []
-    injected, caught = 0, 0
+    injected, caught, sdc_planted, sdc_caught = 0, 0, 0, 0
     worst_ratio, worst_abs, worst_nonfinite = 0.0, 0.0, 0
     t0 = time.time()
 
@@ -344,8 +347,9 @@ def probe(step, dev, kernel, dname, size, iters, seed, inject, rng, hw):
         if _FAULT_HOOK is not None:
             _FAULT_HOOK(i, c)
         if i in inject_runs:
-            flip_bit(c, int_view, bits, rng)
+            plant_fault(c, int_view, bits, rng, models[i])
             injected += 1
+            sdc_planted += models[i] == "gpu-sdc"
 
         c64 = c.to(torch.float64)
         finite = torch.isfinite(c64)
@@ -370,6 +374,7 @@ def probe(step, dev, kernel, dname, size, iters, seed, inject, rng, hw):
             rep_bad.append(i)
         if i in inject_runs and (ref_fail or rep_fail):
             caught += 1
+            sdc_caught += models[i] == "gpu-sdc"
 
     secs = time.time() - t0
     try:
@@ -398,6 +403,10 @@ def probe(step, dev, kernel, dname, size, iters, seed, inject, rng, hw):
         step.add_measurement(name="injected_runs", value=injected, hardware_info=hw)
         step.add_measurement(name="injected_runs_detected", value=caught,
                              validators=[tv.Validator(type=tv.ValidatorType.EQUAL, value=injected)],
+                             hardware_info=hw)
+        step.add_measurement(name="gpu_sdc_faults_planted", value=sdc_planted, hardware_info=hw)
+        step.add_measurement(name="gpu_sdc_faults_detected", value=sdc_caught,
+                             validators=[tv.Validator(type=tv.ValidatorType.EQUAL, value=sdc_planted)],
                              hardware_info=hw)
         clean_bad = (set(ref_bad) | set(rep_bad)) - inject_runs
         ok = caught == injected and not clean_bad
@@ -434,7 +443,9 @@ def main(argv=None):
     p.add_argument("--kernels", default=",".join(KERNELS), help="comma list from softmax,layernorm,gelu,rope,attention")
     p.add_argument("--dtypes", default="fp32,fp16,bf16", help="comma list from fp32,fp16,bf16")
     p.add_argument("--seed", type=int, default=1234)
-    p.add_argument("--inject", type=int, default=0, help="bit flips to inject per step (self-test)")
+    p.add_argument("--inject", type=int, default=0, help="faults to inject per step (self-test)")
+    p.add_argument("--inject-model", default="mixed", choices=INJECT_MODELS,
+                   help="self-test faults: one random bit, a gate-level-shaped fault, or both alternating")
     p.add_argument("--out", default="kernels.jsonl", help="OCP JSON output file")
     args = p.parse_args(argv)
 
@@ -451,7 +462,8 @@ def main(argv=None):
     run = tv.TestRun(name="ai-chip-integrity-kernels", version=VERSION,
                      parameters={"device": str(dev), "size": args.size, "iters": args.iters,
                                  "kernels": ",".join(kernels), "dtypes": ",".join(names), "seed": args.seed,
-                                 "inject": args.inject, "assumed_fn_rel_error": EPS_FN,
+                                 "inject": args.inject, "inject_model": args.inject_model,
+                                 "assumed_fn_rel_error": EPS_FN,
                                  "bound_model": arith.MODEL_ID,
                                  "attention_kernels": ("fused only for fp16/bf16 (flash, efficient, cudnn); math also "
                                                        "for fp32" if dev.type == "cuda" else "device default")})
@@ -471,7 +483,8 @@ def main(argv=None):
                 step.start()
                 try:
                     ok, verdict, msg, secs = probe(step, dev, kernel, name, args.size, args.iters,
-                                                   args.seed, args.inject, rng, hw)
+                                                   args.seed, args.inject, rng, hw,
+                                                   inject_model=args.inject_model)
                     step.end(status=tv.TestStatus.COMPLETE)
                 except (RuntimeError, TypeError, NotImplementedError) as e:
                     step.add_error(symptom="not-supported-on-device", message=str(e)[:500])

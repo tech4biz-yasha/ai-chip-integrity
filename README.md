@@ -6,7 +6,7 @@ An open tester for silent computation errors in AI chips.
 
 It runs a fixed calculation on a GPU, NPU or CPU many times and proves, element by element, whether the chip returned the right answer every time. Results come out in the Open Compute Project Test and Validation format, so they drop straight into fleet tooling.
 
-**Status: early.** Six probes so far, numbered as on the roadmap below: `screen.py` v0.3.3 (probe 1, matrix multiply across several shapes, four precisions and exact FP8), `memcheck.py` v0.1.1 (probe 2, a sweep of most of the device memory), `kernels.py` v0.2.2 (probe 3, softmax, layer norm, GELU, rotary embeddings and fused attention), `abft.py` v0.1.0 (probe 6, checksum-protected matrix multiply with proven thresholds), `patterns.py` v0.1.3 (probe 9, data patterns that drive the matrix multiply) and `counters.py` v0.1.1 (probe 11, the chip's own error counters, read around every run of the other five). One device at a time, six measured chips. Read the limits section before relying on a PASS.
+**Status: early.** Six probes so far, numbered as on the roadmap below: `screen.py` v0.3.4 (probe 1, matrix multiply across several shapes, four precisions and exact FP8), `memcheck.py` v0.1.1 (probe 2, a sweep of most of the device memory), `kernels.py` v0.2.3 (probe 3, softmax, layer norm, GELU, rotary embeddings and fused attention), `abft.py` v0.1.0 (probe 6, checksum-protected matrix multiply with proven thresholds), `patterns.py` v0.1.4 (probe 9, data patterns that drive the matrix multiply) and `counters.py` v0.1.1 (probe 11, the chip's own error counters, read around every run of the other five). One device at a time, six measured chips. Read the limits section before relying on a PASS.
 
 ## Quick start
 
@@ -24,7 +24,7 @@ On many Macs the built-in `python3` is version 3.9, and pip then reports "No mat
 On an NVIDIA GPU host with Docker and the NVIDIA container toolkit, with nothing else installed:
 
 ```
-docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.4.1
+docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.4.2
 ```
 
 ## Why this exists
@@ -160,7 +160,7 @@ For int8 the device returns int32 and the reference is computed exactly in int64
 | `outside-error-bound` | All runs agree with each other but sit outside the bound: a faulty unit, a device breaking the arithmetic model (accumulating below FP32, or TF32 used for fp32), or an int8 or FP8 result that is not exact |
 | `nondeterministic-kernel` | At least 3 runs and at least 10% of runs differ from run 0, yet all stay inside the bound. The repeat check cannot be used on that device and precision |
 
-**Self-test.** `--inject N` flips one random bit of one random output element in `N` runs (never run 0), after the result has been copied back from the device. It proves the checker catches corruption; it does not stress the chip. The verdict then becomes `injection-self-test-pass` only if every injected run was caught and no uninjected run failed.
+**Self-test.** `--inject N` plants a fault in `N` runs (never run 0), after the result has been copied back from the device. It proves the checker catches corruption; it does not stress the chip. `--inject-model` picks the fault. `bit` flips one random bit of one random output element. `gpu-sdc` plants a fault shaped like NVIDIA's gate-level fault injection study of a data-center GPU (Tung et al., DSN 2026, [arXiv:2605.04213](https://arxiv.org/abs/2605.04213)): one warp-aligned chunk of 32 output elements is hit, the corrupted elements repeat with a period of 2, 4, 8 or 16 inside it, and each one is set to zero (50.68%), to NaN or an infinity (1.01% together) or has one to eight of its bits flipped, the low bits more often than the high ones (48.31%). The paper gives the flip-count histogram only as a figure, so 35% of the bit-flip outcomes here are single-bit, under the 40% ceiling it reports; integer outputs get only the zero and bit-flip outcomes. `mixed`, the default, alternates the two, starting with `bit`. The verdict then becomes `injection-self-test-pass` only if every injected run was caught and no uninjected run failed.
 
 ## Probe 2: memory (`memcheck.py`)
 
@@ -209,7 +209,7 @@ Every bound adds the output rounding of the test precision and an absolute floor
 
 A device that breaks any of them, or that substitutes the tanh approximation for GELU, shows as `outside-error-bound` on every run and the message says so. To tell a faulty unit from a loose function library, every softmax, GELU and RoPE step also measures the device's own exp, erf, sin and cos on that step's inputs and records the worst error; when it exceeds the allowance, the verdict message says the library is outside the model. At the test default, the fp32 bounds sit within 3e-5 of the output scale for softmax, layer norm and GELU, and within 1e-3 for attention, whose bound carries worst-case matrix-unit accumulation through the softmax (`tests/test_kernels.py::test_bounds_are_tight_for_fp32`).
 
-Verdicts and the `--inject N` self-test are the same as the compute probe.
+Verdicts, the `--inject N` self-test and `--inject-model` are the same as the compute probe.
 
 ## Probe 6: checksum-protected matrix multiply (`abft.py`)
 
@@ -327,7 +327,8 @@ Options for `screen.py`:
 | `--iters` | `50` | runs per shape and precision |
 | `--dtypes` | `fp32,fp16,bf16,int8,fp8,fp8fast` | comma list from `fp32`, `fp16`, `bf16`, `int8`, `fp8`, `fp8fast` |
 | `--seed` | `1234` | input seed |
-| `--inject` | `0` | bit flips to inject per step (self-test) |
+| `--inject` | `0` | faults to inject per step (self-test) |
+| `--inject-model` | `mixed` | self-test faults: `bit`, `gpu-sdc` (shaped like Tung et al., DSN 2026) or `mixed`, which alternates them |
 | `--out` | `results.jsonl` | OCP output file |
 
 Options for `kernels.py`:
@@ -340,7 +341,8 @@ Options for `kernels.py`:
 | `--kernels` | `softmax,layernorm,gelu,rope,attention` | comma list of kernels |
 | `--dtypes` | `fp32,fp16,bf16` | comma list from `fp32`, `fp16`, `bf16` |
 | `--seed` | `1234` | input seed |
-| `--inject` | `0` | bit flips to inject per step (self-test) |
+| `--inject` | `0` | faults to inject per step (self-test) |
+| `--inject-model` | `mixed` | self-test faults: `bit`, `gpu-sdc` (shaped like Tung et al., DSN 2026) or `mixed`, which alternates them |
 | `--out` | `kernels.jsonl` | OCP output file |
 
 Options for `abft.py`:
@@ -365,7 +367,8 @@ Options for `patterns.py`:
 | `--dtypes` | `fp32,fp16,bf16,int8,fp8,fp8fast` | comma list of precisions |
 | `--patterns` | all eight | comma list from `wide`, `mantissa`, `cancel`, `alternate`, `sparse`, `subnormal`, `near_max`, `extremes` |
 | `--seed` | `1234` | input seed |
-| `--inject` | `0` | bit flips to inject per step (self-test) |
+| `--inject` | `0` | faults to inject per step (self-test) |
+| `--inject-model` | `mixed` | self-test faults: `bit`, `gpu-sdc` (shaped like Tung et al., DSN 2026) or `mixed`, which alternates them |
 | `--out` | `patterns.jsonl` | OCP output file |
 
 Exit code is 0 for PASS and 1 for FAIL. A precision or shape the device does not support (for example int8 matmul on a device without it) is skipped and recorded as an error artifact.
@@ -396,25 +399,26 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 
 ## Tests
 
-`python -m pytest -q` runs 176 tests on the CPU in under a minute; 6 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set. On CPUs whose matrix multiply ignores flush-to-zero, such as Apple silicon, the two flushing tests in `tests/test_patterns.py` skip themselves, giving 174 passed.
+`python -m pytest -q` runs 207 tests on the CPU in under a minute; 6 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set. On CPUs whose matrix multiply ignores flush-to-zero, such as Apple silicon, the two flushing tests in `tests/test_patterns.py` skip themselves, giving 174 passed.
 
 1. `tests/test_screen.py` (37): every verdict path, every bit position caught by the self-test, NaN handling, int8 and FP8 off-by-one, FP8 inputs exact and K above 4096 skipped, rectangular shapes, bound tightness.
 2. `tests/test_kernels.py` (23): all kernels and precisions, the self-test on six seeds, intermittent and systematic faults, a one-ulp change, internal fp16 arithmetic and tanh-GELU both caught as outside the bound, NaN handling, fp32 bound tightness, a sin that is off by 1e-4 caught in RoPE, RoPE angles reaching every position, the device's own exp, erf, sin and cos measured, and the CUDA attention path forced onto the CPU: a batch dimension added with the same shape and values back, the kernel that ran recorded, fused kernels only for fp16 and bf16, and a loud refusal when no kernel fits.
 3. `tests/test_memcheck.py` (8): a stuck bit reported with its offset, a dead row counted word by word, injected flips located, the patterns themselves.
-4. `tests/test_arith.py` (19): the model checked against simulations of the hardware it claims to cover. A simulated tensor core that truncates, at block widths 1 to 32, stays inside the bound; a constructed case breaks the old v0.2.0 bound by almost 2x and stays inside the new one; a FlashAttention-2 style kernel emulated op by op stays inside the attention bound; PyTorch's ARM CPU erf and GELU, emulated op by op, stay inside the GELU bound; and FP8 sums of {-1, 0, 1} stay exact in a 13-bit accumulator while a 9-bit one loses them.
+4. `tests/test_arith.py` (25): the model checked against simulations of the hardware it claims to cover. A simulated tensor core that truncates, at block widths 1 to 32, stays inside the bound; a constructed case breaks the old v0.2.0 bound by almost 2x and stays inside the new one; a FlashAttention-2 style kernel emulated op by op stays inside the attention bound; PyTorch's ARM CPU erf and GELU, emulated op by op, stay inside the GELU bound; and FP8 sums of {-1, 0, 1} stay exact in a 13-bit accumulator while a 9-bit one loses them.
 5. `tests/test_build_site.py` (6): a newer tool version replaces the older row for the same device on the site, kernel sizes render from the files, data pattern rows render with the flushing behaviour, a mixed policy is shown as such, checksum rows render with their located self-test count, and the attention kernel that ran is named.
 6. `tests/test_patterns.py` (17): every pattern passes on CPU, each input set really has its pattern and stays clear of overflow, FP8 and int8 inputs stay exact, flushing is detected and judging a flushing device against the wrong model fails, the policy is measured at each step's own shape (a library that picks its kernel by shape), a kernel that keeps in some places and flushes in others passes with and without injected flips, a fault four times the bound is caught on the cancelling pattern, injected flips are caught on every pattern, and the output matches the OCP schema.
 7. `tests/test_abft.py` (25): clean runs in every precision, injected errors located to their exact row and column on several seeds, a single error pointing at its element, a fault in a checksum flagging only its line, no false alarm on the same-sign, wide, near-maximum and cancelling patterns in every precision, checksums scaled to stay in range, the rectangle fault counted as a blind spot, NaN, and the OCP schema.
-8. `tests/test_counters.py` (17): with a simulated NVIDIA management library, every cross-check verdict; unsupported counters left out rather than zeroed; no counters on CPU and Apple devices; corrected errors reported without failing a run; uncorrected errors failing it; a wrong answer with quiet counters confirmed silent; the site keeping the counter step out of the precision list; and the OCP schema.
+8. `tests/test_counters.py` (22): with a simulated NVIDIA management library, every cross-check verdict; unsupported counters left out rather than zeroed; no counters on CPU and Apple devices; corrected errors reported without failing a run; uncorrected errors failing it; a wrong answer with quiet counters confirmed silent; the site keeping the counter step out of the precision list; and the OCP schema.
 9. `tests/test_readme.py` (17): this README carries every probe's version, every option and its default, every option of `chip-integrity run`, every result file, every script and test file, and the citation version and DOI, and the package version matches the citation, so neither can drift from the code without a test failing.
 10. `tests/test_cli.py` (13): `chip-integrity run` executes exactly the ten probe commands in this README with the same file names and self-test strength, `--quick` only adds small sizes, `--skip` leaves whole probes out, a failing step fails the run without stopping the others, a quick run is never offered as a row, bad names and unknown probes are refused before anything runs, one probe runs with its own options, the old `python screen.py` paths still work, and a real quick run writes its files.
+11. `tests/test_gpu_sdc.py` (20): the `gpu-sdc` self-test fault pinned to Tung et al., DSN 2026: the outcome mix exactly as published, every plant changing at least one element even in an all-zero output, faults confined to one warp-aligned chunk of 32 at even spacing, outcome shares within 3 points of the measured 50.68% zeroed and 48.31% bit-flipped, single-bit flips under 40% with the low bits flipped more often, integer outputs only zeroed or bit-flipped, `mixed` alternating the two models, and the compute self-test catching every planted fault under each model.
 
 ## Output format
 
 All five probes write one JSON object per line following the [OCP Test and Validation output spec](https://github.com/opencomputeproject/ocp-diag-core/tree/main/json_spec), version 2.0, written through the official `ocptv` library:
 
-- `testRunStart` with the parameters used (for `screen.py` and `kernels.py` these include `bound_model`, the id of the arithmetic model in `arith.py`), the host name as DUT id, the device as a hardware component, and the `torch` and `python` versions as software components
-- one test step per shape and precision, named `gemm_<precision>_<MxKxN>` (for example `gemm_fp16_4096x4096x4096`), carrying the measurements `runs`, `shape_mkn`, `exact_check`, `accumulation_factor` (the `g` used in the bound, float precisions only), `seconds`, `reference_check_failed_runs`, `repeat_check_failed_runs`, `worst_error_over_bound_ratio` (float precisions only), `worst_abs_error`, `worst_nonfinite_values`, and in self-test mode `injected_runs` and `injected_runs_detected`, with validators on the counts that must be zero or equal to the injected count
+- `testRunStart` with the parameters used (for `screen.py` and `kernels.py` these include `bound_model`, the id of the arithmetic model in `arith.py`, and for every probe with `--inject-model` the `inject_model` used), the host name as DUT id, the device as a hardware component, and the `torch` and `python` versions as software components
+- one test step per shape and precision, named `gemm_<precision>_<MxKxN>` (for example `gemm_fp16_4096x4096x4096`), carrying the measurements `runs`, `shape_mkn`, `exact_check`, `accumulation_factor` (the `g` used in the bound, float precisions only), `seconds`, `reference_check_failed_runs`, `repeat_check_failed_runs`, `worst_error_over_bound_ratio` (float precisions only), `worst_abs_error`, `worst_nonfinite_values`, and in self-test mode `injected_runs`, `injected_runs_detected`, `gpu_sdc_faults_planted` and `gpu_sdc_faults_detected`, with validators on the counts that must be zero or equal to the injected count
 - a `diagnosis` per step with the verdict above
 - `testRunEnd` with the overall PASS or FAIL
 
@@ -464,7 +468,7 @@ Run `chip-integrity run --name NAME` on your device, or the ten probe commands i
 If you use this in research, please cite it as
 
 ```
-Yasha Khandelwal. ai-chip-integrity: an open tester for silent computation errors in AI chips. Version 0.4.1, 2026.
+Yasha Khandelwal. ai-chip-integrity: an open tester for silent computation errors in AI chips. Version 0.4.2, 2026.
 https://doi.org/10.5281/zenodo.23302804
 https://github.com/tech4biz-yasha/ai-chip-integrity
 ```

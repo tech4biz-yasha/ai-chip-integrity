@@ -5,7 +5,7 @@
 Site: https://chipintegrity.org/
 Code: https://github.com/tech4biz-yasha/ai-chip-integrity (MIT)
 Install: pip install ai-chip-integrity (Python 3.10 or newer), then chip-integrity run (every probe and its self-test, ten OCP result files). Docker: ghcr.io/tech4biz-yasha/ai-chip-integrity
-Cite: Yasha Khandelwal, ai-chip-integrity, version 0.4.1, 2026, https://doi.org/10.5281/zenodo.23302804
+Cite: Yasha Khandelwal, ai-chip-integrity, version 0.4.2, 2026, https://doi.org/10.5281/zenodo.23302804
 Contact: yasha.khandelwal@tech4biz.io
 
 ## What it measures
@@ -16,7 +16,7 @@ Memory probe (memcheck.py): fills most of the device memory, writes all zeros, a
 
 Kernel probe (kernels.py): softmax, layer norm, GELU (erf form), rotary position embeddings (sin and cos of FP32 angles up to 4095 rad) and scaled dot product attention through the device's own kernels, 25 runs per kernel and precision, fp32, fp16 and bf16. Bounds derived by rounding-error analysis under one written arithmetic model (arith.py): FP32 rounds to nearest, tensor cores accumulate faithfully in FP32 with truncation allowed, exp, divide and square roots stay within eight ulps, and erf, sin and cos within 2^-20 absolute. The model id is recorded in every result file. Same verdicts as the compute probe.
 
-Self-test: every row is paired with an injection run that flips random bits and must catch all of them.
+Self-test: every row is paired with an injection run that plants faults and must catch all of them. From v0.4.2 the faults alternate between single random bit flips and faults shaped like NVIDIA's gate-level measurements (Tung et al., DSN 2026, arXiv:2605.04213): warp-aligned groups of zeroed, multi-bit-flipped or NaN/infinity values.
 
 ## Measured so far (October 2026)
 

@@ -21,8 +21,8 @@ Every input set is also scaled by a power of two, when needed, so that no partia
 the output type's range. FP8 keeps its inputs in {-1, 0, 1} so its answers stay exact, so it runs alternate
 and sparse only.
 
---inject N flips one random bit in N runs of every step, as in the compute probe. Output: OCP Test and
-Validation JSON to --out.
+--inject N plants a fault in N runs of every step, as in the compute probe, and --inject-model chooses the
+fault the same way. Output: OCP Test and Validation JSON to --out.
 """
 
 import argparse
@@ -39,7 +39,7 @@ from chip_integrity import arith
 from chip_integrity import counters
 from chip_integrity import screen
 
-VERSION = "0.1.3"
+VERSION = "0.1.4"
 FLOAT_PATTERNS = ["wide", "mantissa", "cancel", "alternate", "sparse", "subnormal", "near_max"]
 APPLIES = {
     "fp32": FLOAT_PATTERNS, "fp16": FLOAT_PATTERNS, "bf16": FLOAT_PATTERNS,
@@ -210,7 +210,9 @@ def main(argv=None):
     p.add_argument("--dtypes", default="fp32,fp16,bf16,int8,fp8,fp8fast", help="comma list from fp32,fp16,bf16,int8,fp8,fp8fast")
     p.add_argument("--patterns", default=",".join(ALL_PATTERNS), help="comma list from " + ",".join(ALL_PATTERNS))
     p.add_argument("--seed", type=int, default=1234)
-    p.add_argument("--inject", type=int, default=0, help="bit flips to inject per step (self-test)")
+    p.add_argument("--inject", type=int, default=0, help="faults to inject per step (self-test)")
+    p.add_argument("--inject-model", default="mixed", choices=screen.INJECT_MODELS,
+                   help="self-test faults: one random bit, a gate-level-shaped fault, or both alternating")
     p.add_argument("--out", default="patterns.jsonl", help="OCP JSON output file")
     args = p.parse_args(argv)
 
@@ -231,7 +233,8 @@ def main(argv=None):
     run = tv.TestRun(name="ai-chip-integrity-patterns", version=VERSION,
                      parameters={"device": str(dev), "shapes": ",".join("x".join(map(str, s)) for s in shapes),
                                  "iters": args.iters, "dtypes": ",".join(names), "patterns": ",".join(pats),
-                                 "seed": args.seed, "inject": args.inject, "bound_model": arith.MODEL_ID})
+                                 "seed": args.seed, "inject": args.inject, "inject_model": args.inject_model,
+                                 "bound_model": arith.MODEL_ID})
     dut = tv.Dut(id=socket.gethostname())
     hw = dut.add_hardware_info(name=screen.device_label(dev))
     dut.add_software_info(name="torch", version=torch.__version__)
@@ -262,7 +265,8 @@ def main(argv=None):
                         # product with a subnormal input be dropped, so no split of the matrix can raise a false alarm
                         ok, verdict, msg, secs = screen.screen_case(step, dev, name, shape, args.iters, args.seed,
                                                                     args.inject, rng, hw, case=case,
-                                                                    allow_flush=(not subnormal) or policy == "mixed")
+                                                                    allow_flush=(not subnormal) or policy == "mixed",
+                                                                    inject_model=args.inject_model)
                         if subnormal:
                             msg += {"keeps": "; device keeps subnormal inputs", "flushes": "; device flushes subnormal inputs",
                                     "mixed": "; device keeps subnormal inputs in some places and flushes them in others"}[policy]

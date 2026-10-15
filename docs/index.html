@@ -34,7 +34,7 @@
       "name": "ai-chip-integrity",
       "codeRepository": "https://github.com/tech4biz-yasha/ai-chip-integrity",
       "identifier": "https://doi.org/10.5281/zenodo.23302804",
-      "version": "0.4.1",
+      "version": "0.4.2",
       "programmingLanguage": "Python",
       "license": "https://opensource.org/licenses/MIT",
       "author": {"@id": "https://chipintegrity.org/#person"},
@@ -721,7 +721,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <h2>The self-test</h2>
 <p class="lede">A clean table is only worth something if the tester can show it would have seen a fault. So every row is paired with an injection run.</p>
 <div class="grid2">
-<div class="panel"><h3>Compute self-test</h3><p>In five of the fifty runs, one random bit of one random output element is flipped before the checks run. The bit can be anywhere: sign, exponent or the lowest mantissa bit. All five must be caught. On the chips measured so far, with the v0.2.0 bound, the reference check alone caught 46 of every 60 flips and the repeat check caught all 60. That is why there are two checks.</p></div>
+<div class="panel"><h3>Compute self-test</h3><p>In five of the fifty runs a fault is planted before the checks run, and all five must be caught. Since v0.4.2 the five alternate between two kinds. Three flip one random bit of one random output element, which can be anywhere: sign, exponent or the lowest mantissa bit. Two follow NVIDIA's gate-level fault injection study of a data-center GPU (Tung et al., DSN 2026): one warp-aligned group of 32 outputs is hit at a regular spacing, and each value hit is zeroed, has several bits flipped, or, rarely, turns into NaN or infinity, in the proportions that study measured. On the chips measured so far, with the v0.2.0 bound, the reference check alone caught 46 of every 60 single-bit flips and the repeat check caught all 60. That is why there are two checks.</p></div>
 <div class="panel"><h3>Memory self-test</h3><p>After each pattern is written, five random bits in five random words of real device memory are flipped. The sweep must locate all of them by address. Because the flips happen in device memory, this exercises the actual read-back path, not only the comparison code.</p></div>
 </div>
 </section>
@@ -753,7 +753,7 @@ chip-integrity run --quick
 chip-integrity run --name NAME
 
 <span class="c"># or, on an NVIDIA GPU host with Docker, with nothing else installed</span>
-docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.4.1 run --name NAME --out-dir /results</pre>
+docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.4.2 run --name NAME --out-dir /results</pre>
 <p class="note">On many Macs the built-in <code>python3</code> is version 3.9, which pip skips. Install a newer Python from python.org or with Homebrew first, then create the environment with its versioned command, for example <code>python3.12 -m venv chip-env</code>.</p>
 <p class="note">The same ten files come from running each probe by hand from a clone of the repository, for example <code>python screen.py --out NAME_clean.jsonl</code> and then <code>python screen.py --inject 5 --out NAME_inject.jsonl</code> for its self-test. The README lists all ten commands.</p>
 <ol class="steps">
@@ -792,6 +792,7 @@ docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-int
 <ul class="plain">
 <li><b>Zheng et al., OSDI 2026.</b> SDCs in the Wild: characterising and diagnosing SDC-defective GPUs in production LLM training. The source of the finding that microbenchmark screening misses most faulty units. <a href="https://www.usenix.org/conference/osdi26/presentation/zheng">usenix.org</a></li>
 <li><b>Lei et al., OSDI 2026.</b> Safeguarding LLM Training at Scale: online SDC detection and insights from 35 million GPU hours. <a href="https://www.usenix.org/conference/osdi26/presentation/lei">usenix.org</a></li>
+<li><b>Tung, Huang, Saxena, Shirvani, Hukerikar, Jain, Tyagi and Gongalore, DSN 2026.</b> The Anatomy of Silent Data Corruption: GPU error pattern study and modeling guidance. Gate-level fault injection on a data-center GPU: half of all corruptions are zeroed values, under 40% of bit-flip corruptions are single-bit, and corruptions repeat at warp-aligned spacings. The self-test's gpu-sdc faults follow its measurements. <a href="https://arxiv.org/abs/2605.04213">arxiv.org</a></li>
 <li><b>Higham, Accuracy and Stability of Numerical Algorithms.</b> The componentwise rounding error bound for inner products used by the reference check.</li>
 <li><b>Huang and Abraham, 1984.</b> Algorithm-based fault tolerance for matrix operations, IEEE Transactions on Computers. The row and column checksums behind probe 6.</li>
 <li><b>Fasi, Higham, Mikaitis and Pranesh, 2021.</b> Numerical behavior of NVIDIA tensor cores. The measurement that tensor cores accumulate with truncation, which sets the fp16 and bf16 bound. <a href="https://peerj.com/articles/cs-330">peerj.com</a></li>
@@ -806,12 +807,12 @@ docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-int
 <h2>About and cite</h2>
 <p>Chip Integrity is maintained by Yasha Khandelwal, Bengaluru. The code is MIT licensed. The project stays vendor neutral: the same tests run on every chip, and a row is published only with its result file.</p>
 <pre>Yasha Khandelwal. ai-chip-integrity: an open tester for silent computation errors in AI chips.
-Version 0.4.1, 2026. https://doi.org/10.5281/zenodo.23302804
+Version 0.4.2, 2026. https://doi.org/10.5281/zenodo.23302804
 https://github.com/tech4biz-yasha/ai-chip-integrity</pre>
 <p>Questions, rows and findings: <a href="mailto:yasha.khandelwal@tech4biz.io">yasha.khandelwal@tech4biz.io</a> or an issue on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</p>
 </section>
 
-<footer>Page generated from the result files on 2026-10-11. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</footer>
+<footer>Page generated from the result files on 2026-10-15. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</footer>
 </div>
 </main>
 </div>

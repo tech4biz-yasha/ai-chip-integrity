@@ -19,8 +19,12 @@ silent error. The final verdict separates three cases:
   nondeterministic-kernel  many runs differ but all stay inside the bound, so
                            the repeat check cannot be used on this device/dtype
 
---inject N flips one random bit in N chosen runs (never the first run) to prove
-the checks catch corruption. In that mode the verdict reports detection.
+--inject N plants a fault in N chosen runs (never the first run) to prove the
+checks catch corruption. With --inject-model mixed (the default) the faults
+alternate between one random bit flip and a fault shaped like NVIDIA's
+gate-level measurements (Tung et al., DSN 2026): a warp-aligned group of
+elements nullified, flipped in several bits, or set to NaN or infinity. In that
+mode the verdict reports detection.
 
 Output: OCP Test & Validation JSON, one object per line, written to --out.
 A short summary is printed to the terminal.
@@ -43,7 +47,7 @@ import ocptv.output as tv  # noqa: E402
 from chip_integrity import arith  # noqa: E402
 from chip_integrity import counters  # noqa: E402
 
-VERSION = "0.3.3"
+VERSION = "0.3.4"
 
 FP8 = getattr(torch, "float8_e4m3fn", None)   # E4M3, the FP8 format inference engines run on
 
@@ -194,7 +198,78 @@ def flip_bit(c, int_view, bits, rng):
     return idx, bit
 
 
-def screen_case(step, dev, name, shape, iters, seed, inject, rng, hw, case=None, allow_flush=True):
+# Fault model from NVIDIA's gate-level study: Tung, Huang, Saxena, Shirvani, Hukerikar, Jain, Tyagi and
+# Gongalore, "The Anatomy of Silent Data Corruption: GPU Error Pattern Study and Modeling Guidance", DSN 2026,
+# arXiv:2605.04213. It follows their Fig. 8 template: the output is serialized, one warp-aligned chunk of
+# WARP elements is hit, the corrupted elements repeat with a period of 2, 4, 8 or 16 inside it (Observation 8),
+# and each gets an outcome drawn from the measured mix (Observations 1 and 2). Bit-flip outcomes are multi-bit
+# more often than not (Observation 7) and favour the low bits (Observation 6). The paper gives the flip-count
+# and per-bit histograms only as figures, so SINGLE_BIT_SHARE and MAX_FLIPPED_BITS approximate them.
+WARP = 32
+SDC_PERIODS = (2, 4, 8, 16)
+SDC_OUTCOMES = (("nullified", 50.68), ("nan", 0.39), ("+inf", 0.49), ("-inf", 0.13), ("bit-flips", 48.31))
+SINGLE_BIT_SHARE = 0.35
+MAX_FLIPPED_BITS = 8
+INJECT_MODELS = ("mixed", "bit", "gpu-sdc")
+SPECIAL = {"nan": float("nan"), "+inf": float("inf"), "-inf": float("-inf")}
+
+
+def _pick_bits(bits, k, rng):
+    """k distinct bit positions, each drawn with weight falling linearly from the lowest bit to the highest."""
+    pool, picked = list(range(bits)), []
+    for _ in range(k):
+        j = rng.choices(range(len(pool)), [bits - b for b in pool])[0]
+        picked.append(pool.pop(j))
+    return picked
+
+
+def plant_gpu_sdc(c, int_view, bits, rng):
+    """Plant one fault shaped like NVIDIA's gate-level measurements (see SDC_OUTCOMES) into a CPU tensor, in
+    place. Returns the number of elements whose bits changed, which is always at least one."""
+    flat = c.view(int_view).view(-1)
+    n = flat.numel()
+    base = WARP * rng.randrange((n + WARP - 1) // WARP)
+    width = min(WARP, n - base)
+    period = rng.choice(SDC_PERIODS)
+    idx = list(range(base + rng.randrange(min(period, width)), base + width, period))
+    names, weights = zip(*[(o, w) for o, w in SDC_OUTCOMES
+                           if c.dtype.is_floating_point or o in ("nullified", "bit-flips")])
+    before = flat[idx].clone()
+    for i in idx:
+        outcome = rng.choices(names, weights)[0]
+        if outcome == "nullified":
+            flat[i] = 0
+        elif outcome == "bit-flips":
+            k = 1 if rng.random() < SINGLE_BIT_SHARE else rng.randint(2, min(MAX_FLIPPED_BITS, bits))
+            mask = sum(1 << b for b in _pick_bits(bits, k, rng))
+            mask = mask - (1 << bits) if mask >= 1 << (bits - 1) else mask
+            flat[i] = flat[i] ^ torch.tensor(mask, dtype=int_view)
+        else:
+            flat[i] = torch.tensor(SPECIAL[outcome], dtype=c.dtype).view(int_view)
+    changed = int((flat[idx] != before).sum())
+    if changed == 0:                                       # e.g. zeros nullified: make sure a fault is planted
+        flat[idx[0]] = flat[idx[0]] ^ torch.tensor(1, dtype=int_view)
+        changed = 1
+    return changed
+
+
+def fault_models(inject_runs, model):
+    """The fault each injected run gets: 'bit' or 'gpu-sdc'. 'mixed' alternates them, starting with 'bit'."""
+    if model == "mixed":
+        return {run: ("bit", "gpu-sdc")[j % 2] for j, run in enumerate(sorted(inject_runs))}
+    return {run: model for run in inject_runs}
+
+
+def plant_fault(c, int_view, bits, rng, model):
+    """Plant one self-test fault of the given model ('bit' or 'gpu-sdc') into a CPU tensor, in place."""
+    if model == "gpu-sdc":
+        plant_gpu_sdc(c, int_view, bits, rng)
+    else:
+        flip_bit(c, int_view, bits, rng)
+
+
+def screen_case(step, dev, name, shape, iters, seed, inject, rng, hw, case=None, allow_flush=True,
+                inject_model="mixed"):
     """One step: run C = A @ B `iters` times and judge every run. `case` = (a, b, ref, |A||B|) supplies the
     inputs (the data pattern probe uses this); by default they come from make_case. allow_flush=False drops the
     allowance for a device flushing subnormal inputs, for callers that have already matched the reference to
@@ -215,9 +290,10 @@ def screen_case(step, dev, name, shape, iters, seed, inject, rng, hw, case=None,
     fast = name == "fp8fast"
 
     inject_runs = set(rng.sample(range(1, iters), min(inject, iters - 1))) if inject else set()
+    models = fault_models(inject_runs, inject_model)
     first_bits = None
     ref_bad, rep_bad = [], []
-    injected, caught = 0, 0
+    injected, caught, sdc_planted, sdc_caught = 0, 0, 0, 0
     worst_ratio, worst_abs, worst_nonfinite = 0.0, 0.0, 0
     t0 = time.time()
 
@@ -228,8 +304,9 @@ def screen_case(step, dev, name, shape, iters, seed, inject, rng, hw, case=None,
         if _FAULT_HOOK is not None:
             _FAULT_HOOK(i, c)
         if i in inject_runs:
-            flip_bit(c, int_view, bits, rng)
+            plant_fault(c, int_view, bits, rng, models[i])
             injected += 1
+            sdc_planted += models[i] == "gpu-sdc"
 
         c64 = c.to(torch.float64)
         finite = torch.isfinite(c64)
@@ -255,6 +332,7 @@ def screen_case(step, dev, name, shape, iters, seed, inject, rng, hw, case=None,
             rep_bad.append(i)
         if i in inject_runs and (ref_fail or rep_fail):
             caught += 1
+            sdc_caught += models[i] == "gpu-sdc"
 
     secs = time.time() - t0
 
@@ -278,6 +356,10 @@ def screen_case(step, dev, name, shape, iters, seed, inject, rng, hw, case=None,
         step.add_measurement(name="injected_runs", value=injected, hardware_info=hw)
         step.add_measurement(name="injected_runs_detected", value=caught,
                              validators=[tv.Validator(type=tv.ValidatorType.EQUAL, value=injected)],
+                             hardware_info=hw)
+        step.add_measurement(name="gpu_sdc_faults_planted", value=sdc_planted, hardware_info=hw)
+        step.add_measurement(name="gpu_sdc_faults_detected", value=sdc_caught,
+                             validators=[tv.Validator(type=tv.ValidatorType.EQUAL, value=sdc_planted)],
                              hardware_info=hw)
         clean_bad = (set(ref_bad) | set(rep_bad)) - inject_runs
         ok = caught == injected and not clean_bad
@@ -313,7 +395,9 @@ def main(argv=None):
     p.add_argument("--iters", type=int, default=50, help="runs per shape and precision")
     p.add_argument("--dtypes", default="fp32,fp16,bf16,int8,fp8,fp8fast", help="comma list from fp32,fp16,bf16,int8,fp8,fp8fast")
     p.add_argument("--seed", type=int, default=1234)
-    p.add_argument("--inject", type=int, default=0, help="bit flips to inject per step (self-test)")
+    p.add_argument("--inject", type=int, default=0, help="faults to inject per step (self-test)")
+    p.add_argument("--inject-model", default="mixed", choices=INJECT_MODELS,
+                   help="self-test faults: one random bit, a gate-level-shaped fault, or both alternating")
     p.add_argument("--out", default="results.jsonl", help="OCP JSON output file")
     args = p.parse_args(argv)
 
@@ -338,7 +422,7 @@ def main(argv=None):
         version=VERSION,
         parameters={"device": str(dev), "shapes": ",".join("x".join(map(str, sh)) for sh in shapes),
                     "iters": args.iters, "dtypes": ",".join(names), "seed": args.seed,
-                    "inject": args.inject, "bound_model": arith.MODEL_ID},
+                    "inject": args.inject, "inject_model": args.inject_model, "bound_model": arith.MODEL_ID},
     )
     dut = tv.Dut(id=socket.gethostname())
     hw = dut.add_hardware_info(name=device_label(dev))
@@ -357,7 +441,8 @@ def main(argv=None):
                 step.start()
                 try:
                     ok, verdict, msg, secs = screen_case(step, dev, name, shape, args.iters,
-                                                         args.seed, args.inject, rng, hw)
+                                                         args.seed, args.inject, rng, hw,
+                                                         inject_model=args.inject_model)
                     step.end(status=tv.TestStatus.COMPLETE)
                 except (RuntimeError, TypeError, NotImplementedError) as e:
                     step.add_error(symptom="not-supported-on-device", message=str(e)[:500])

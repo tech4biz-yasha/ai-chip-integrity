@@ -1,6 +1,6 @@
 # AI Chip Integrity Suite: every probe and its self-test in one container.
 #
-#   docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.4.1
+#   docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.4.2
 #
 # Base: the same PyTorch 2.8.0 and CUDA 12.8 build the published H100 rows were measured with.
 FROM pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime
