@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Measured results | Chip Integrity</title>
+<meta name="description" content="Every row on this page is generated from a result file in the repository, and every chip also has its own page with the full detail. Nothing here is modelled or estimated.">
+<meta name="author" content="Yasha Khandelwal">
+<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
+<link rel="canonical" href="https://chipintegrity.org/results.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Measured results | Chip Integrity">
+<meta property="og:description" content="Every row on this page is generated from a result file in the repository, and every chip also has its own page with the full detail. Nothing here is modelled or estimated.">
+<meta property="og:url" content="https://chipintegrity.org/results.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+
+</head>
+<body data-page="results">
+<a class="skip" href="#content">Skip to content</a>
+<header class="top">
+<div class="topin">
+<a class="brand" href="index.html">chip<b>integrity</b>.org</a>
+<button class="menu" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+<nav id="nav" aria-label="Site">
+<a href="learn.html">Learn</a>
+<a href="method.html">Method</a>
+<a href="results.html" aria-current="page">Results</a>
+<a href="chips/index.html">Chips</a>
+<a href="run.html">Run it</a>
+<a href="about.html">About</a>
+</nav>
+<a class="gh" href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>
+</div>
+</header>
+<main id="content">
+<div class="wrap"><div class="pagehead"><div class="kicker">EVIDENCE</div><h1>Results from every chip measured</h1><p class="lede">Every row on this page is generated from a result file in the repository, and every chip also has its own page with the full detail. Nothing here is modelled or estimated.</p><div class="learnh">ON THIS PAGE YOU WILL LEARN</div><ol class="learn"><li>Which chips have been measured, and when</li><li>What each probe found on each chip</li><li>Where to download every raw result file</li></ol></div>
+<section id="results" class="reveal">
+<div class="kicker">EVIDENCE</div>
+<h2>Measured results</h2>
+<p class="lede">Every row comes from a result file in the repository, and the tables are generated from those files. Nothing here is modelled or estimated.</p>
+<h3 id="chips">One page per chip</h3>
+<p class="note">Each chip has its own page with every step of every probe, the setup, the self-test and the result files. <a href="chips/index.html">All chips on one page</a>.</p>
+<div class="grid3"><a class="panel chipcard" href="chips/apple-gpu-mps-arm64.html"><h3>Apple GPU (MPS) arm64</h3><p>Tested 10 October 2026. 1,785 compute runs, 0 silent faults, 264 of 264 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-a100-sxm4-80gb.html"><h3>NVIDIA A100-SXM4-80GB</h3><p>Tested 7 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-geforce-rtx-4090.html"><h3>NVIDIA GeForce RTX 4090</h3><p>Tested 11 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-h100-80gb-hbm3.html"><h3>NVIDIA H100 80GB HBM3</h3><p>Tested 10 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-h200.html"><h3>NVIDIA H200</h3><p>Tested 8 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-rtx-a5000.html"><h3>NVIDIA RTX A5000</h3><p>Tested 11 October 2026. 2,055 compute runs, 0 silent faults, 297 of 297 planted faults caught.</p></a></div>
+<h3>Compute probe</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Device</th><th>Date</th><th>Shapes (M×K×N)</th><th>Precisions</th><th>Runs</th><th>Silent faults</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
+<tbody><tr>
+<td>NVIDIA H100 80GB HBM3<span class="sub">PyTorch 2.8.0+cu128 · tool v0.3.2 · error counters quiet</span></td>
+<td class="date">2026-10-10</td>
+<td>1024x1024x1024<br>4096x4096x4096<br>32x4096x11008</td>
+<td>fp32, fp16, bf16, int8, fp8, fp8fast</td>
+<td>900</td>
+<td>0</td>
+<td>90 of 90</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_v032.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_v032_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA A100-SXM4-80GB<span class="sub">PyTorch 2.8.0+cu128 · tool v0.2.0</span></td>
+<td class="date">2026-10-07</td>
+<td>1024x1024x1024<br>4096x4096x4096<br>32x4096x11008</td>
+<td>fp32, fp16, bf16, int8</td>
+<td>600</td>
+<td>0</td>
+<td>60 of 60</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/a100_clean.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/a100_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA GeForce RTX 4090<span class="sub">PyTorch 2.8.0+cu128 · tool v0.3.2 · ECC off, so the error counters cannot see memory errors</span></td>
+<td class="date">2026-10-11</td>
+<td>1024x1024x1024<br>4096x4096x4096<br>32x4096x11008</td>
+<td>fp32, fp16, bf16, int8, fp8, fp8fast</td>
+<td>900</td>
+<td>0</td>
+<td>90 of 90</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtx4090_clean.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtx4090_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA H200<span class="sub">PyTorch 2.8.0+cu128 · tool v0.2.0</span></td>
+<td class="date">2026-10-08</td>
+<td>1024x1024x1024<br>4096x4096x4096<br>32x4096x11008</td>
+<td>fp32, fp16, bf16, int8</td>
+<td>600</td>
+<td>0</td>
+<td>60 of 60</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h200_clean.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h200_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA RTX A5000<span class="sub">PyTorch 2.8.0+cu128 · tool v0.3.2 · ECC off, so the error counters cannot see memory errors</span></td>
+<td class="date">2026-10-11</td>
+<td>1024x1024x1024<br>4096x4096x4096<br>32x4096x11008</td>
+<td>fp32, fp16, bf16, int8 (6 skipped)</td>
+<td>600</td>
+<td>0</td>
+<td>60 of 60</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_clean.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>Apple GPU (MPS) arm64<span class="sub">PyTorch 2.14.1 · tool v0.2.0</span></td>
+<td class="date">2026-10-07</td>
+<td>1024x1024x1024<br>4096x4096x4096<br>32x4096x11008</td>
+<td>fp32, fp16, bf16 (3 skipped)</td>
+<td>450</td>
+<td>0</td>
+<td>45 of 45</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/mac_v020.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/mac_v020_inject.jsonl">self-test</a></td>
+</tr></tbody>
+</table></div>
+<h3>Kernel probe</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Device</th><th>Date</th><th>Kernels</th><th>Precisions</th><th>Runs</th><th>Worst error / bound</th><th>Silent faults</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
+<tbody><tr>
+<td>NVIDIA H100 80GB HBM3<span class="sub">PyTorch 2.8.0+cu128 · tool v0.2.2 · error counters quiet</span></td>
+<td class="date">2026-10-10</td>
+<td>softmax, layernorm, gelu, rope, attention<span class="sub">4096×4096; rope 4096×128; attention 8×1024×128 · attention: efficient (fp32); flash (fp16, bf16)</span></td>
+<td>fp32, fp16, bf16</td>
+<td>375</td>
+<td>0.999</td>
+<td>0</td>
+<td>45 of 45</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_kernels_v022.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_kernels_v022_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA GeForce RTX 4090<span class="sub">PyTorch 2.8.0+cu128 · tool v0.2.2 · ECC off, so the error counters cannot see memory errors</span></td>
+<td class="date">2026-10-11</td>
+<td>softmax, layernorm, gelu, rope, attention<span class="sub">4096×4096; rope 4096×128; attention 8×1024×128 · attention: efficient (fp32); flash (fp16, bf16)</span></td>
+<td>fp32, fp16, bf16</td>
+<td>375</td>
+<td>0.999</td>
+<td>0</td>
+<td>45 of 45</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtx4090_kernels.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtx4090_kernels_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA RTX A5000<span class="sub">PyTorch 2.8.0+cu128 · tool v0.2.2 · ECC off, so the error counters cannot see memory errors</span></td>
+<td class="date">2026-10-11</td>
+<td>softmax, layernorm, gelu, rope, attention<span class="sub">4096×4096; rope 4096×128; attention 8×1024×128 · attention: efficient (fp32); flash (fp16, bf16)</span></td>
+<td>fp32, fp16, bf16</td>
+<td>375</td>
+<td>0.999</td>
+<td>0</td>
+<td>45 of 45</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_kernels.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_kernels_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>Apple GPU (MPS) arm64<span class="sub">PyTorch 2.14.1 · tool v0.2.0</span></td>
+<td class="date">2026-10-10</td>
+<td>softmax, layernorm, gelu, rope, attention<span class="sub">4096×4096; rope 4096×128; attention 8×1024×128</span></td>
+<td>fp32, fp16, bf16</td>
+<td>375</td>
+<td>0.999</td>
+<td>0</td>
+<td>45 of 45</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/mac_kernels_v020.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/mac_kernels_v020_inject.jsonl">self-test</a></td>
+</tr></tbody>
+</table></div>
+<p class="note">Worst error over bound is the largest measured error on the device divided by the bound at that element, across every kernel and precision. Values near 1 at fp16 and bf16 are expected: there the bound is dominated by the single rounding of the output, so there is almost nothing to spare. A value above 1 is a failed run. On NVIDIA GPUs the row also names the fused attention kernel that ran in each precision: flash, cuDNN or memory-efficient.</p>
+<h3>Checksum probe</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Device</th><th>Date</th><th>Shapes</th><th>Precisions</th><th>Runs</th><th>Silent faults</th><th>Blind-spot runs</th><th>Threshold / typical value</th><th>Injected located</th><th>Verdict</th><th>Files</th></tr></thead>
+<tbody><tr>
+<td>NVIDIA H100 80GB HBM3<span class="sub">PyTorch 2.8.0+cu128 · tool v0.1.0 · error counters quiet</span></td>
+<td class="date">2026-10-10</td>
+<td>1024x1024x1024<br>32x4096x11008</td>
+<td>fp32, fp16, bf16</td>
+<td>120</td>
+<td>0</td>
+<td>0</td>
+<td>827.15</td>
+<td>18 of 18</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_abft.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_abft_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA GeForce RTX 4090<span class="sub">PyTorch 2.8.0+cu128 · tool v0.1.0 · ECC off, so the error counters cannot see memory errors</span></td>
+<td class="date">2026-10-11</td>
+<td>1024x1024x1024<br>32x4096x11008</td>
+<td>fp32, fp16, bf16</td>
+<td>120</td>
+<td>0</td>
+<td>0</td>
+<td>827.15</td>
+<td>18 of 18</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtx4090_abft.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtx4090_abft_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA RTX A5000<span class="sub">PyTorch 2.8.0+cu128 · tool v0.1.0 · ECC off, so the error counters cannot see memory errors</span></td>
+<td class="date">2026-10-11</td>
+<td>1024x1024x1024<br>32x4096x11008</td>
+<td>fp32, fp16, bf16</td>
+<td>120</td>
+<td>0</td>
+<td>0</td>
+<td>827.15</td>
+<td>18 of 18</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_abft.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_abft_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>Apple GPU (MPS) arm64<span class="sub">PyTorch 2.14.1 · tool v0.1.0 · no error counters</span></td>
+<td class="date">2026-10-10</td>
+<td>1024x1024x1024<br>32x4096x11008</td>
+<td>fp32, fp16, bf16</td>
+<td>120</td>
+<td>0</td>
+<td>0</td>
+<td>827.15</td>
+<td>18 of 18</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/mac_abft.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/mac_abft_inject.jsonl">self-test</a></td>
+</tr></tbody>
+</table></div>
+<p class="note">Threshold over typical value is how large an error must be, compared with a typical element of C, before a proven checksum is guaranteed to see it, at the worst precision and shape. It is set by the shape, the precision and the arithmetic model, not by the chip's answers, because the threshold adds up the worst-case rounding of every element in a row: on the H100 it runs from 2.3 (fp32 at 1024×1024×1024) to 827 (bf16 at 32×4096×11008). Below it, the reference and repeat checks carry the smaller faults. Blind-spot runs are runs the reference check failed while every checksum held.</p>
+<h3>Data pattern probe</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Device</th><th>Date</th><th>Patterns</th><th>Precisions</th><th>Runs</th><th>Silent faults</th><th>Injected caught</th><th>Subnormal inputs</th><th>Verdict</th><th>Files</th></tr></thead>
+<tbody><tr>
+<td>NVIDIA H100 80GB HBM3<span class="sub">PyTorch 2.8.0+cu128 · tool v0.1.2 · error counters quiet</span></td>
+<td class="date">2026-10-10</td>
+<td>wide, mantissa, cancel, alternate, sparse, subnormal, near_max, extremes</td>
+<td>fp32, fp16, bf16, int8, fp8, fp8fast</td>
+<td>1,120</td>
+<td>0</td>
+<td>168 of 168</td>
+<td>kept</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_patterns.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_patterns_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA GeForce RTX 4090<span class="sub">PyTorch 2.8.0+cu128 · tool v0.1.2 · ECC off, so the error counters cannot see memory errors</span></td>
+<td class="date">2026-10-11</td>
+<td>wide, mantissa, cancel, alternate, sparse, subnormal, near_max, extremes</td>
+<td>fp32, fp16, bf16, int8, fp8, fp8fast</td>
+<td>1,120</td>
+<td>0</td>
+<td>168 of 168</td>
+<td>kept</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtx4090_patterns.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtx4090_patterns_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA RTX A5000<span class="sub">PyTorch 2.8.0+cu128 · tool v0.1.2 · ECC off, so the error counters cannot see memory errors</span></td>
+<td class="date">2026-10-11</td>
+<td>wide, mantissa, cancel, alternate, sparse, subnormal, near_max, extremes</td>
+<td>fp32, fp16, bf16, int8 (8 skipped)</td>
+<td>960</td>
+<td>0</td>
+<td>144 of 144</td>
+<td>kept</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_patterns.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_patterns_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>Apple GPU (MPS) arm64<span class="sub">PyTorch 2.14.1 · tool v0.1.0</span></td>
+<td class="date">2026-10-10</td>
+<td>wide, mantissa, cancel, alternate, sparse, subnormal, near_max</td>
+<td>fp32, fp16, bf16 (14 skipped)</td>
+<td>840</td>
+<td>0</td>
+<td>126 of 126</td>
+<td>flushed: fp32, bf16</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/mac_patterns.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/mac_patterns_inject.jsonl">self-test</a></td>
+</tr></tbody>
+</table></div>
+<p class="note">Subnormal inputs says whether the chip kept or flushed subnormal inputs to zero, per precision and measured at each shape. Either is allowed; the probe measures which, then checks the chip against that exact model. Mixed means a kernel kept them in some places and flushed them in others.</p>
+<h3>Memory probe</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Device</th><th>Date</th><th>Memory tested</th><th>Patterns</th><th>Dwell</th><th>Bad words</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
+<tbody><tr>
+<td>NVIDIA H100 80GB HBM3<span class="sub">tool v0.1.1 · error counters quiet</span></td>
+<td class="date">2026-10-10</td>
+<td>62.75 GiB of 79.18 GiB<span class="sub">16,844,324,864 words</span></td>
+<td>6</td>
+<td>2.0 s</td>
+<td>0</td>
+<td>30 of 30</td>
+<td class="ok">no-memory-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_memcheck_v011.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_memcheck_v011_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA A100-SXM4-80GB<span class="sub">tool v0.1.0</span></td>
+<td class="date">2026-10-07</td>
+<td>63.00 GiB of 79.25 GiB<span class="sub">16,911,433,728 words</span></td>
+<td>6</td>
+<td>2.0 s</td>
+<td>0</td>
+<td>30 of 30</td>
+<td class="ok">no-memory-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/a100_memcheck.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/a100_memcheck_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA GeForce RTX 4090<span class="sub">tool v0.1.1 · ECC off, so the error counters cannot see memory errors</span></td>
+<td class="date">2026-10-11</td>
+<td>18.50 GiB of 23.52 GiB<span class="sub">4,966,055,936 words</span></td>
+<td>6</td>
+<td>2.0 s</td>
+<td>0</td>
+<td>30 of 30</td>
+<td class="ok">no-memory-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtx4090_memcheck.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtx4090_memcheck_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA H200<span class="sub">tool v0.1.0</span></td>
+<td class="date">2026-10-08</td>
+<td>111.25 GiB of 139.81 GiB<span class="sub">29,863,444,480 words</span></td>
+<td>6</td>
+<td>2.0 s</td>
+<td>0</td>
+<td>30 of 30</td>
+<td class="ok">no-memory-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h200_memcheck.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h200_memcheck_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA RTX A5000<span class="sub">tool v0.1.1 · ECC off, so the error counters cannot see memory errors</span></td>
+<td class="date">2026-10-11</td>
+<td>18.50 GiB of 23.55 GiB<span class="sub">4,966,055,936 words</span></td>
+<td>6</td>
+<td>2.0 s</td>
+<td>0</td>
+<td>30 of 30</td>
+<td class="ok">no-memory-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_memcheck.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_memcheck_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>Apple GPU (MPS) arm64<span class="sub">tool v0.1.0</span></td>
+<td class="date">2026-10-07</td>
+<td>5.50 GiB of 11.84 GiB<span class="sub">1,476,395,008 words</span></td>
+<td>6</td>
+<td>2.0 s</td>
+<td>0</td>
+<td>30 of 30</td>
+<td class="ok">no-memory-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/mac_memcheck.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/mac_memcheck_inject.jsonl">self-test</a></td>
+</tr></tbody>
+</table></div>
+<p class="note">Rented data centre GPUs are young, monitored and already screened, so clean rows are the expected result there. The research says faults concentrate in aged units and appear under data-dependent, long, hot workloads. Those are the next probes on the roadmap, and where the first real findings are expected.</p>
+</section>
+</div>
+</main>
+<footer class="foot">
+<div class="footin">
+<div><div class="brand">chip<b>integrity</b>.org</div><p>Open tests for silent computation errors in AI chips. MIT licensed. Every number on this site is read from a public result file.</p></div>
+<div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="index.html">Home</a><a href="learn.html">Learn</a><a href="method.html">Method</a><a href="results.html">Results</a><a href="chips/index.html">Chips</a><a href="run.html">Run it</a><a href="about.html">About</a></nav></div>
+<div><div class="fh">CITE</div><p>Yasha Khandelwal, ai-chip-integrity, version 0.4.2, 2026, <a href="https://doi.org/10.5281/zenodo.23393790">https://doi.org/10.5281/zenodo.23393790</a></p></div>
+</div>
+<div class="footbase">Page generated from the result files on 2026-10-15. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>
+</footer>
+<script src="assets/site.js"></script>
+</body>
+</html>

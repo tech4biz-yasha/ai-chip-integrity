@@ -120,11 +120,10 @@ def site_from_repo():
 
 def test_every_chip_gets_its_own_page_with_its_files():
     runs, chip_map = site_from_repo()
-    template = (pathlib.Path(build_site.ROOT) / "docs" / "template.html").read_text()
     by_file = {r["file"]: r for r in runs}
     assert len({build_site.chip_slug(d) for d in chip_map}) == len(chip_map) > 0
     for device, rows in chip_map.items():
-        html = build_site.chip_page(device, chip_map, by_file, template, "2026-01-01")
+        html = build_site.chip_page(device, chip_map, by_file, "2026-01-01")
         slug = build_site.chip_slug(device)
         assert f'<link rel="canonical" href="https://chipintegrity.org/chips/{slug}.html">' in html
         assert f"<h1>{build_site.esc(device)}</h1>" in html
@@ -135,7 +134,7 @@ def test_every_chip_gets_its_own_page_with_its_files():
         st = build_site.chip_stats(rows)
         assert f'{st["caught"]} of {st["injected"]}' in html and f'{st["runs"]:,}' in html
         assert "{{" not in html
-    index = build_site.chips_index(chip_map, template, "2026-01-01")
+    index = build_site.chips_index(chip_map, "2026-01-01")
     for device in chip_map:
         assert f'href="{build_site.chip_slug(device)}.html"' in index
 
@@ -164,11 +163,11 @@ def test_every_link_on_every_page_opens_from_a_plain_folder():
     import os
     import re
     docs = pathlib.Path(build_site.ROOT) / "docs"
-    pages = [docs / "index.html"] + sorted((docs / "chips").glob("*.html"))
-    assert len(pages) > 2
+    pages = sorted(docs.glob("*.html")) + sorted((docs / "chips").glob("*.html"))
+    assert len(pages) >= 13
     for page in pages:
         html = page.read_text()
-        for link in re.findall(r'href="([^"]+)"', html):
+        for link in re.findall(r'(?:href|src)="([^"]+)"', html):
             if link.startswith(("https://", "http://", "mailto:")):
                 continue
             assert not link.startswith("/"), f"{page.name}: {link} only works on a web server"

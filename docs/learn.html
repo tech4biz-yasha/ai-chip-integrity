@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>What a silent error is, and why it matters | Chip Integrity</title>
+<meta name="description" content="Start here if the subject is new. This page explains how a chip can return a wrong number without raising any error, why that matters for anyone training or serving AI models, and the words used everywhere else on this site.">
+<meta name="author" content="Yasha Khandelwal">
+<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
+<link rel="canonical" href="https://chipintegrity.org/learn.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="What a silent error is, and why it matters | Chip Integrity">
+<meta property="og:description" content="Start here if the subject is new. This page explains how a chip can return a wrong number without raising any error, why that matters for anyone training or serving AI models, and the words used everywhere else on this site.">
+<meta property="og:url" content="https://chipintegrity.org/learn.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+
+</head>
+<body data-page="learn">
+<a class="skip" href="#content">Skip to content</a>
+<header class="top">
+<div class="topin">
+<a class="brand" href="index.html">chip<b>integrity</b>.org</a>
+<button class="menu" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+<nav id="nav" aria-label="Site">
+<a href="learn.html" aria-current="page">Learn</a>
+<a href="method.html">Method</a>
+<a href="results.html">Results</a>
+<a href="chips/index.html">Chips</a>
+<a href="run.html">Run it</a>
+<a href="about.html">About</a>
+</nav>
+<a class="gh" href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>
+</div>
+</header>
+<main id="content">
+<div class="wrap"><div class="pagehead"><div class="kicker">LEARN</div><h1>Silent errors in AI chips, from the beginning</h1><p class="lede">Start here if the subject is new. This page explains how a chip can return a wrong number without raising any error, why that matters for anyone training or serving AI models, and the words used everywhere else on this site.</p><div class="learnh">ON THIS PAGE YOU WILL LEARN</div><ol class="learn"><li>What a silent computation error is, with a worked example</li><li>Why it matters at the scale AI now runs at</li><li>The terms used in the method and the results</li></ol></div>
+<section id="silent" class="reveal">
+<div class="kicker">LEARN, PART 1 OF 5</div>
+<h2>What a silent error is</h2>
+<p class="lede">When a chip fails, there are three ways it can tell you. Only two of them are loud.</p>
+<div class="grid3">
+<div class="panel"><h3>It crashes</h3><p>The job stops. Annoying, but you know. Nothing is quietly wrong.</p></div>
+<div class="panel"><h3>It raises an error</h3><p>Memory with ECC, for example, notices a flipped bit, corrects it or reports it. Monitoring sees a counter go up.</p></div>
+<div class="panel"><h3>It gives a wrong number</h3><p>The job finishes. Every status light is green. One number in the output is wrong, and nothing on the chip knows. That is a silent error.</p></div>
+</div>
+<h3>Where silent errors come from</h3>
+<p>A modern AI chip has tens of thousands of arithmetic units and billions of memory cells, made on a process so fine that a few atoms decide whether a transistor switches on time. Most units are perfect. A few are marginal: they work at one temperature and fail at another, work on most inputs and fail on a specific bit pattern, or degrade as the chip ages. When a marginal unit produces the wrong bit during a multiply, nothing compares the answer to the truth, so the wrong number simply flows onward.</p>
+<div class="fig">
+<svg viewBox="0 0 900 190" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, ui-monospace, Menlo, monospace" font-size="12">
+<rect x="20" y="40" width="190" height="60" fill="none" stroke="#2B3B5E"/><text x="34" y="66" fill="#E8ECF4">input numbers</text><text x="34" y="86" fill="#93A0BA">2.0 and 3.0</text>
+<line class="pulse" x1="210" y1="70" x2="300" y2="70" stroke="#39B9EE" stroke-width="2"/>
+<rect x="300" y="24" width="220" height="92" fill="none" stroke="#2B3B5E"/><text x="316" y="50" fill="#E8ECF4">multiply unit</text><text x="316" y="72" fill="#93A0BA">healthy: 6.0</text><text x="316" y="94" fill="#F26D6D">marginal: 6.0000076</text>
+<line class="pulse" x1="520" y1="70" x2="610" y2="70" stroke="#39B9EE" stroke-width="2"/>
+<rect x="610" y="40" width="270" height="60" fill="none" stroke="#2B3B5E"/><text x="626" y="66" fill="#E8ECF4">next layer uses the number</text><text x="626" y="86" fill="#93A0BA">no error, no log line, no crash</text>
+<text x="20" y="160" fill="#5E6B86">A single mantissa bit flipped inside one multiply. The chip does not compare 6.0000076 with anything, so it never knows.</text>
+</svg>
+<div class="cap">The difference between a healthy and a marginal unit can be one bit: far below what anyone notices in a single number, and enough to change a model's output after a billion more multiplies.</div>
+</div>
+<h3>Why the usual tests miss them</h3>
+<p>Vendor diagnostics run a fixed stress pattern for a short time and look for crashes and error counters. The research on real fleets says that is not enough. ByteDance's team reported that screening GPUs with synthetic microbenchmarks missed over 60 percent of the units that later corrupted real training runs, because the faults depend on the data being processed, show up with age, and are specific to individual units. A test that exercises one pattern for a few seconds can pass a chip that fails on the next pattern an hour later.</p>
+</section>
+
+<section id="why" class="reveal">
+<div class="kicker">LEARN, PART 2 OF 5</div>
+<h2>Why it matters</h2>
+<p class="lede">One wrong number is harmless. The problem is scale: thousands of chips, billions of operations a second, and nothing that checks the answers.</p>
+<div class="grid2">
+<div class="panel"><h3>Training runs go quietly wrong</h3><p>In large language model training, a corrupted gradient from one faulty GPU spreads to every other GPU at the next synchronisation. The loss curve wobbles, days of compute are lost, and the cause stays invisible until someone finds the one unit. The second OSDI 2026 study below counted 18 such incidents and 13 faulty GPUs across 35 million GPU hours.</p></div>
+<div class="panel"><h3>Inference answers drift</h3><p>A serving fleet with one marginal chip produces slightly different answers from that chip, forever. No crash, no alert, just a share of users getting worse results.</p></div>
+<div class="panel"><h3>The used GPU market has no condition test</h3><p>Second-hand accelerators are bought and sold on model name and hours of use. Age is the biggest risk factor for silent faults, and there is no open, shared way to test a used card before paying for it.</p></div>
+<div class="panel"><h3>Lenders cannot inspect the collateral</h3><p>Loans are secured against GPUs. A jet has maintenance records and an inspection standard; a GPU has a serial number. An open integrity test is the first step towards a condition grade anyone can verify.</p></div>
+</div>
+</section>
+
+<section id="glossary" class="reveal">
+<div class="kicker">LEARN, PART 5 OF 5</div>
+<h2>Glossary</h2>
+<dl class="gl">
+<dt>silent error, silent data corruption, SDC</dt><dd>A wrong result from a chip with no crash, no error flag and no log entry. The chip does not know it happened.</dd>
+<dt>bit flip</dt><dd>One binary digit changing value. In a floating point number a flipped high bit can change the value by orders of magnitude; a flipped low bit changes it by less than one part in a million.</dd>
+<dt>rotary embedding (RoPE)</dt><dd>The way most current language models tell the model where a token sits: each pair of values in an attention head is rotated by an angle proportional to the position, computed with sin and cos.</dd>
+<dt>ECC</dt><dd>Error-correcting code. Extra bits stored with memory that let the hardware detect and usually correct a single flipped bit. ECC covers memory, not the arithmetic units, and not every chip has it on all memory.</dd>
+<dt>HBM</dt><dd>High bandwidth memory, the stacked memory next to a data centre GPU die. An H100 has 80 GB of it.</dd>
+<dt>tensor core</dt><dd>A unit on NVIDIA GPUs that multiplies small matrices in one step. fp16, bf16, FP8 and int8 matrix multiplies run through tensor cores; fp32 runs through the regular floating point units.</dd>
+<dt>fp32, fp16, bf16, FP8, int8</dt><dd>Number formats. fp32 keeps 24 bits of precision, fp16 keeps 11, bf16 keeps 8 with a wider range, FP8 (E4M3) keeps 4, int8 is an exact integer. Models are served in the smaller formats because they are faster, which is why the tester checks all five.</dd>
+<dt>accumulation</dt><dd>The running sum inside a dot product. Even when the inputs are fp16, the sum is normally kept in fp32, which is what the reference bound assumes and what the tester enforces on CUDA.</dd>
+<dt>deterministic kernel</dt><dd>A GPU routine that gives bit-identical output every time for the same input. Not all do, which is why non-determinism is reported as its own verdict instead of as a fault.</dd>
+<dt>reference bound</dt><dd>The largest error that correct rounding can produce for a given computation and precision. Anything larger is a wrong answer. The bound used here is the standard componentwise bound for inner products from Higham.</dd>
+<dt>fault injection</dt><dd>Deliberately corrupting a value to confirm the checks notice. Used here as a self-test on every published row.</dd>
+<dt>dwell</dt><dd>The pause between writing memory and reading it back. Weak cells lose their value over time, so a longer dwell catches more of them.</dd>
+<dt>OCP Test and Validation</dt><dd>The Open Compute Project's open format for hardware diagnostic output, used by cloud operators so that any test's results can be read by any fleet tool. All six probes write it.</dd>
+</dl>
+</section>
+</div>
+</main>
+<footer class="foot">
+<div class="footin">
+<div><div class="brand">chip<b>integrity</b>.org</div><p>Open tests for silent computation errors in AI chips. MIT licensed. Every number on this site is read from a public result file.</p></div>
+<div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="index.html">Home</a><a href="learn.html">Learn</a><a href="method.html">Method</a><a href="results.html">Results</a><a href="chips/index.html">Chips</a><a href="run.html">Run it</a><a href="about.html">About</a></nav></div>
+<div><div class="fh">CITE</div><p>Yasha Khandelwal, ai-chip-integrity, version 0.4.2, 2026, <a href="https://doi.org/10.5281/zenodo.23393790">https://doi.org/10.5281/zenodo.23393790</a></p></div>
+</div>
+<div class="footbase">Page generated from the result files on 2026-10-15. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>
+</footer>
+<script src="assets/site.js"></script>
+</body>
+</html>

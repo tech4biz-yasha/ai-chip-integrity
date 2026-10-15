@@ -5,162 +5,46 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Every chip measured | Chip Integrity</title>
 <meta name="description" content="Every AI chip tested by Chip Integrity for silent computation errors, one page each, generated from public result files.">
+<meta name="author" content="Yasha Khandelwal">
+<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
 <link rel="canonical" href="https://chipintegrity.org/chips/index.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Every chip measured | Chip Integrity">
+<meta property="og:description" content="Every AI chip tested by Chip Integrity for silent computation errors, one page each, generated from public result files.">
+<meta property="og:url" content="https://chipintegrity.org/chips/index.html">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-:root{
-  --bg:#080D18;--bg2:#0D1424;--bg3:#111A2E;--line:#1A2540;--line2:#2B3B5E;
-  --text:#E8ECF4;--muted:#93A0BA;--dim:#5E6B86;
-  --blue:#39B9EE;--teal:#2BD7B3;--red:#F26D6D;--amber:#F2C66D;
-  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
-  --sans:"IBM Plex Sans",-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
-  --rail:220px;
-}
-*{box-sizing:border-box}
-html{scroll-behavior:smooth;scroll-padding-top:24px}
-body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17px;line-height:1.65;
-  background-image:radial-gradient(rgba(57,185,238,.13) 1px,transparent 1px);background-size:26px 26px}
-a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
-a:focus-visible,button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
-.layout{display:grid;grid-template-columns:var(--rail) 1fr;min-height:100vh}
-.rail{position:sticky;top:0;height:100vh;border-right:1px solid var(--line);padding:28px 22px;background:rgba(8,13,24,.9);overflow:auto}
-.rail .brand{font-family:var(--mono);font-size:15px;letter-spacing:.06em;color:var(--text);display:block;margin-bottom:6px}
-.rail .brand b{color:var(--blue);font-weight:500}
-.rail .tag{font-size:12.5px;color:var(--dim);line-height:1.4;margin-bottom:26px}
-.rail a.n{display:block;font-size:14px;color:var(--muted);padding:6px 0;border-left:2px solid transparent;padding-left:12px;margin-left:-14px}
-.rail a.n:hover{color:var(--text);text-decoration:none}
-.rail a.n.on{color:var(--text);border-left-color:var(--blue)}
-.rail .grp{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--dim);margin:22px 0 6px}
-main{min-width:0}
-.wrap{max-width:980px;padding:0 48px}
-section{padding:72px 0;border-top:1px solid var(--line)}
-.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.16em;color:var(--blue);margin-bottom:10px}
-h1{font-size:46px;line-height:1.1;font-weight:600;letter-spacing:-.015em;margin:0 0 20px;max-width:820px}
-h2{font-size:30px;line-height:1.2;font-weight:600;letter-spacing:-.01em;margin:0 0 16px}
-h3{font-size:19px;font-weight:600;margin:28px 0 8px}
-p{margin:0 0 16px;max-width:720px}
-p.lede{font-size:19px;color:var(--muted)}
-.hero{padding:76px 0 56px}
-.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:40px;align-items:center}
-.stats{display:grid;grid-template-columns:repeat(5,1fr);border:1px solid var(--line);background:var(--line);gap:1px;margin-top:36px}
-.stat{background:var(--bg2);padding:18px 16px}
-.stat .n{font-family:var(--mono);font-size:22px;line-height:1.1}
-.stat .l{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.3}
-.panel{position:relative;background:var(--bg2);border:1px solid var(--line);padding:26px 28px;margin:22px 0}
-.panel:before,.panel:after{content:"";position:absolute;width:14px;height:14px;border-color:var(--blue);border-style:solid}
-.panel:before{top:-1px;left:-1px;border-width:1px 0 0 1px}
-.panel:after{bottom:-1px;right:-1px;border-width:0 1px 1px 0}
-.panel h3{margin-top:0}
-.panel p{color:var(--muted)}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
-.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:22px}
-.grid2 .panel,.grid3 .panel{margin:0}
-.grid2>*,.grid3>*{min-width:0}
-.fig{background:#060A13;border:1px solid var(--line);margin:22px 0}
-.fig svg{display:block;width:100%;height:auto}
-.fig .cap{font-size:13.5px;color:var(--muted);padding:12px 16px;border-top:1px solid var(--line)}
-code{font-family:var(--mono);font-size:.92em;background:var(--bg3);padding:1px 6px;border-radius:2px}
-pre{font-family:var(--mono);font-size:13.5px;background:#060A13;border:1px solid var(--line);padding:18px 20px;overflow-x:auto;line-height:1.7;margin:16px 0;color:var(--text)}
-pre .c{color:var(--dim)}
-.formula{white-space:nowrap;font-family:var(--mono);font-size:13.5px;background:#060A13;border:1px solid var(--line);padding:16px 20px;color:var(--teal);line-height:1.9;margin:14px 0;overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:14.5px;margin:16px 0}
-th{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;color:var(--muted);text-align:left;padding:10px 12px;border-bottom:1px solid var(--line2);font-weight:500;white-space:nowrap}
-td{padding:13px 12px;border-bottom:1px solid var(--line);vertical-align:top}
-td .sub{display:block;font-family:var(--mono);font-size:11.5px;color:var(--dim);margin-top:4px}
-td.ok{color:var(--teal);font-family:var(--mono);font-size:13px;white-space:nowrap}
-td.bad{color:var(--red);font-family:var(--mono);font-size:13px;white-space:nowrap}
-td.date{white-space:nowrap}
-.tablewrap{overflow-x:auto}
-.pats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
-.pats div{border:1px solid var(--line);padding:10px 12px}
-.pats b{display:block;font-family:var(--mono);font-size:13px;font-weight:500}
-.pats span{display:block;font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:4px}
-@media (max-width:980px){.pats{grid-template-columns:repeat(2,1fr)}}
-.gl dt{font-family:var(--mono);font-size:14px;color:var(--teal);margin-top:14px}
-.gl dd{margin:4px 0 0;color:var(--muted);max-width:720px}
-.verdict{display:grid;grid-template-columns:220px 1fr;gap:10px 18px;align-items:baseline;margin:14px 0}
-.verdict .v{font-family:var(--mono);font-size:13.5px;color:var(--teal)}
-.verdict .v.bad{color:var(--red)}.verdict .v.warn{color:var(--amber)}
-.verdict div:nth-child(even){color:var(--muted)}
-ol.steps{padding-left:22px;color:var(--muted)}ol.steps li{margin:8px 0}ol.steps b{color:var(--text);font-weight:500}
-ul.plain{padding-left:20px;color:var(--muted)}ul.plain li{margin:8px 0}ul.plain b{color:var(--text);font-weight:500}
-.note{color:var(--muted);font-size:14.5px}
-.road{border-left:1px solid var(--line2);margin:20px 0 0 8px;padding-left:24px}
-.road .r{position:relative;margin-bottom:22px}
-.road .r:before{content:"";position:absolute;left:-29px;top:9px;width:9px;height:9px;background:var(--bg);border:1px solid var(--line2)}
-.road .r.done:before{background:var(--teal);border-color:var(--teal)}
-.road .r.now:before{background:var(--blue);border-color:var(--blue)}
-.road .r b{display:block;font-weight:500}
-.road .r span{color:var(--muted);font-size:15px}
-footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);font-size:14.5px}
-.die{width:100%;height:auto}
-.scan{animation:scan 6s linear infinite}
-@keyframes scan{0%{transform:translateX(0)}100%{transform:translateX(364px)}}
-.cell-bad{animation:badcell 6s linear infinite}
-@keyframes badcell{0%,56%{fill:#15213A}60%,100%{fill:#F26D6D}}
-.flag{opacity:0;animation:flag 6s linear infinite}
-@keyframes flag{0%,62%{opacity:0}66%,100%{opacity:1}}
-.pulse{stroke-dasharray:6 10;animation:dash 1.6s linear infinite}
-@keyframes dash{to{stroke-dashoffset:-32}}
-.fill{animation:fill 5s ease-in-out infinite}
-@keyframes fill{0%{width:0}45%{width:100%}60%{width:100%}100%{width:0}}
-@media (prefers-reduced-motion:reduce){.scan,.cell-bad,.flag,.pulse,.fill{animation:none}.cell-bad{fill:#F26D6D}.flag{opacity:1}.fill{width:100%}}
-@media (max-width:980px){.layout{grid-template-columns:1fr}.rail{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}.rail a.n,.rail .grp{display:inline-block;margin:4px 10px 4px 0;border:0;padding:0}.wrap{padding:0 22px}.hero-grid,.grid2,.grid3{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}h1{font-size:34px}.verdict{grid-template-columns:1fr}}
-.chipcard{display:block;color:inherit;text-decoration:none}.chipcard:hover{border-color:var(--teal)}.chipcard h3{margin-top:0}.rail .n[aria-current]{color:var(--teal)}.crumb{font-family:var(--mono);font-size:12px;color:var(--dim);margin-bottom:18px}.crumb a{color:var(--dim)}
-.probemap{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));border:1px solid var(--line);background:var(--line);gap:1px;margin-top:22px}.probemap .stat{display:block;color:inherit;text-decoration:none}.probemap .stat .n{font-size:15px}.probemap .stat:hover .n{color:var(--teal)}
-.budget{margin:22px 0 8px;border-top:1px solid var(--line)}
-.brow{display:grid;grid-template-columns:minmax(150px,250px) 1fr 170px;gap:16px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
-.brow .lab{font-family:var(--mono);font-size:13px}.brow .val{font-family:var(--mono);font-size:12.5px;color:var(--muted);text-align:right}
-.track{position:relative;height:8px;background:var(--bg2);border:1px solid var(--line)}
-.fill{position:absolute;left:0;top:0;bottom:0;background:var(--teal);animation:grow 1.4s cubic-bezier(.2,.7,.2,1) both}
-.limitline{position:absolute;right:-1px;top:-6px;bottom:-6px;width:2px;background:var(--red)}
-@keyframes grow{from{width:0}}
-details{margin-top:14px}details summary{cursor:pointer;font-family:var(--mono);font-size:13px;color:var(--teal)}
-.probehead{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:baseline;margin:16px 0 4px}
-.probehead .big{font-size:20px;font-weight:600}.big.good{color:var(--teal)}.big.badtxt{color:var(--red)}
-.spec{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:22px}
-.spec>div{background:var(--bg2);padding:14px 16px}.spec .k{font-size:12px;color:var(--muted)}.spec .v{font-family:var(--mono);font-size:13.5px;margin-top:4px;overflow-wrap:anywhere}
-.files{list-style:none;padding:0;margin:0}.files li{padding:9px 0;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:13px}
-.callout{border-left:3px solid var(--amber);background:var(--bg2);padding:22px 26px}
-.chipfig{width:100%;height:auto}.chipfig .frame{fill:none;stroke:var(--line)}
-.chipfig .cell{fill:var(--teal);opacity:.16;animation:lit .6s ease-out both}@keyframes lit{from{opacity:0}to{opacity:.16}}
-.chipfig .scan{fill:var(--teal);opacity:.7;animation:scan 5s linear infinite}@keyframes scan{from{transform:translateX(0)}to{transform:translateX(397px)}}
-.chipfig .cap{font-family:var(--mono);font-size:11px;letter-spacing:.08em;fill:var(--dim)}.chipfig .cap.good{fill:var(--teal)}.chipfig .cap.badtxt{fill:var(--red)}
-@media (max-width:760px){.brow{grid-template-columns:1fr}.brow .val{text-align:left}.probehead{grid-template-columns:1fr}}
-@media (prefers-reduced-motion:reduce){.fill,.chipfig .cell,.chipfig .scan{animation:none}}
-</style>
+<link rel="stylesheet" href="../assets/site.css">
+
 </head>
-<body>
-<div class="layout">
-<nav class="rail" aria-label="Sections">
+<body data-page="chips/index">
+<a class="skip" href="#content">Skip to content</a>
+<header class="top">
+<div class="topin">
 <a class="brand" href="../index.html">chip<b>integrity</b>.org</a>
-<div class="tag">Open tests for silent computation errors in AI chips</div>
-<div class="grp">CHIPS</div>
-<a class="n" href="index.html" aria-current="page">Every chip measured</a>
-<a class="n" href="apple-gpu-mps-arm64.html">Apple GPU (MPS) arm64</a>
-<a class="n" href="nvidia-a100-sxm4-80gb.html">NVIDIA A100-SXM4-80GB</a>
-<a class="n" href="nvidia-geforce-rtx-4090.html">NVIDIA GeForce RTX 4090</a>
-<a class="n" href="nvidia-h100-80gb-hbm3.html">NVIDIA H100 80GB HBM3</a>
-<a class="n" href="nvidia-h200.html">NVIDIA H200</a>
-<a class="n" href="nvidia-rtx-a5000.html">NVIDIA RTX A5000</a>
-<div class="grp">THE METHOD</div>
-<a class="n" href="../index.html#method">How a chip is tested</a>
-<a class="n" href="../index.html#run">Run it on your chip</a>
+<button class="menu" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+<nav id="nav" aria-label="Site">
+<a href="../learn.html">Learn</a>
+<a href="../method.html">Method</a>
+<a href="../results.html">Results</a>
+<a href="../chips/index.html" aria-current="page">Chips</a>
+<a href="../run.html">Run it</a>
+<a href="../about.html">About</a>
 </nav>
-<main id="top">
-<div class="wrap">
-<div class="hero">
-<div class="crumb"><a href="../index.html">chipintegrity.org</a> / chips</div>
-<div class="kicker">EVIDENCE</div>
-<h1>Every chip measured</h1>
-<p class="lede">One page per chip, each generated from its result files: what was run, how close every precision
-came to its proven error limit, and proof that every planted fault was caught.</p>
+<a class="gh" href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>
 </div>
-<div class="grid3"><a class="panel chipcard" href="apple-gpu-mps-arm64.html"><h3>Apple GPU (MPS) arm64</h3><p>Tested 10 October 2026. 1,785 compute runs, 0 silent faults, 264 of 264 planted faults caught.</p></a><a class="panel chipcard" href="nvidia-a100-sxm4-80gb.html"><h3>NVIDIA A100-SXM4-80GB</h3><p>Tested 7 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="nvidia-geforce-rtx-4090.html"><h3>NVIDIA GeForce RTX 4090</h3><p>Tested 11 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="nvidia-h100-80gb-hbm3.html"><h3>NVIDIA H100 80GB HBM3</h3><p>Tested 10 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="nvidia-h200.html"><h3>NVIDIA H200</h3><p>Tested 8 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="nvidia-rtx-a5000.html"><h3>NVIDIA RTX A5000</h3><p>Tested 11 October 2026. 2,055 compute runs, 0 silent faults, 297 of 297 planted faults caught.</p></a></div>
-</div>
-<footer>Page generated from the result files on 2026-10-15. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</footer>
+</header>
+<main id="content">
+<div class="wrap"><div class="pagehead"><div class="crumb"><a href="../index.html">chipintegrity.org</a> / chips</div><div class="kicker">EVIDENCE</div><h1>Every chip measured</h1><p class="lede">One page per chip, each generated from its result files: what was run, how close every precision came to its proven error limit, and proof that every planted fault was caught.</p></div><section class="reveal"><div class="grid3"><a class="panel chipcard" href="apple-gpu-mps-arm64.html"><h3>Apple GPU (MPS) arm64</h3><p>Tested 10 October 2026. 1,785 compute runs, 0 silent faults, 264 of 264 planted faults caught.</p></a><a class="panel chipcard" href="nvidia-a100-sxm4-80gb.html"><h3>NVIDIA A100-SXM4-80GB</h3><p>Tested 7 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="nvidia-geforce-rtx-4090.html"><h3>NVIDIA GeForce RTX 4090</h3><p>Tested 11 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="nvidia-h100-80gb-hbm3.html"><h3>NVIDIA H100 80GB HBM3</h3><p>Tested 10 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="nvidia-h200.html"><h3>NVIDIA H200</h3><p>Tested 8 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="nvidia-rtx-a5000.html"><h3>NVIDIA RTX A5000</h3><p>Tested 11 October 2026. 2,055 compute runs, 0 silent faults, 297 of 297 planted faults caught.</p></a></div></section></div>
 </main>
+<footer class="foot">
+<div class="footin">
+<div><div class="brand">chip<b>integrity</b>.org</div><p>Open tests for silent computation errors in AI chips. MIT licensed. Every number on this site is read from a public result file.</p></div>
+<div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="../index.html">Home</a><a href="../learn.html">Learn</a><a href="../method.html">Method</a><a href="../results.html">Results</a><a href="../chips/index.html">Chips</a><a href="../run.html">Run it</a><a href="../about.html">About</a></nav></div>
+<div><div class="fh">CITE</div><p>Yasha Khandelwal, ai-chip-integrity, version 0.4.2, 2026, <a href="https://doi.org/10.5281/zenodo.23393790">https://doi.org/10.5281/zenodo.23393790</a></p></div>
 </div>
+<div class="footbase">Page generated from the result files on 2026-10-15. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>
+</footer>
+<script src="../assets/site.js"></script>
 </body>
 </html>

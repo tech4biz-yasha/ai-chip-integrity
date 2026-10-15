@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How a chip is tested | Chip Integrity</title>
+<meta name="description" content="Every probe follows the same idea: run real AI maths many times, check each answer two ways, and prove the checks work by planting faults on purpose. This page walks through each probe, how a verdict is read, the self-test, and what a PASS can and cannot tell you.">
+<meta name="author" content="Yasha Khandelwal">
+<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
+<link rel="canonical" href="https://chipintegrity.org/method.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="How a chip is tested | Chip Integrity">
+<meta property="og:description" content="Every probe follows the same idea: run real AI maths many times, check each answer two ways, and prove the checks work by planting faults on purpose. This page walks through each probe, how a verdict is read, the self-test, and what a PASS can and cannot tell you.">
+<meta property="og:url" content="https://chipintegrity.org/method.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+
+</head>
+<body data-page="method">
+<a class="skip" href="#content">Skip to content</a>
+<header class="top">
+<div class="topin">
+<a class="brand" href="index.html">chip<b>integrity</b>.org</a>
+<button class="menu" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+<nav id="nav" aria-label="Site">
+<a href="learn.html">Learn</a>
+<a href="method.html" aria-current="page">Method</a>
+<a href="results.html">Results</a>
+<a href="chips/index.html">Chips</a>
+<a href="run.html">Run it</a>
+<a href="about.html">About</a>
+</nav>
+<a class="gh" href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>
+</div>
+</header>
+<main id="content">
+<div class="wrap"><div class="pagehead"><div class="kicker">METHOD</div><h1>The method behind every verdict</h1><p class="lede">Every probe follows the same idea: run real AI maths many times, check each answer two ways, and prove the checks work by planting faults on purpose. This page walks through each probe, how a verdict is read, the self-test, and what a PASS can and cannot tell you.</p><div class="learnh">ON THIS PAGE YOU WILL LEARN</div><ol class="learn"><li>The probes, and what each one exercises</li><li>The two checks behind every verdict: a proven error bound and a bit-for-bit repeat</li><li>How the self-test shows a clean result means something</li><li>What a PASS means, and its limits</li></ol></div>
+<section id="method" class="reveal">
+<div class="kicker">LEARN, PART 3 OF 5</div>
+<h2>How a chip is tested here</h2>
+<p class="lede">Six probes so far, numbered as on the roadmap. Probe 1 makes the chip multiply matrices and judges every output element. Probe 2 fills the chip's memory with known values and reads every one back. Probe 3 checks the other kernels inside a transformer the same way as probe 1. Probe 6 has the chip compute checksums inside the same multiply, so a wrong element can be caught and located without any reference. Probe 9 feeds the matrix multiply inputs built to reach particular bits. Probe 11 reads the chip's own error counters around every run and asks whether the hardware noticed. The compute, kernel and pattern probes run two independent checks on every output, and the checksum probe adds a third, so a fault has to hide from all of them.</p>
+
+<h3>Probe 1: compute</h3>
+<p>The chip multiplies two fixed matrices, A and B, fifty times at each of three shapes and four precisions, plus FP8. Two checks run on every output.</p>
+<div class="fig">
+<svg viewBox="0 0 1000 250" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, ui-monospace, Menlo, monospace" font-size="12">
+<rect x="20" y="88" width="170" height="64" fill="none" stroke="#2B3B5E"/><text x="36" y="114" fill="#E8ECF4">fixed inputs A, B</text><text x="36" y="134" fill="#93A0BA">seeded, rounded</text>
+<line class="pulse" x1="190" y1="120" x2="250" y2="120" stroke="#39B9EE" stroke-width="2"/>
+<rect x="250" y="88" width="170" height="64" fill="none" stroke="#2B3B5E"/><text x="266" y="114" fill="#E8ECF4">chip computes</text><text x="266" y="134" fill="#93A0BA">C = A @ B, 50 times</text>
+<line class="pulse" x1="420" y1="108" x2="490" y2="68" stroke="#39B9EE" stroke-width="2"/>
+<line class="pulse" x1="420" y1="132" x2="490" y2="172" stroke="#39B9EE" stroke-width="2"/>
+<rect x="490" y="36" width="270" height="64" fill="none" stroke="#2B3B5E"/><text x="506" y="62" fill="#E8ECF4">reference check</text><text x="506" y="82" fill="#93A0BA">every element inside the bound?</text>
+<rect x="490" y="140" width="270" height="64" fill="none" stroke="#2B3B5E"/><text x="506" y="166" fill="#E8ECF4">repeat check</text><text x="506" y="186" fill="#93A0BA">every run bit-identical to run 0?</text>
+<line class="pulse" x1="760" y1="68" x2="820" y2="108" stroke="#39B9EE" stroke-width="2"/>
+<line class="pulse" x1="760" y1="172" x2="820" y2="132" stroke="#39B9EE" stroke-width="2"/>
+<rect x="820" y="88" width="160" height="64" fill="none" stroke="#2BD7B3"/><text x="836" y="114" fill="#2BD7B3">verdict</text><text x="836" y="134" fill="#93A0BA">one per step</text>
+<text x="20" y="230" fill="#5E6B86">The CPU computes the same product in float64 as the reference. The chip never sees it.</text>
+</svg>
+<div class="cap">The checks are independent. A large error fails the reference check. A tiny one, even a single bit, fails the repeat check because the first run and the later run no longer match.</div>
+</div>
+<div class="grid2">
+<div class="panel">
+<h3>The reference check, in plain words</h3>
+<p>Floating point arithmetic rounds at every step, so two correct computers can legitimately differ in the last digit. The question is how different they are allowed to be. Numerical analysis has a proven answer: for a dot product of length K, the rounding error can never exceed a bound that depends only on K, the precision and how the hardware rounds. Every element of the chip's result is compared with a float64 reference and must sit inside that bound. For int8 the arithmetic is exact, so the bound is zero.</p>
+<div class="formula">|C − R| ≤ acc + u_out·(|R| + acc)<br>acc = g·(|A|@|B|)<br>g = n·u / (1 − n·u)<br>fp32: n = K, u = 2⁻²⁴<br>fp16, bf16: n = 2K, u = 2⁻²³<br>u_out: 2⁻²⁴ fp32, 2⁻¹¹ fp16, 2⁻⁸ bf16<br>int8, FP8: exact, bound 0</div>
+<p>fp32 runs on the FP32 fused multiply-add units with TF32 off. fp16 and bf16 run on tensor cores, which round by truncation rather than to nearest and add in blocks, as Fasi, Higham, Mikaitis and Pranesh measured, so they get the wider allowance. Every fp16 and bf16 row measured with v0.2.0 also passed a bound four times tighter than this one. An element outside the bound is a wrong answer, not a difference of opinion about tolerance.</p>
+</div>
+<div class="panel">
+<h3>The repeat check, in plain words</h3>
+<p>The same inputs through the same chip should give the same bits every time. Run 0 is kept, and every later run is compared bit for bit. This catches an intermittent fault far too small to leave the bound, because the two runs simply no longer match. On the chips measured so far every run matched, which is itself a useful fact: the matrix kernels on these chips are deterministic.</p>
+</div>
+</div>
+
+<h3>Probe 2: memory</h3>
+<p>The matrix multiply touches a few megabytes. Most of an 80 GB chip is memory, and a bad row or a stuck bit there corrupts whatever lands on it. The memory probe fills most of the device memory, writes a known value into every 32-bit word, waits, and reads every word back.</p>
+<div class="fig">
+<div style="padding:22px 24px 10px">
+<div style="font-family:var(--mono);font-size:12px;color:var(--dim);margin-bottom:10px">DEVICE MEMORY, ONE PATTERN PASS</div>
+<div style="height:18px;background:#15213A;border:1px solid var(--line2);position:relative;overflow:hidden"><div class="fill" style="height:100%;background:linear-gradient(90deg,#1E6F94,#39B9EE);width:0"></div></div>
+<div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:8px"><span>write the pattern into every word</span><span>dwell 2 s</span><span>read back, compare exactly</span></div>
+</div>
+<div style="padding:4px 24px 18px">
+<div style="font-family:var(--mono);font-size:12px;color:var(--dim);margin:14px 0 10px">SIX PATTERNS, IN ORDER</div>
+<div class="pats">
+<div><b>all zeros</b><span>every bit 0</span></div>
+<div><b>all ones</b><span>every bit 1</span></div>
+<div><b>0xAAAAAAAA</b><span>1010 1010 ...</span></div>
+<div><b>0x55555555</b><span>0101 0101 ...</span></div>
+<div><b>address hash</b><span>each word unique</span></div>
+<div><b>inverse hash</b><span>each bit flipped</span></div>
+</div>
+<div style="font-size:13.5px;color:var(--dim);margin-top:14px">Together they drive every bit to 0 and to 1 while its neighbours hold the opposite, which is what exposes stuck bits, coupled cells and weak rows.</div>
+</div>
+<div class="cap">For each failing word the probe records the byte offset and the bits that differed, so a stuck bit shows as a single mask such as 0x00000020 at a known address.</div>
+</div>
+<h3>Probe 3: transformer kernels</h3>
+<p>Matrix multiply uses the multiply-accumulate units. A transformer block also runs exponentials, divisions, square roots, error functions, sines and cosines, which live on different silicon, and the research says faults are data-dependent: a unit that multiplies correctly can still get a softmax wrong. The kernel probe runs five of them with the device's own kernels, including its attention kernel, and judges every output element the same two ways.</p>
+<div class="grid2">
+<div class="panel"><h3>Softmax</h3><p>Rows of logits. Exercises exp, a sum reduction and a divide. The bound follows the error of each exponential through the sum and the quotient.</p></div>
+<div class="panel"><h3>Layer norm</h3><p>Mean, variance, reciprocal square root, scale and shift. The variance allowance is sized for the two-pass, Welford and E[x²]&minus;&mu;² methods, so a correct implementation of any of them passes.</p></div>
+<div class="panel"><h3>GELU</h3><p>The erf form, elementwise. The bound comes from the argument scaling, the erf itself and three roundings.</p></div>
+<div class="panel"><h3>Rotary embeddings</h3><p>How most current language models encode token position. The device takes sin and cos of real angles, up to 4,095 radians at the default size, then rotates each pair of values. Large angles test the argument reduction inside sin and cos.</p></div>
+<div class="panel" style="grid-column:1/-1"><h3>Attention</h3><p>softmax(QK<sup>T</sup>/&radic;d)V through the device's fused attention kernel. The bound carries the tensor-core error of QK<sup>T</sup> through the softmax, allows for the running rescale fused kernels apply block by block, and for P being held in fp16 or bf16. That is why it is the widest.</p></div>
+</div>
+<p>Every bound on this site follows from one written arithmetic model, recorded in every result file: FP32 arithmetic rounds to nearest, tensor cores accumulate faithfully in FP32, exp, divide and square roots stay within eight ulps, and erf, sin and cos within 2<sup>&minus;20</sup> absolute, which admits the shortcut erf that PyTorch uses on ARM processors. Each step also measures the device's own exp, erf, sin and cos on its inputs, so a loose function library can be told apart from a faulty unit. CUDA's own math library documents errors well inside that. A device that breaks the model, or that substitutes an approximate GELU, shows as outside-error-bound on every run, and the message says so. Below the smallest normal value of the output type the bound becomes an absolute floor, because fp16 cannot represent a probability of 10<sup>&minus;8</sup> and no chip should be blamed for that.</p>
+<h3>Probe 6: checksum-protected matrix multiply</h3>
+<p>Huang and Abraham showed in 1984 that a multiply can check itself. Append to A a row holding its column sums, append to B a column holding its row sums, and one multiply returns C together with C's own row sums and column sums, computed by the same hardware in the same pass. A wrong element breaks exactly one row check and one column check, and where they cross is the element. No reference answer is needed, so the check can run inside real work for the cost of one extra row and column, and it is the design that later becomes a block in silicon.</p>
+<div class="formula">A' = [ A ; 2⁻ˢ·(column sums of A) ]<br>B' = [ B , 2⁻ˢ·(row sums of B) ]<br>A'·B' = [ C , 2⁻ˢ·(row sums of C) ;<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2⁻ˢ·(column sums of C) , … ]</div>
+<p>In floating point, rounding makes a correct row sum differ slightly from its checksum, so everything depends on the threshold. Here each threshold is derived element by element from the same arithmetic model as every other bound, and the host removes the known rounding of the checksums exactly, so a correct chip can never cross it. The power of two 2⁻ˢ keeps the checksums from overflowing near the top of the range. The probe also measures its own blind spot: a rectangle of four errors that cancel in every row and column sum is invisible to checksums, so any run the reference check fails while the checksums hold is counted, never passed.</p>
+<h3>Probe 9: data patterns</h3>
+<p>Some faults only fire on particular bit patterns, and uniform random inputs almost never produce them. The data pattern probe runs the same matrix multiply, with the same two checks and the same proven or exact reference, on inputs built to reach specific parts of the arithmetic. Every input set is scaled by a power of two where needed, so no partial sum in any order can overflow.</p>
+<div class="verdict">
+<div class="v">wide</div><div>Random exponents across about 80 binades, which exercises the shifters that line numbers up before they are added.</div>
+<div class="v">mantissa</div><div>Every mantissa bit set to 1, the longest carry chains a multiplier or adder can see.</div>
+<div class="v">cancel</div><div>Built so the exact answer is zero, so only rounding may remain in the result.</div>
+<div class="v">alternate</div><div>Checkerboard signs, which make every product in a dot product the same sign, so sums grow to their largest.</div>
+<div class="v">sparse</div><div>Nine values in ten are exact zeros, for the logic that handles and skips zeros.</div>
+<div class="v">subnormal</div><div>Inputs below the smallest normal number. The probe first measures, at the step's own shape, whether the chip flushes them to zero, then holds it to the exact model that matches, with no allowance for the other. Shape matters because libraries pick kernels by shape, and kernels differ.</div>
+<div class="v">near_max</div><div>Scaled so the largest possible sum is a quarter to a half of the output type's maximum.</div>
+<div class="v">extremes</div><div>int8 only: &minus;128, &minus;127, 0 and 127, the corners of the integer multiplier.</div>
+</div>
+<p>FP8 keeps its inputs in {&minus;1, 0, 1} so its answers stay exact, so it runs the alternate and sparse patterns only.</p>
+<h3>Probe 11: error counters</h3>
+<p>A silent error is one the chip does not notice. So every run of the other probes reads the chip's own error counters at its start and its end: ECC counts, remapped memory rows and retired pages, with temperature, clock and power beside them. Then it asks whether the hardware noticed what the probe noticed. Wrong answers with every counter quiet are a silent error in the strict sense, the case ECC and the error logs cannot see. The counters come from NVIDIA's management library, so on other chips the probe records that none are available. On a card with ECC switched off, as on the RTX 4090 and RTX A5000 measured here, the counters cannot record memory errors at all, and the probe says so instead of calling them quiet.</p>
+</section>
+
+<section id="verdicts" class="reveal">
+<div class="kicker">LEARN, PART 4 OF 5</div>
+<h2>Reading a verdict</h2>
+<p class="lede">Every step ends in one of these words. They are chosen so a reader can tell a chip fault from a software quirk without opening the file.</p>
+<h3>Compute, kernel, checksum and data pattern probes</h3>
+<div class="verdict">
+<div class="v">no-silent-errors</div><div>Every run inside the bound and bit-identical to run 0. The baseline.</div>
+<div class="v bad">silent-data-corruption</div><div>Some runs differ from run 0. An intermittent fault, the kind a fleet scanner exists to find.</div>
+<div class="v bad">outside-error-bound</div><div>All runs agree with each other but sit outside the proven bound. A faulty unit, a device accumulating below FP32, or for the kernel probe an exp, erf or GELU that is less accurate than assumed.</div>
+<div class="v warn">nondeterministic-kernel</div><div>Many runs differ, yet all stay inside the bound. The kernel is not repeatable on that device and precision, so the repeat check cannot be used there. Reported as a finding, not a fault.</div>
+</div>
+<h3>Error counters, every run</h3>
+<div class="verdict">
+<div class="v">counters-quiet</div><div>No counter moved and every answer was right.</div>
+<div class="v bad">silent-error-confirmed</div><div>Wrong answers, and every counter stayed quiet. The hardware did not notice.</div>
+<div class="v bad">hardware-noticed</div><div>Wrong answers, and a counter moved too.</div>
+<div class="v warn">corrected-during-run</div><div>Every answer was right, but the hardware corrected errors during the run. Worth watching on a healthy chip.</div>
+<div class="v bad">uncorrected-during-run</div><div>The hardware recorded uncorrected errors. A fault even if the answers held.</div>
+<div class="v warn">ecc-off</div><div>ECC is switched off on the device, so its memory error counters cannot move and their silence proves nothing. The probes' own checks still stand.</div>
+<div class="v">counters-unavailable</div><div>The device has no error counters to read, such as an Apple GPU or a CPU. Never fails a run.</div>
+</div>
+<h3>Memory probe</h3>
+<div class="verdict">
+<div class="v">no-memory-errors</div><div>Every word read back correctly on every pattern.</div>
+<div class="v bad">memory-errors</div><div>At least one word differed. The measurements say which patterns and the log says where.</div>
+</div>
+<h3>Self-test</h3>
+<div class="verdict">
+<div class="v">injection-self-test-pass</div><div>Every injected fault was caught and nothing else fired. A row is only published alongside one of these.</div>
+<div class="v bad">injection-self-test-fail</div><div>The tester missed something it planted. The row is not publishable until that is understood.</div>
+</div>
+</section>
+
+<section id="selftest" class="reveal">
+<div class="kicker">EVIDENCE</div>
+<h2>The self-test</h2>
+<p class="lede">A clean table is only worth something if the tester can show it would have seen a fault. So every row is paired with an injection run.</p>
+<svg class="flow" viewBox="0 0 990 150" role="img" aria-label="run on the chip then plant a fault then check it twice then caught"><rect class="node" x="10" y="26" width="220" height="86" rx="6"/><text class="lab" x="28" y="60">RUN ON THE CHIP</text><text class="sub" x="28" y="86">result copied back</text><path class="wire draw" d="M230 69 L260 69"/><rect class="node" x="260" y="26" width="220" height="86" rx="6"/><text class="lab" x="278" y="60">PLANT A FAULT</text><text class="sub" x="278" y="86">one bit, or NVIDIA's pattern</text><path class="wire draw" d="M480 69 L510 69"/><rect class="node" x="510" y="26" width="220" height="86" rx="6"/><text class="lab" x="528" y="60">CHECK IT TWICE</text><text class="sub" x="528" y="86">bound and repeat</text><path class="wire draw" d="M730 69 L760 69"/><rect class="node" x="760" y="26" width="220" height="86" rx="6"/><text class="lab okt" x="778" y="60">CAUGHT</text><text class="sub" x="778" y="86">or the step fails</text><circle class="dot move" cx="120" cy="69" r="6" style="--d:750px"/></svg>
+
+<div class="grid2">
+<div class="panel"><h3>Compute self-test</h3><p>In five of the fifty runs a fault is planted before the checks run, and all five must be caught. Since v0.4.2 the five alternate between two kinds. Three flip one random bit of one random output element, which can be anywhere: sign, exponent or the lowest mantissa bit. Two follow NVIDIA's gate-level fault injection study of a data-center GPU (Tung et al., DSN 2026): one warp-aligned group of 32 outputs is hit at a regular spacing, and each value hit is zeroed, has several bits flipped, or, rarely, turns into NaN or infinity, in the proportions that study measured. On the chips measured so far, with the v0.2.0 bound, the reference check alone caught 46 of every 60 single-bit flips and the repeat check caught all 60. That is why there are two checks.</p></div>
+<div class="panel"><h3>Memory self-test</h3><p>After each pattern is written, five random bits in five random words of real device memory are flipped. The sweep must locate all of them by address. Because the flips happen in device memory, this exercises the actual read-back path, not only the comparison code.</p></div>
+</div>
+<div class="panel"><h3>NVIDIA's fault patterns on a real GPU</h3><p>The faults in NVIDIA's study are permanent: a broken unit gives the same wrong answer on every run, so comparing runs cannot catch them and the reference check has to. On 15 October 2026 the compute probe ran on a rented RTX 4090 with only the NVIDIA-shaped faults, 49 in each of six precisions (fp32, fp16, bf16, int8, FP8 and fast-accumulation FP8) at 1024×1024×1024. The reference check alone flagged all 294. Because it judges each run on its own, the same faults would be flagged if they repeated on every run. <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/evidence/rtx4090_gpu_sdc_reference.jsonl">Result file</a></p></div>
+</section>
+
+<section id="limits" class="reveal">
+<div class="kicker">EVIDENCE</div>
+<h2>What a PASS means, and does not</h2>
+<ul class="plain">
+<li><b>It means:</b> no silent error appeared in these matrix multiplies, these checksums, these data patterns, these transformer kernels and this memory sweep, in these runs, on this device, on this day.</li>
+<li><b>It does not mean:</b> the chip is healthy. Faults that depend on heat or on hours of load are not yet exercised, and the data patterns so far cover the matrix multiply only. The next probes add them.</li>
+<li><b>Arithmetic model:</b> every bound assumes FP32 arithmetic that rounds to nearest, tensor cores that accumulate faithfully in FP32, exp, divide and square roots within eight ulps, and erf, sin and cos within 2<sup>&minus;20</sup> absolute. A device that breaks the model shows as outside-error-bound on every run, and the message says so.</li>
+<li><b>One device per run:</b> links between chips are not yet tested.</li>
+<li><b>Self-test scope:</b> the compute injection corrupts the output after it leaves the device, so it proves the checker, not the chip. The memory injection corrupts device memory itself.</li>
+</ul>
+</section>
+</div>
+</main>
+<footer class="foot">
+<div class="footin">
+<div><div class="brand">chip<b>integrity</b>.org</div><p>Open tests for silent computation errors in AI chips. MIT licensed. Every number on this site is read from a public result file.</p></div>
+<div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="index.html">Home</a><a href="learn.html">Learn</a><a href="method.html">Method</a><a href="results.html">Results</a><a href="chips/index.html">Chips</a><a href="run.html">Run it</a><a href="about.html">About</a></nav></div>
+<div><div class="fh">CITE</div><p>Yasha Khandelwal, ai-chip-integrity, version 0.4.2, 2026, <a href="https://doi.org/10.5281/zenodo.23393790">https://doi.org/10.5281/zenodo.23393790</a></p></div>
+</div>
+<div class="footbase">Page generated from the result files on 2026-10-15. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>
+</footer>
+<script src="assets/site.js"></script>
+</body>
+</html>

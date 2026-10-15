@@ -3,7 +3,8 @@
 This folder is a complete static site. No build step, no server code, no database.
 
 Files
-- index.html      the home page, self-contained (fonts load from Google Fonts)
+- index.html      the home page; learn.html, method.html, results.html, run.html and about.html are the other pages
+- assets/         site.css and site.js, shared by every page (fonts load from Google Fonts)
 - chips/          one page per measured chip (chips/<chip>.html) and chips/index.html listing them all
 - robots.txt      allows all crawlers, points to the sitemap
 - sitemap.xml

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Run it on your chip | Chip Integrity</title>
+<meta name="description" content="The same tests run on an NVIDIA GPU, an Apple GPU or a CPU with one command. This page shows how to install and run them, and what is planned next.">
+<meta name="author" content="Yasha Khandelwal">
+<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
+<link rel="canonical" href="https://chipintegrity.org/run.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Run it on your chip | Chip Integrity">
+<meta property="og:description" content="The same tests run on an NVIDIA GPU, an Apple GPU or a CPU with one command. This page shows how to install and run them, and what is planned next.">
+<meta property="og:url" content="https://chipintegrity.org/run.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+
+</head>
+<body data-page="run">
+<a class="skip" href="#content">Skip to content</a>
+<header class="top">
+<div class="topin">
+<a class="brand" href="index.html">chip<b>integrity</b>.org</a>
+<button class="menu" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+<nav id="nav" aria-label="Site">
+<a href="learn.html">Learn</a>
+<a href="method.html">Method</a>
+<a href="results.html">Results</a>
+<a href="chips/index.html">Chips</a>
+<a href="run.html" aria-current="page">Run it</a>
+<a href="about.html">About</a>
+</nav>
+<a class="gh" href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>
+</div>
+</header>
+<main id="content">
+<div class="wrap"><div class="pagehead"><div class="kicker">TAKE PART</div><h1>Test your own chip</h1><p class="lede">The same tests run on an NVIDIA GPU, an Apple GPU or a CPU with one command. This page shows how to install and run them, and what is planned next.</p><div class="learnh">ON THIS PAGE YOU WILL LEARN</div><ol class="learn"><li>How to install the tester and run every probe on your own chip</li><li>What is planned next on the roadmap</li></ol></div>
+<section id="run" class="reveal">
+<div class="kicker">TAKE PART</div>
+<h2>Run it on your chip</h2>
+<p class="lede">One command, ten result files, one pull request. Works on CUDA, Apple MPS and CPU today.</p>
+<pre><span class="c"># install once, in its own virtual environment (Python 3.10 or newer)</span>
+python3 -m venv chip-env &amp;&amp; source chip-env/bin/activate
+pip install ai-chip-integrity
+
+<span class="c"># a one-minute smoke test: every probe and its self-test at small sizes</span>
+chip-integrity run --quick
+
+<span class="c"># the full run: every probe and its self-test, ten OCP result files</span>
+chip-integrity run --name NAME
+
+<span class="c"># or, on an NVIDIA GPU host with Docker, with nothing else installed</span>
+docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.4.2 run --name NAME --out-dir /results</pre>
+<p class="note">On many Macs the built-in <code>python3</code> is version 3.9, which pip skips. Install a newer Python from python.org or with Homebrew first, then create the environment with its versioned command, for example <code>python3.12 -m venv chip-env</code>.</p>
+<p class="note">The same ten files come from running each probe by hand from a clone of the repository, for example <code>python screen.py --out NAME_clean.jsonl</code> and then <code>python screen.py --inject 5 --out NAME_inject.jsonl</code> for its self-test. The README lists all ten commands.</p>
+<ol class="steps">
+<li><b>Open a pull request</b> with the ten files, the device name, driver version and PyTorch version.</li>
+<li><b>Rows are added only from attached files.</b> The table is regenerated from them, so a row cannot say more than its file does.</li>
+<li><b>Found a fault?</b> Open an issue with the file. A real finding on real hardware is the most useful thing anyone can contribute.</li>
+</ol>
+<p class="note">The output follows the OCP Test and Validation spec v2.0 through the official <code>ocptv</code> library, and the test suite validates it against the published schema.</p>
+</section>
+
+<section id="roadmap" class="reveal">
+<div class="kicker">TAKE PART</div>
+<h2>Roadmap</h2>
+<p class="lede">Twelve probes, each aimed at one part of the chip. Six are built: 1, 2, 3, 6, 9 and 11.</p>
+<div class="road">
+<div class="r done"><b>1. Matrix multiply</b><span>Three shapes, four precisions plus FP8, a proven or exact reference and a bit-exact repeat check. Done. FP4 once a Blackwell card is measured.</span></div>
+<div class="r done"><b>2. Memory pattern sweep</b><span>Six patterns over most of device memory, exact read-back, address and bit mask on every miss. Done. On-chip SRAM next.</span></div>
+<div class="r done"><b>3. Transformer kernels</b><span>Softmax, layer norm, GELU, rotary embeddings and the fused attention kernel against a float64 reference with derived bounds. Done.</span></div>
+<div class="r now"><b>4. Full model forward pass</b><span>A small LLM, every layer checked against a CPU float64 reference. Each layer is fed the device's own input, so its bound stays as tight as a single kernel's.</span></div>
+<div class="r"><b>5. Reductions, all-reduce and copy engines</b><span>Sums across threads, blocks and then GPUs over NVLink and PCIe, with checksums that must agree at both ends, plus copies of known patterns between host and device.</span></div>
+<div class="r done"><b>6. Checksum-protected matrix multiply</b><span>Huang and Abraham's row and column checksums, which detect and locate a wrong element inside the multiply itself, with proven thresholds and the blind spot measured. Done.</span></div>
+<div class="r"><b>7. Hours under load</b><span>The same probes for hours at full power, with temperature and clocks logged next to every result.</span></div>
+<div class="r"><b>8. Clock and voltage margin sweep</b><span>Lower the margin step by step where the driver allows it and record where each unit starts to fail. Likely needs bare-metal access.</span></div>
+<div class="r done"><b>9. Data pattern library</b><span>Wide exponents, full mantissas, cancellation, alternating signs, sparsity, subnormals with flush detection, near-overflow and int8 extremes, for the matrix multiply. Done. Patterns for the transformer kernels next.</span></div>
+<div class="r"><b>10. Fault injection inside the computation</b><span>Flip bits in registers during the multiply to measure how often a flip becomes a wrong answer. The basis for a space radiation column.</span></div>
+<div class="r done"><b>11. ECC and error counters</b><span>Every run of every probe reads the chip's counters before and after and records whether the hardware noticed what the probe noticed. Done. First real test on the H100 on 10 October 2026: every ECC and row-remap counter quiet. On 11 October the RTX 4090 and RTX A5000 ran with ECC off, which added the ecc-off verdict.</span></div>
+<div class="r"><b>12. Recovery</b><span>After a detected fault, reset and rerun on the same card to see whether the fault clears. Likely needs bare-metal access.</span></div>
+<div class="r"><b>Fleet mode</b><span>Run every probe across many devices automatically and collect the files. Fault rates are per thousand units, so volume is how they get found.</span></div>
+<div class="r"><b>Vendor comparison</b><span>Run NVIDIA DCGM and AMD AGFHC on the same device and record what each catches.</span></div>
+</div>
+</section>
+</div>
+</main>
+<footer class="foot">
+<div class="footin">
+<div><div class="brand">chip<b>integrity</b>.org</div><p>Open tests for silent computation errors in AI chips. MIT licensed. Every number on this site is read from a public result file.</p></div>
+<div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="index.html">Home</a><a href="learn.html">Learn</a><a href="method.html">Method</a><a href="results.html">Results</a><a href="chips/index.html">Chips</a><a href="run.html">Run it</a><a href="about.html">About</a></nav></div>
+<div><div class="fh">CITE</div><p>Yasha Khandelwal, ai-chip-integrity, version 0.4.2, 2026, <a href="https://doi.org/10.5281/zenodo.23393790">https://doi.org/10.5281/zenodo.23393790</a></p></div>
+</div>
+<div class="footbase">Page generated from the result files on 2026-10-15. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>
+</footer>
+<script src="assets/site.js"></script>
+</body>
+</html>

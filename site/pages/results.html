@@ -1,0 +1,38 @@
+{{INTRO}}
+<section id="results">
+<div class="kicker">EVIDENCE</div>
+<h2>Measured results</h2>
+<p class="lede">Every row comes from a result file in the repository, and the tables are generated from those files. Nothing here is modelled or estimated.</p>
+<h3 id="chips">One page per chip</h3>
+<p class="note">Each chip has its own page with every step of every probe, the setup, the self-test and the result files. <a href="chips/index.html">All chips on one page</a>.</p>
+<div class="grid3">{{CHIP_CARDS}}</div>
+<h3>Compute probe</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Device</th><th>Date</th><th>Shapes (M×K×N)</th><th>Precisions</th><th>Runs</th><th>Silent faults</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
+<tbody>{{COMPUTE_ROWS}}</tbody>
+</table></div>
+<h3>Kernel probe</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Device</th><th>Date</th><th>Kernels</th><th>Precisions</th><th>Runs</th><th>Worst error / bound</th><th>Silent faults</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
+<tbody>{{KERNEL_ROWS}}</tbody>
+</table></div>
+<p class="note">Worst error over bound is the largest measured error on the device divided by the bound at that element, across every kernel and precision. Values near 1 at fp16 and bf16 are expected: there the bound is dominated by the single rounding of the output, so there is almost nothing to spare. A value above 1 is a failed run. On NVIDIA GPUs the row also names the fused attention kernel that ran in each precision: flash, cuDNN or memory-efficient.</p>
+<h3>Checksum probe</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Device</th><th>Date</th><th>Shapes</th><th>Precisions</th><th>Runs</th><th>Silent faults</th><th>Blind-spot runs</th><th>Threshold / typical value</th><th>Injected located</th><th>Verdict</th><th>Files</th></tr></thead>
+<tbody>{{CHECKSUM_ROWS}}</tbody>
+</table></div>
+<p class="note">Threshold over typical value is how large an error must be, compared with a typical element of C, before a proven checksum is guaranteed to see it, at the worst precision and shape. It is set by the shape, the precision and the arithmetic model, not by the chip's answers, because the threshold adds up the worst-case rounding of every element in a row: on the H100 it runs from 2.3 (fp32 at 1024×1024×1024) to 827 (bf16 at 32×4096×11008). Below it, the reference and repeat checks carry the smaller faults. Blind-spot runs are runs the reference check failed while every checksum held.</p>
+<h3>Data pattern probe</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Device</th><th>Date</th><th>Patterns</th><th>Precisions</th><th>Runs</th><th>Silent faults</th><th>Injected caught</th><th>Subnormal inputs</th><th>Verdict</th><th>Files</th></tr></thead>
+<tbody>{{PATTERN_ROWS}}</tbody>
+</table></div>
+<p class="note">Subnormal inputs says whether the chip kept or flushed subnormal inputs to zero, per precision and measured at each shape. Either is allowed; the probe measures which, then checks the chip against that exact model. Mixed means a kernel kept them in some places and flushed them in others.</p>
+<h3>Memory probe</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Device</th><th>Date</th><th>Memory tested</th><th>Patterns</th><th>Dwell</th><th>Bad words</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
+<tbody>{{MEMORY_ROWS}}</tbody>
+</table></div>
+<p class="note">Rented data centre GPUs are young, monitored and already screened, so clean rows are the expected result there. The research says faults concentrate in aged units and appear under data-dependent, long, hot workloads. Those are the next probes on the roadmap, and where the first real findings are expected.</p>
+</section>

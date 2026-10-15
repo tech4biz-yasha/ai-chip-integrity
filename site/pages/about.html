@@ -1,0 +1,26 @@
+{{INTRO}}
+<section id="research">
+<div class="kicker">TAKE PART</div>
+<h2>Research and standards this builds on</h2>
+<ul class="plain">
+<li><b>Zheng et al., OSDI 2026.</b> SDCs in the Wild: characterising and diagnosing SDC-defective GPUs in production LLM training. The source of the finding that microbenchmark screening misses most faulty units. <a href="https://www.usenix.org/conference/osdi26/presentation/zheng">usenix.org</a></li>
+<li><b>Lei et al., OSDI 2026.</b> Safeguarding LLM Training at Scale: online SDC detection and insights from 35 million GPU hours. <a href="https://www.usenix.org/conference/osdi26/presentation/lei">usenix.org</a></li>
+<li><b>Tung, Huang, Saxena, Shirvani, Hukerikar, Jain, Tyagi and Gongalore, DSN 2026.</b> The Anatomy of Silent Data Corruption: GPU error pattern study and modeling guidance. Gate-level fault injection on a data-center GPU: half of all corruptions are zeroed values, under 40% of bit-flip corruptions are single-bit, and corruptions repeat at warp-aligned spacings. The self-test's gpu-sdc faults follow its measurements. <a href="https://arxiv.org/abs/2605.04213">arxiv.org</a></li>
+<li><b>Higham, Accuracy and Stability of Numerical Algorithms.</b> The componentwise rounding error bound for inner products used by the reference check.</li>
+<li><b>Huang and Abraham, 1984.</b> Algorithm-based fault tolerance for matrix operations, IEEE Transactions on Computers. The row and column checksums behind probe 6.</li>
+<li><b>Fasi, Higham, Mikaitis and Pranesh, 2021.</b> Numerical behavior of NVIDIA tensor cores. The measurement that tensor cores accumulate with truncation, which sets the fp16 and bf16 bound. <a href="https://peerj.com/articles/cs-330">peerj.com</a></li>
+<li><b>DeepSeek-AI, 2024.</b> DeepSeek-V3 technical report. Reports that Hopper's FP8 tensor cores keep 14 bits when they add, which is why the FP8 inputs here are chosen so every sum fits in 13. <a href="https://arxiv.org/abs/2412.19437">arxiv.org</a></li>
+<li><b>Valpey and Pai, 2025.</b> Modeling three generations of tensor cores. A formal model of rounding and accumulation order on Volta, Turing and Ampere. <a href="https://arxiv.org/abs/2502.15999">arxiv.org</a></li>
+<li><b>OCP Test and Validation.</b> The open diagnostic output format and reference implementation all six probes write to. <a href="https://github.com/opencomputeproject/ocp-diag-core">ocp-diag-core</a></li>
+</ul>
+</section>
+
+<section id="about">
+<div class="kicker">TAKE PART</div>
+<h2>About and cite</h2>
+<p>Chip Integrity is maintained by Yasha Khandelwal, Bengaluru. The code is MIT licensed. The project stays vendor neutral: the same tests run on every chip, and a row is published only with its result file.</p>
+<pre>Yasha Khandelwal. ai-chip-integrity: an open tester for silent computation errors in AI chips.
+Version 0.4.2, 2026. https://doi.org/10.5281/zenodo.23393790
+https://github.com/tech4biz-yasha/ai-chip-integrity</pre>
+<p>Questions, rows and findings: <a href="mailto:yasha.khandelwal@tech4biz.io">yasha.khandelwal@tech4biz.io</a> or an issue on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</p>
+</section>

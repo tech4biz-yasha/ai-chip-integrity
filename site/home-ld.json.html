@@ -1,0 +1,46 @@
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://chipintegrity.org/#site",
+      "url": "https://chipintegrity.org/",
+      "name": "Chip Integrity",
+      "description": "An open, vendor-neutral tester for silent computation errors in AI chips, with results in OCP Test and Validation format.",
+      "author": {"@id": "https://chipintegrity.org/#person"}
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "@id": "https://chipintegrity.org/#code",
+      "name": "ai-chip-integrity",
+      "codeRepository": "https://github.com/tech4biz-yasha/ai-chip-integrity",
+      "identifier": "https://doi.org/10.5281/zenodo.23393790",
+      "version": "0.4.2",
+      "programmingLanguage": "Python",
+      "license": "https://opensource.org/licenses/MIT",
+      "author": {"@id": "https://chipintegrity.org/#person"},
+      "description": "Six probes for AI accelerators: a compute probe that checks matrix multiplies against a proven float64 error bound and bit-for-bit repeatability, a memory probe that writes six patterns into every word of most of device memory and reads them back, a kernel probe that checks softmax, layer norm, GELU, rotary embeddings and attention the same two ways, a data pattern probe that drives the matrix multiply with inputs built to reach particular bits, a checksum-protected matrix multiply that detects and locates a wrong element with proven thresholds, and an error counter cross-check that records whether the chip's own counters noticed. Output follows the OCP Test and Validation spec."
+    },
+    {
+      "@type": "Dataset",
+      "@id": "https://chipintegrity.org/#results",
+      "name": "Chip Integrity measured results",
+      "description": "Silent computation error measurements for AI chips (NVIDIA H200, NVIDIA H100, NVIDIA A100, NVIDIA GeForce RTX 4090, NVIDIA RTX A5000, Apple GPU) from the compute, kernel, checksum, data pattern, memory and error counter probes, each row backed by an OCP Test and Validation result file.",
+      "url": "https://chipintegrity.org/#results",
+      "license": "https://opensource.org/licenses/MIT",
+      "creator": {"@id": "https://chipintegrity.org/#person"},
+      "isBasedOn": "https://github.com/tech4biz-yasha/ai-chip-integrity",
+      "keywords": ["silent data corruption", "GPU reliability", "AI accelerator testing", "silent errors", "OCP Test and Validation", "GPU health check", "H100", "A100", "FP8", "ABFT"],
+      "measurementTechnique": "Matrix multiply and transformer kernels against a float64 reference with derived componentwise rounding bounds and bit-for-bit repeat comparison; pattern sweep over most of the device memory with exact read-back; software fault injection self-test on every row"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://chipintegrity.org/#person",
+      "name": "Yasha Khandelwal",
+      "email": "mailto:yasha.khandelwal@tech4biz.io",
+      "url": "https://yashakhandelwal.com/"
+    }
+  ]
+}
+</script>
