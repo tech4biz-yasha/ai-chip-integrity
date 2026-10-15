@@ -107,3 +107,73 @@ def test_attention_kernel_is_shown_when_chosen():
     assert build_site.attention_note({"attention": {"default": ["fp32", "fp16", "bf16"]}}) == ""
     note = build_site.attention_note({"attention": {"flash": ["bf16", "fp16"], "efficient": ["fp32"]}})
     assert note == " · attention: efficient (fp32); flash (fp16, bf16)"
+
+
+def site_from_repo():
+    """The parsed result files in results/ and the chip map the pages are built from."""
+    import glob, os
+    runs = [build_site.parse(p) for p in sorted(glob.glob(os.path.join(build_site.RESULTS, "*.jsonl")))]
+    compute, memory, kernel, pattern, checksum = build_site.summarise(runs)
+    return runs, build_site.chip_rows({"compute": compute, "memory": memory, "kernel": kernel, "pattern": pattern,
+                                       "checksum": checksum})
+
+
+def test_every_chip_gets_its_own_page_with_its_files():
+    runs, chip_map = site_from_repo()
+    template = (pathlib.Path(build_site.ROOT) / "docs" / "template.html").read_text()
+    by_file = {r["file"]: r for r in runs}
+    assert len({build_site.chip_slug(d) for d in chip_map}) == len(chip_map) > 0
+    for device, rows in chip_map.items():
+        html = build_site.chip_page(device, chip_map, by_file, template, "2026-01-01")
+        slug = build_site.chip_slug(device)
+        assert f'<link rel="canonical" href="https://chipintegrity.org/chips/{slug}.html">' in html
+        assert f"<h1>{build_site.esc(device)}</h1>" in html
+        for row in rows.values():
+            for key in ("clean_file", "inject_file"):
+                if row.get(key):
+                    assert f'/blob/main/{row[key]}"' in html, (device, row[key])
+        st = build_site.chip_stats(rows)
+        assert f'{st["caught"]} of {st["injected"]}' in html and f'{st["runs"]:,}' in html
+        assert "{{" not in html
+    index = build_site.chips_index(chip_map, template, "2026-01-01")
+    for device in chip_map:
+        assert f'href="{build_site.chip_slug(device)}.html"' in index
+
+
+def test_chip_totals_add_up_to_the_home_page():
+    _, chip_map = site_from_repo()
+    stats = [build_site.chip_stats(rows) for rows in chip_map.values()]
+    html = (pathlib.Path(build_site.ROOT) / "docs" / "index.html").read_text()
+    assert f'{sum(s["runs"] for s in stats):,}' in html
+    assert f'{sum(s["caught"] for s in stats)} of {sum(s["injected"] for s in stats)}' in html
+
+
+def test_sitemap_and_llms_list_every_chip_page():
+    _, chip_map = site_from_repo()
+    xml = build_site.sitemap(sorted(chip_map), "2026-01-01")
+    llms = build_site.llms_measured(chip_map)
+    for device in chip_map:
+        url = f"https://chipintegrity.org/chips/{build_site.chip_slug(device)}.html"
+        assert f"<loc>{url}</loc>" in xml and url in llms
+    assert "<loc>https://chipintegrity.org/chips/index.html</loc>" in xml
+
+
+def test_every_link_on_every_page_opens_from_a_plain_folder():
+    """The site must work opened straight from its folder or the deploy zip, and on any static host: every link is
+    relative, points at a real file (never a bare folder), and every #section it names exists in that file."""
+    import os
+    import re
+    docs = pathlib.Path(build_site.ROOT) / "docs"
+    pages = [docs / "index.html"] + sorted((docs / "chips").glob("*.html"))
+    assert len(pages) > 2
+    for page in pages:
+        html = page.read_text()
+        for link in re.findall(r'href="([^"]+)"', html):
+            if link.startswith(("https://", "http://", "mailto:")):
+                continue
+            assert not link.startswith("/"), f"{page.name}: {link} only works on a web server"
+            path, _, frag = link.partition("#")
+            target = (page.parent / path).resolve() if path else page
+            assert target.is_file(), f"{page.relative_to(docs)}: {link} does not open a file"
+            if frag:
+                assert f'id="{frag}"' in target.read_text(), f"{page.relative_to(docs)}: {link} has no #{frag}"

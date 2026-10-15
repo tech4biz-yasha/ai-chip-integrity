@@ -3,7 +3,8 @@
 This folder is a complete static site. No build step, no server code, no database.
 
 Files
-- index.html      the whole site, one page, self-contained (fonts load from Google Fonts)
+- index.html      the home page, self-contained (fonts load from Google Fonts)
+- chips/          one page per measured chip (chips/<chip>.html) and chips/index.html listing them all
 - robots.txt      allows all crawlers, points to the sitemap
 - sitemap.xml
 - llms.txt        summary for LLM crawlers
@@ -19,5 +20,5 @@ DNS
 - CNAME www to the host (for GitHub Pages: tech4biz-yasha.github.io)
 
 Updating
-- The page is generated from the result files in the repo by build_site.py (python build_site.py from the repo root, then copy docs/ to the host).
+- Every page is generated from the result files in the repo by build_site.py (python build_site.py from the repo root), then copy the whole docs/ folder to the host, including chips/. Every link is relative, so the site also opens straight from the folder; no server rules are needed.
 - Source: https://github.com/tech4biz-yasha/ai-chip-integrity

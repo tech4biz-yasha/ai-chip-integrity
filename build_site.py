@@ -13,6 +13,7 @@ import json
 import math
 import os
 import re
+import shutil
 from collections import defaultdict
 from datetime import datetime, timezone
 
@@ -404,6 +405,430 @@ def memory_rows(rows):
     return "\n".join(out)
 
 
+# ---- One page per chip --------------------------------------------------------------------------------------
+# Every chip in the tables gets its own page at /chips/<slug>/, generated here from the same result files, so the
+# pages can always be rebuilt from the repository and never say more than the files do.
+
+SITE = "https://chipintegrity.org"
+CHIPS_DIR = os.path.join(ROOT, "docs", "chips")
+PASS_VERDICTS = {"no-silent-errors", "injection-self-test-pass", "no-memory-errors"}
+PROBE_INFO = [  # table, anchor, roadmap number, title, what the probe does
+    ("compute", "compute", 1, "Compute probe", "Matrix multiplies at several shapes and precisions. Every output element "
+     "is checked against an exact or float64 reference under a proven rounding-error bound, and every run is compared "
+     "bit for bit with the first run."),
+    ("kernel", "kernels", 3, "Transformer kernel probe", "Softmax, layer norm, GELU, rotary embeddings and fused "
+     "attention, each checked against a float64 reference under its own proven bound and against the first run bit "
+     "for bit."),
+    ("checksum", "checksum", 6, "Checksum probe", "A matrix multiply protected by row and column checksums (Huang and "
+     "Abraham) with proven thresholds, so a wrong element is located to its exact row and column."),
+    ("pattern", "patterns", 9, "Data pattern probe", "Inputs built to reach particular bits (wide exponents, long "
+     "mantissas, cancellation, alternating signs, sparse inputs, subnormals and values near the top of the range), "
+     "fed through the same matrix multiply checks."),
+    ("memory", "memory", 2, "Memory probe", "Most of the device memory written with six patterns, left to dwell, and "
+     "read back word by word."),
+]
+
+
+def chip_slug(device):
+    return re.sub(r"[^a-z0-9]+", "-", device.lower()).strip("-")
+
+
+def citation():
+    """Version and DOI from CITATION.cff, so every page cites the current release."""
+    with open(os.path.join(ROOT, "CITATION.cff"), encoding="utf-8") as f:
+        text = f.read()
+    return re.search(r"^version: (\S+)", text, re.M).group(1), re.search(r"^doi: (\S+)", text, re.M).group(1)
+
+
+def chip_rows(tables):
+    """{device: {table: row}} across the five tables."""
+    out = defaultdict(dict)
+    for name, rows in tables.items():
+        for r in rows:
+            out[r["device"]][name] = r
+    return out
+
+
+def chip_stats(rows):
+    """The same totals as the home page, for one chip."""
+    runs = sum(rows[k].get("runs", 0) for k in ("compute", "kernel", "pattern", "checksum") if k in rows)
+    injected = sum(r.get("injected", 0) for r in rows.values())
+    caught = sum(r.get("caught", 0) for r in rows.values())
+    words = rows["memory"].get("bytes", 0) // 4 if "memory" in rows else 0
+    faults = (sum(rows[k].get("ref_fail", 0) + rows[k].get("rep_fail", 0) for k in ("compute", "kernel", "pattern")
+                  if k in rows) + rows.get("checksum", {}).get("faults", 0) + rows.get("memory", {}).get("bad", 0))
+    return {"runs": runs, "words": words, "faults": faults, "caught": caught, "injected": injected}
+
+
+def nice_date(d):
+    day = datetime.strptime(d, "%Y-%m-%d")
+    return f"{day.day} {day.strftime('%B %Y')}"
+
+
+def chip_dates(rows):
+    return sorted(set().union(*(r["dates"] for r in rows.values())))
+
+
+def file_link(path, label):
+    return f'<a href="{REPO}/blob/main/{esc(path)}">{esc(label)}</a>'
+
+
+def step_table(run):
+    """Every step of one result file, as the file records it."""
+    if run is None:
+        return ""
+    body = []
+    for name, s in run["steps"].items():
+        if "_skipped" in s:
+            body.append(f'<tr><td><code>{esc(name)}</code></td><td></td><td></td>'
+                        f'<td><span class="sub">not supported on this device</span></td></tr>')
+            continue
+        size = f'{s["runs"]:,} runs' if "runs" in s else (gib(s["bytes_tested"]) if "bytes_tested" in s else "")
+        ratio = s.get("worst_error_over_bound_ratio")
+        if ratio is None:
+            bound = "exact" if s.get("exact_check") else ""
+        else:
+            bound = "under 0.001" if ratio < 0.001 else f"{ratio:.3f}"
+        verdict = s.get("_verdict", "")
+        cls = "ok" if verdict in PASS_VERDICTS else "bad"
+        body.append(f'<tr><td><code>{esc(name)}</code></td><td>{size}</td>'
+                    f'<td>{bound}</td><td class="{cls}">{esc(verdict)}</td></tr>')
+    return ('<div class="tablewrap"><table><thead><tr><th>Step in the result file</th><th>Size</th>'
+            '<th>Worst error / bound</th><th>Verdict</th></tr></thead><tbody>' + "\n".join(body) + "</tbody></table></div>")
+
+
+def chip_summary(st):
+    if st["faults"] == 0:
+        first = (f'Across {st["runs"]:,} compute runs, every output element stayed inside its proven error bound and '
+                 f'every repeat matched the first run bit for bit.') if st["runs"] else "No compute rows yet."
+        if st["words"]:
+            first += f' All {st["words"]:,} memory words read back correctly.'
+    else:
+        first = f'{st["faults"]} checks failed on this chip. The probe tables below show which steps and why.'
+    return first + (f' The self-tests caught {st["caught"]} of the {st["injected"]} faults planted to prove the checks '
+                    f'work.' if st["injected"] else "")
+
+
+def chip_card(device, rows, href):
+    st, dates = chip_stats(rows), chip_dates(rows)
+    return (f'<a class="panel chipcard" href="{href}"><h3>{esc(device)}</h3><p>Tested {nice_date(dates[-1])}. '
+            f'{st["runs"]:,} compute runs, {st["faults"]} silent faults, {st["caught"]} of {st["injected"]} planted '
+            f'faults caught.</p></a>')
+
+
+
+
+PRECISION_LABEL = {"fp32": "FP32", "fp16": "FP16", "bf16": "BF16", "int8": "INT8", "fp8": "FP8",
+                   "fp8fast": "FP8 fast-accumulation"}
+KERNEL_LABEL = {"softmax": "Softmax", "layernorm": "Layer norm", "gelu": "GELU", "rope": "RoPE", "attention": "Attention"}
+
+
+def bar(label, frac, value, cls="", limit=False):
+    """One labelled bar. frac is the filled share of the track, 0 to 1."""
+    width = max(0.0, min(frac, 1.0)) * 100
+    return (f'<div class="brow{(" " + cls) if cls else ""}"><div class="lab">{label}</div><div class="track">'
+            f'<div class="fill" style="width:{width:.1f}%"></div>{"<div class=limitline></div>" if limit else ""}</div>'
+            f'<div class="val">{value}</div></div>')
+
+
+def budget_rows(run, group):
+    """Worst error over bound for each precision (or kernel) in one result file: how much of the proven error budget
+    the chip used. Exact checks are listed apart, because any difference at all fails them."""
+    if run is None:
+        return [], []
+    worst, exact = {}, set()
+    for name, s in run["steps"].items():
+        if "_skipped" in s:
+            continue
+        key = group(name)
+        if s.get("exact_check"):
+            exact.add(key)
+        elif s.get("worst_error_over_bound_ratio") is not None:
+            worst[key] = max(worst.get(key, 0.0), s["worst_error_over_bound_ratio"])
+    return sorted(worst.items(), key=lambda kv: -kv[1]), sorted(exact)
+
+
+def die_svg(st):
+    cells = []
+    for i in range(14):
+        for j in range(6):
+            cells.append(f'<rect x="{34 + i * 27}" y="{34 + j * 27}" width="21" height="21" class="cell" '
+                         f'style="animation-delay:{(i * 6 + j) * 0.02:.2f}s"/>')
+    caption = f'{st["runs"]:,} runs, every output checked' if st["runs"] else "memory checked word by word"
+    verdict = "0 wrong answers" if st["faults"] == 0 else f'{st["faults"]} failed checks'
+    return (f'<svg class="chipfig" viewBox="0 0 440 260" role="img" aria-label="{caption}, {verdict}">'
+            f'<rect x="20" y="20" width="400" height="190" class="frame"/>{"".join(cells)}'
+            f'<rect x="20" y="20" width="3" height="190" class="scan"/>'
+            f'<text x="20" y="236" class="cap">{caption.upper()}</text>'
+            f'<text x="420" y="236" text-anchor="end" class="cap {"good" if st["faults"] == 0 else "badtxt"}">'
+            f'{verdict.upper()}</text></svg>')
+
+
+def spec_sheet(groups):
+    out = []
+    for title, items in groups:
+        cells = "".join(f'<div><div class="k">{k}</div><div class="v">{v}</div></div>' for k, v in items if v)
+        out.append(f'<h3>{title}</h3><div class="spec">{cells}</div>')
+    return "".join(out)
+
+
+def chip_page(device, chip_map, runs_by_file, template, built):
+    rows, devices = chip_map[device], sorted(chip_map)
+    slug, st, dates = chip_slug(device), chip_stats(rows), chip_dates(rows)
+    here = ' aria-current="page"'
+    version, doi = citation()
+    url = f"{SITE}/chips/{slug}.html"
+    style = re.search(r"<style>.*?</style>", template, re.S).group(0)
+    fonts = "\n".join(re.findall(r'<link rel="preconnect"[^>]*>|<link href="https://fonts\.googleapis\.com[^>]*>', template))
+    files = [(r.get(k), lbl) for name, r in sorted(rows.items()) for k, lbl in (("clean_file", "result"), ("inject_file", "self-test"))
+             if r.get(k)]
+    title = f"{device}: silent computation error test results"
+    desc = (f'{device} tested by Chip Integrity: {st["runs"]:,} compute runs checked element by element, '
+            f'{st["faults"]} silent faults found, {st["caught"]} of {st["injected"]} planted faults caught. '
+            f'Every result file is public.')
+    ld = {"@context": "https://schema.org", "@type": "Dataset", "name": f"Silent computation error tests: {device}",
+          "description": desc, "url": url, "license": "https://opensource.org/licenses/MIT", "isAccessibleForFree": True,
+          "creator": {"@type": "Person", "name": "Yasha Khandelwal"}, "dateModified": dates[-1],
+          "measurementTechnique": "OCP Test and Validation output from ai-chip-integrity",
+          "distribution": [{"@type": "DataDownload", "encodingFormat": "application/x-ndjson",
+                            "contentUrl": f"{REPO}/blob/main/{f}"} for f, _ in files]}
+    present = [p for p in PROBE_INFO if p[0] in rows]
+    rail = "\n".join(
+        ['<a class="brand" href="../index.html">chip<b>integrity</b>.org</a>',
+         '<div class="tag">Open tests for silent computation errors in AI chips</div>', '<div class="grp">THIS CHIP</div>',
+         '<a class="n" href="#top">Summary</a>', '<a class="n" href="#budget">Error budget used</a>',
+         '<a class="n" href="#proof">Proof the checks work</a>']
+        + [f'<a class="n" href="#{a}">{t}</a>' for _, a, _, t, _ in present]
+        + ['<a class="n" href="#setup">Setup and files</a>', '<a class="n" href="#limits">What this result shows</a>',
+           '<a class="n" href="#run">Run it on your chip</a>', '<div class="grp">ALL CHIPS</div>',
+           '<a class="n" href="index.html">Every chip measured</a>']
+        + [f'<a class="n" href="{chip_slug(d)}.html"{here if d == device else ""}>{esc(d)}</a>' for d in devices]
+        + ['<div class="grp">THE METHOD</div>', '<a class="n" href="../index.html#method">How a chip is tested</a>',
+           '<a class="n" href="../index.html#verdicts">Reading a verdict</a>',
+           '<a class="n" href="../index.html#selftest">The self-test</a>',
+           '<a class="n" href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>'])
+
+    # The error budget: how close each precision and kernel came to its proven bound.
+    budget, exact_list = [], []
+    for name, label, group in (("compute", "matrix multiply", lambda n: n.split("_")[1]),
+                               ("pattern", "data patterns", lambda n: n.split("_")[1]),
+                               ("kernel", "", lambda n: n)):
+        if name not in rows:
+            continue
+        worst, exact = budget_rows(runs_by_file.get(rows[name].get("clean_file")), group)
+        for key, ratio in worst:
+            if label:
+                lab = f"{PRECISION_LABEL.get(key, key)} {label}"
+            else:
+                kern, _, prec = key.partition("_")
+                lab = f"{KERNEL_LABEL.get(kern, kern)} {PRECISION_LABEL.get(prec, prec)}"
+            used = "under 0.1% of bound" if ratio < 0.001 else f"{ratio * 100:.1f}% of bound"
+            budget.append((ratio, bar(esc(lab), ratio, used, limit=True)))
+        exact_list += [f"{PRECISION_LABEL.get(k, k)} {label}".strip() for k in exact]
+    budget_html = "".join(b for _, b in sorted(budget, key=lambda x: -x[0]))
+    exact_html = (f'<p class="note">Checked exactly, where any difference at all fails: '
+                  f'{esc(", ".join(dict.fromkeys(exact_list)))}. Every one matched.</p>' if exact_list else "")
+
+    # Proof: every planted fault caught, probe by probe, and how much memory the sweep covered.
+    proof = "".join(bar(esc(t), r["caught"] / r["injected"], f'{r["caught"]} of {r["injected"]} caught', cls="proof")
+                    for n, _, _, t, _ in present for r in [rows[n]] if r.get("injected"))
+    mem_run = runs_by_file.get(rows.get("memory", {}).get("clean_file"))
+    if mem_run:
+        tested = max(s.get("bytes_tested", 0) for s in mem_run["steps"].values())
+        total = max(s.get("device_memory_bytes", 0) for s in mem_run["steps"].values())
+        if total:
+            proof += bar("Device memory swept", tested / total, f"{gib(tested)} of {gib(total)}", cls="proof")
+
+    sections = []
+    for name, anchor, number, ptitle, what in present:
+        r = rows[name]
+        run = runs_by_file.get(r.get("clean_file"))
+        nsteps = sum(1 for s in run["steps"].values()) if run else 0
+        meta = f'Tool v{esc(r["version"])}' + (f', PyTorch {esc(r["torch"])}' if r.get("torch") else "")
+        meta += ", " + ", ".join(nice_date(d) for d in sorted(r["dates"]))
+        bad = r.get("ref_fail", 0) + r.get("rep_fail", 0) + r.get("faults", 0) + r.get("bad", 0)
+        size = (f'{r.get("bytes", 0) // 4:,} memory words read back' if name == "memory"
+                else f'{r.get("runs", 0):,} runs across {r.get("steps", nsteps)} steps')
+        verdict = ("No silent faults." if bad == 0 else f"{bad} failed checks.")
+        selftest = (f' The self-test caught {r["caught"]} of {r["injected"]} planted faults.' if r.get("injected") else "")
+        links = " · ".join(x for x in [file_link(r["clean_file"], "Result file") if r.get("clean_file") else "",
+                                       file_link(r["inject_file"], "Self-test file") if r.get("inject_file") else ""] if x)
+        counters = (f'<p class="note">Error counters: {esc(COUNTER_NOTES.get(r["counters"], r["counters"]))}.</p>'
+                    if r.get("counters") else "")
+        sections.append(
+            f'<section id="{anchor}"><div class="kicker">PROBE {number}</div><h2>{ptitle}</h2>'
+            f'<p class="lede">{what}</p>'
+            f'<div class="probehead"><div class="big {"good" if bad == 0 else "badtxt"}">{verdict}</div>'
+            f'<div>{size}.{selftest}</div></div>'
+            f'<p class="note">{meta}. {links}</p>{counters}'
+            f'<details><summary>Show all {nsteps} steps from the result file</summary>{step_table(run)}</details>'
+            "</section>")
+    stats = "".join(f'<div class="stat"><div class="n">{n}</div><div class="l">{l}</div></div>' for n, l in [
+        (len(present), "probes run on this chip"), (f'{st["runs"]:,}', "compute runs checked element by element"),
+        (f'{st["words"] / 1e9:.1f} billion' if st["words"] else "0", "memory words written and read back"),
+        (st["faults"], "silent faults found"), (f'{st["caught"]} of {st["injected"]}', "planted faults caught in self-tests")])
+    tiles = []
+    for name, anchor, number, ptitle, _ in present:
+        r = rows[name]
+        size = (f'{r.get("bytes", 0) // 4 / 1e9:.1f} billion words' if name == "memory" else f'{r.get("runs", 0):,} runs')
+        bad = (r.get("ref_fail", 0) + r.get("rep_fail", 0) + r.get("faults", 0) + r.get("bad", 0))
+        state = "no silent faults" if bad == 0 else f"{bad} failed checks"
+        tiles.append(f'<a class="stat" href="#{anchor}"><div class="n">{ptitle}</div><div class="l">Probe {number} · '
+                     f'{size} · {state}</div></a>')
+    others = "".join(chip_card(d, r, f"{chip_slug(d)}.html") for d, r in sorted(chip_map.items()) if d != device)
+    torch_versions = sorted({r["torch"] for r in rows.values() if r.get("torch")})
+    counters_seen = sorted({COUNTER_NOTES.get(r["counters"], r["counters"]) for r in rows.values() if r.get("counters")})
+    spec = spec_sheet([
+        ("The chip", [("Name, as the driver reports it", esc(device)),
+                      ("Device memory", gib(total) if mem_run and total else ""),
+                      ("Error counters", esc("; ".join(counters_seen)))]),
+        ("The software", [("PyTorch", esc(", ".join(torch_versions))),
+                          ("Probe versions", ", ".join(f'{t} v{esc(rows[n]["version"])}' for n, _, _, t, _ in present))]),
+        ("The test", [("Dates tested", ", ".join(nice_date(d) for d in dates)),
+                      ("Result files", f"{len(files)} files in the OCP Test and Validation format")])])
+    file_list = "".join(f'<li>{file_link(f, f.split("/")[-1])} <span class="sub">{lbl}</span></li>' for f, lbl in files)
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{esc(title)} | Chip Integrity</title>
+<meta name="description" content="{esc(desc)}">
+<meta name="author" content="Yasha Khandelwal">
+<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
+<link rel="canonical" href="{url}">
+<meta property="og:type" content="article">
+<meta property="og:title" content="{esc(title)}">
+<meta property="og:description" content="{esc(desc)}">
+<meta property="og:url" content="{url}">
+<script type="application/ld+json">{json.dumps(ld)}</script>
+{fonts}
+{style}
+</head>
+<body>
+<div class="layout">
+<nav class="rail" aria-label="Sections">
+{rail}
+</nav>
+<main id="top">
+<div class="wrap">
+<div class="hero">
+<div class="crumb"><a href="../index.html">chipintegrity.org</a> / <a href="index.html">chips</a> / {esc(slug)}</div>
+<div class="hero-grid">
+<div>
+<div class="kicker">CHIP RESULT, LAST TESTED {nice_date(dates[-1]).upper()}</div>
+<h1>{esc(device)}</h1>
+<p class="lede">{chip_summary(st)}</p>
+<p>Every number on this page is read from the result files listed at the bottom, written in the OCP Test and
+Validation format. New to this? Start with <a href="../index.html#silent">what a silent error is</a> and
+<a href="../index.html#method">how a chip is tested here</a>.</p>
+</div>
+<div class="fig" aria-hidden="true">{die_svg(st)}</div>
+</div>
+<div class="stats">{stats}</div>
+<div class="probemap">{"".join(tiles)}</div>
+</div>
+<section id="budget"><div class="kicker">HOW CLOSE IT CAME</div><h2>Error budget used</h2>
+<p class="lede">Floating-point answers are never exact, so each check allows a rounding error and proves how large it
+can honestly be. The red line is that proven limit. A bar shows the largest error this chip produced, as a share of
+the limit, across every run. Anything past the line would be a wrong answer.</p>
+<div class="budget">{budget_html}</div>{exact_html}
+<p class="note">Bars close to the line at FP16 and BF16 are expected: there the limit is dominated by the single
+rounding of the output, so a correct chip has almost nothing to spare. A bar past the line is a failed run.</p></section>
+<section id="proof"><div class="kicker">PROOF THE CHECKS WORK</div><h2>Every planted fault was caught</h2>
+<p class="lede">A clean result is only worth something if the tester would have seen a fault. So next to every clean
+run, the self-test plants faults on purpose, including the patterns NVIDIA measured at gate level, and every one must
+be caught. <a href="../index.html#selftest">How the self-test works</a>.</p>
+<div class="budget">{proof}</div></section>
+{"".join(sections)}
+<section id="setup"><div class="kicker">EVIDENCE</div><h2>Setup and files</h2>
+{spec}
+<h3>Result files</h3><ul class="files">{file_list}</ul></section>
+<section id="limits"><div class="callout"><div class="kicker">READ BEFORE RELYING ON IT</div><h2>What this result shows</h2>
+<p>These numbers describe one unit of this chip, tested on the dates above. A clean result means no silent error
+showed up in these runs under these checks. It cannot rule out a fault that appears under other workloads,
+temperatures or ages, and another unit of the same model can behave differently. <a href="../index.html#limits">What a PASS
+means</a> explains the limits in full.</p></div></section>
+<section id="run"><div class="kicker">TAKE PART</div><h2>Run it on your chip</h2>
+<p class="lede">The same tests on your own hardware, in one command. Every result file it writes can be published
+here as a new row.</p>
+<pre>pip install ai-chip-integrity
+chip-integrity run --name {slug}</pre>
+<p class="note">Cite the tool as: Yasha Khandelwal, ai-chip-integrity, version {esc(version)}, 2026,
+<a href="https://doi.org/{esc(doi)}">https://doi.org/{esc(doi)}</a></p></section>
+<section id="chips"><div class="kicker">ALL CHIPS</div><h2>Other chips measured</h2>
+<div class="grid3">{others}</div></section>
+</div>
+<footer>Page generated from the result files on {built}. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</footer>
+</main>
+</div>
+</body>
+</html>
+"""
+
+
+def chips_index(chip_map, template, built):
+    """chips/index.html: every chip measured, one card each, like the stores index on agentmemoryintegrity.org."""
+    style = re.search(r"<style>.*?</style>", template, re.S).group(0)
+    fonts = "\n".join(re.findall(r'<link rel="preconnect"[^>]*>|<link href="https://fonts\.googleapis\.com[^>]*>', template))
+    cards = "".join(chip_card(d, r, f"{chip_slug(d)}.html") for d, r in sorted(chip_map.items()))
+    rail = "\n".join(['<a class="brand" href="../index.html">chip<b>integrity</b>.org</a>',
+                      '<div class="tag">Open tests for silent computation errors in AI chips</div>',
+                      '<div class="grp">CHIPS</div>', '<a class="n" href="index.html" aria-current="page">Every chip measured</a>']
+                     + [f'<a class="n" href="{chip_slug(d)}.html">{esc(d)}</a>' for d in sorted(chip_map)]
+                     + ['<div class="grp">THE METHOD</div>', '<a class="n" href="../index.html#method">How a chip is tested</a>',
+                        '<a class="n" href="../index.html#run">Run it on your chip</a>'])
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Every chip measured | Chip Integrity</title>
+<meta name="description" content="Every AI chip tested by Chip Integrity for silent computation errors, one page each, generated from public result files.">
+<link rel="canonical" href="{SITE}/chips/index.html">
+{fonts}
+{style}
+</head>
+<body>
+<div class="layout">
+<nav class="rail" aria-label="Sections">
+{rail}
+</nav>
+<main id="top">
+<div class="wrap">
+<div class="hero">
+<div class="crumb"><a href="../index.html">chipintegrity.org</a> / chips</div>
+<div class="kicker">EVIDENCE</div>
+<h1>Every chip measured</h1>
+<p class="lede">One page per chip, each generated from its result files: what was run, how close every precision
+came to its proven error limit, and proof that every planted fault was caught.</p>
+</div>
+<div class="grid3">{cards}</div>
+</div>
+<footer>Page generated from the result files on {built}. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</footer>
+</main>
+</div>
+</body>
+</html>
+"""
+
+
+def sitemap(devices, built):
+    urls = [(f"{SITE}/", "1.0"), (f"{SITE}/chips/index.html", "0.9"), (f"{SITE}/llms.txt", "0.6")] + [(f"{SITE}/chips/{chip_slug(d)}.html", "0.8") for d in devices]
+    body = "\n".join(f"  <url><loc>{u}</loc><lastmod>{built}</lastmod><changefreq>weekly</changefreq>"
+                     f"<priority>{p}</priority></url>" for u, p in urls)
+    return f'<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n{body}\n</urlset>\n'
+
+
+def llms_measured(chip_map):
+    lines = ["## Measured so far", "", "One page per chip, generated from the result files:"]
+    for d, rows in sorted(chip_map.items()):
+        st = chip_stats(rows)
+        lines.append(f'- {d}: {SITE}/chips/{chip_slug(d)}.html (last tested {chip_dates(rows)[-1]}; {st["runs"]:,} compute '
+                     f'runs, {st["faults"]} silent faults, {st["caught"]} of {st["injected"]} planted faults caught)')
+    return "\n".join(lines) + "\n"
+
+
 def main():
     runs = [parse(p) for p in sorted(glob.glob(os.path.join(RESULTS, "*.jsonl")))]
     compute, memory, kernel, pattern, checksum = summarise(runs)
@@ -429,11 +854,36 @@ def main():
                 .replace("{{PATTERN_ROWS}}", pattern_rows(pattern) or '<tr><td colspan="10">No rows yet. The data pattern probe is new; rows are added as the files come in.</td></tr>')
                 .replace("{{KERNEL_ROWS}}", kernel_rows(kernel) or '<tr><td colspan="10">No rows yet. The kernel probe was added after the first four chips were measured; rows are added as the files come in.</td></tr>')
                 .replace("{{BUILT}}", built))
+    chip_map = chip_rows({"compute": compute, "memory": memory, "kernel": kernel, "pattern": pattern,
+                          "checksum": checksum})
+    devices = sorted(chip_map)
+    assert len({chip_slug(d) for d in devices}) == len(devices), "two chips share a page address"
+    html = html.replace("{{CHIP_CARDS}}", "".join(chip_card(d, chip_map[d], f"chips/{chip_slug(d)}.html") for d in devices))
     assert not re.search(r"{{[A-Z_]+}}", html), "unfilled placeholder"
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(html)
+    with open(os.path.join(ROOT, "docs", "template.html"), encoding="utf-8") as f:
+        template = f.read()
+    runs_by_file = {r["file"]: r for r in runs}
+    if os.path.isdir(CHIPS_DIR):
+        shutil.rmtree(CHIPS_DIR)
+    os.makedirs(CHIPS_DIR)
+    for d in devices:
+        with open(os.path.join(CHIPS_DIR, f"{chip_slug(d)}.html"), "w", encoding="utf-8") as f:
+            f.write(chip_page(d, chip_map, runs_by_file, template, built))
+    with open(os.path.join(CHIPS_DIR, "index.html"), "w", encoding="utf-8") as f:
+        f.write(chips_index(chip_map, template, built))
+    with open(os.path.join(ROOT, "docs", "sitemap.xml"), "w", encoding="utf-8") as f:
+        f.write(sitemap(devices, built))
+    llms_path = os.path.join(ROOT, "docs", "llms.txt")
+    with open(llms_path, encoding="utf-8") as f:
+        llms = f.read()
+    llms = re.sub(r"## Measured so far.*?(?=\n## |\Z)", lambda m: llms_measured(chip_map), llms, flags=re.S)
+    with open(llms_path, "w", encoding="utf-8") as f:
+        f.write(llms)
     print(f"wrote {os.path.relpath(OUT, ROOT)}: {len(chips)} chips, {total_runs:,} compute runs, "
-          f"{total_words:,} memory words, {total_caught}/{total_injected} injected faults caught")
+          f"{total_words:,} memory words, {total_caught}/{total_injected} injected faults caught; "
+          f"{len(devices)} chip pages")
 
 
 if __name__ == "__main__":

@@ -161,6 +161,28 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 @keyframes fill{0%{width:0}45%{width:100%}60%{width:100%}100%{width:0}}
 @media (prefers-reduced-motion:reduce){.scan,.cell-bad,.flag,.pulse,.fill{animation:none}.cell-bad{fill:#F26D6D}.flag{opacity:1}.fill{width:100%}}
 @media (max-width:980px){.layout{grid-template-columns:1fr}.rail{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}.rail a.n,.rail .grp{display:inline-block;margin:4px 10px 4px 0;border:0;padding:0}.wrap{padding:0 22px}.hero-grid,.grid2,.grid3{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}h1{font-size:34px}.verdict{grid-template-columns:1fr}}
+.chipcard{display:block;color:inherit;text-decoration:none}.chipcard:hover{border-color:var(--teal)}.chipcard h3{margin-top:0}.rail .n[aria-current]{color:var(--teal)}.crumb{font-family:var(--mono);font-size:12px;color:var(--dim);margin-bottom:18px}.crumb a{color:var(--dim)}
+.probemap{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));border:1px solid var(--line);background:var(--line);gap:1px;margin-top:22px}.probemap .stat{display:block;color:inherit;text-decoration:none}.probemap .stat .n{font-size:15px}.probemap .stat:hover .n{color:var(--teal)}
+.budget{margin:22px 0 8px;border-top:1px solid var(--line)}
+.brow{display:grid;grid-template-columns:minmax(150px,250px) 1fr 170px;gap:16px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
+.brow .lab{font-family:var(--mono);font-size:13px}.brow .val{font-family:var(--mono);font-size:12.5px;color:var(--muted);text-align:right}
+.track{position:relative;height:8px;background:var(--bg2);border:1px solid var(--line)}
+.fill{position:absolute;left:0;top:0;bottom:0;background:var(--teal);animation:grow 1.4s cubic-bezier(.2,.7,.2,1) both}
+.limitline{position:absolute;right:-1px;top:-6px;bottom:-6px;width:2px;background:var(--red)}
+@keyframes grow{from{width:0}}
+details{margin-top:14px}details summary{cursor:pointer;font-family:var(--mono);font-size:13px;color:var(--teal)}
+.probehead{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:baseline;margin:16px 0 4px}
+.probehead .big{font-size:20px;font-weight:600}.big.good{color:var(--teal)}.big.badtxt{color:var(--red)}
+.spec{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:22px}
+.spec>div{background:var(--bg2);padding:14px 16px}.spec .k{font-size:12px;color:var(--muted)}.spec .v{font-family:var(--mono);font-size:13.5px;margin-top:4px;overflow-wrap:anywhere}
+.files{list-style:none;padding:0;margin:0}.files li{padding:9px 0;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:13px}
+.callout{border-left:3px solid var(--amber);background:var(--bg2);padding:22px 26px}
+.chipfig{width:100%;height:auto}.chipfig .frame{fill:none;stroke:var(--line)}
+.chipfig .cell{fill:var(--teal);opacity:.16;animation:lit .6s ease-out both}@keyframes lit{from{opacity:0}to{opacity:.16}}
+.chipfig .scan{fill:var(--teal);opacity:.7;animation:scan 5s linear infinite}@keyframes scan{from{transform:translateX(0)}to{transform:translateX(397px)}}
+.chipfig .cap{font-family:var(--mono);font-size:11px;letter-spacing:.08em;fill:var(--dim)}.chipfig .cap.good{fill:var(--teal)}.chipfig .cap.badtxt{fill:var(--red)}
+@media (max-width:760px){.brow{grid-template-columns:1fr}.brow .val{text-align:left}.probehead{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.fill,.chipfig .cell,.chipfig .scan{animation:none}}
 </style>
 </head>
 <body>
@@ -176,6 +198,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <a class="n" href="#glossary">Glossary</a>
 <div class="grp">EVIDENCE</div>
 <a class="n" href="#results">Measured results</a>
+<a class="n" href="#chips">Chip pages</a>
 <a class="n" href="#selftest">The self-test</a>
 <a class="n" href="#limits">What a PASS means</a>
 <div class="grp">TAKE PART</div>
@@ -410,6 +433,9 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <div class="kicker">EVIDENCE</div>
 <h2>Measured results</h2>
 <p class="lede">Every row comes from a result file in the repository, and the tables are generated from those files. Nothing here is modelled or estimated.</p>
+<h3 id="chips">One page per chip</h3>
+<p class="note">Each chip has its own page with every step of every probe, the setup, the self-test and the result files. <a href="chips/index.html">All chips on one page</a>.</p>
+<div class="grid3"><a class="panel chipcard" href="chips/apple-gpu-mps-arm64.html"><h3>Apple GPU (MPS) arm64</h3><p>Tested 10 October 2026. 1,785 compute runs, 0 silent faults, 264 of 264 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-a100-sxm4-80gb.html"><h3>NVIDIA A100-SXM4-80GB</h3><p>Tested 7 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-geforce-rtx-4090.html"><h3>NVIDIA GeForce RTX 4090</h3><p>Tested 11 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-h100-80gb-hbm3.html"><h3>NVIDIA H100 80GB HBM3</h3><p>Tested 10 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-h200.html"><h3>NVIDIA H200</h3><p>Tested 8 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-rtx-a5000.html"><h3>NVIDIA RTX A5000</h3><p>Tested 11 October 2026. 2,055 compute runs, 0 silent faults, 297 of 297 planted faults caught.</p></a></div>
 <h3>Compute probe</h3>
 <div class="tablewrap"><table>
 <thead><tr><th>Device</th><th>Date</th><th>Shapes (M×K×N)</th><th>Precisions</th><th>Runs</th><th>Silent faults</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
