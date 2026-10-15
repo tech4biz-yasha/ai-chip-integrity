@@ -31,7 +31,7 @@
         if (!e.isIntersecting) return;
         e.target.classList.add('in'); [].forEach.call(e.target.querySelectorAll('[data-to]'), count); io.unobserve(e.target);
       });
-    }, {threshold: 0.12});
+    }, {threshold: 0, rootMargin: '0px 0px -6% 0px'});   // any part on screen: a section taller than the screen still appears
     els.forEach(function (el) { io.observe(el); });
   } else els.forEach(function (el) { el.classList.add('in'); });
   // The contents list follows the section being read
