@@ -572,6 +572,26 @@ def spec_sheet(groups):
     return "".join(out)
 
 
+def chip_budget(rows, runs_by_file):
+    """How much of its proven error bound each precision and kernel used, worst first, plus the exact-checked ones."""
+    budget, exact_list = [], []
+    for name, label, group in (("compute", "matrix multiply", lambda n: n.split("_")[1]),
+                               ("pattern", "data patterns", lambda n: n.split("_")[1]),
+                               ("kernel", "", lambda n: n)):
+        if name not in rows:
+            continue
+        worst, exact = budget_rows(runs_by_file.get(rows[name].get("clean_file")), group)
+        for key, ratio in worst:
+            if label:
+                lab = f"{PRECISION_LABEL.get(key, key)} {label}"
+            else:
+                kern, _, prec = key.partition("_")
+                lab = f"{KERNEL_LABEL.get(kern, kern)} {PRECISION_LABEL.get(prec, prec)}"
+            budget.append((ratio, lab))
+        exact_list += [f"{PRECISION_LABEL.get(k, k)} {label}".strip() for k in exact]
+    return sorted(budget, key=lambda x: -x[0]), list(dict.fromkeys(exact_list))
+
+
 def chip_page(device, chip_map, runs_by_file, built):
     rows, devices = chip_map[device], sorted(chip_map)
     slug, st, dates = chip_slug(device), chip_stats(rows), chip_dates(rows)
@@ -597,26 +617,11 @@ def chip_page(device, chip_map, runs_by_file, built):
                   + [("setup", "Setup and files"), ("limits", "What this result shows"), ("run", "Run it on your chip"),
                      ("chips", "Other chips")])
 
-    # The error budget: how close each precision and kernel came to its proven bound.
-    budget, exact_list = [], []
-    for name, label, group in (("compute", "matrix multiply", lambda n: n.split("_")[1]),
-                               ("pattern", "data patterns", lambda n: n.split("_")[1]),
-                               ("kernel", "", lambda n: n)):
-        if name not in rows:
-            continue
-        worst, exact = budget_rows(runs_by_file.get(rows[name].get("clean_file")), group)
-        for key, ratio in worst:
-            if label:
-                lab = f"{PRECISION_LABEL.get(key, key)} {label}"
-            else:
-                kern, _, prec = key.partition("_")
-                lab = f"{KERNEL_LABEL.get(kern, kern)} {PRECISION_LABEL.get(prec, prec)}"
-            used = "under 0.1% of bound" if ratio < 0.001 else f"{ratio * 100:.1f}% of bound"
-            budget.append((ratio, bar(esc(lab), ratio, used, limit=True)))
-        exact_list += [f"{PRECISION_LABEL.get(k, k)} {label}".strip() for k in exact]
+    budget, exact_list = chip_budget(rows, runs_by_file)
+    budget = [(r, bar(esc(l), r, ('under 0.1% of bound' if r < 0.001 else f'{r * 100:.1f}% of bound'), limit=True)) for r, l in budget]
     budget_html = "".join(b for _, b in sorted(budget, key=lambda x: -x[0]))
     exact_html = (f'<p class="note">Checked exactly, where any difference at all fails: '
-                  f'{esc(", ".join(dict.fromkeys(exact_list)))}. Every one matched.</p>' if exact_list else "")
+                  f'{esc(", ".join(exact_list))}. Every one matched.</p>' if exact_list else "")
 
     # Proof: every planted fault caught, probe by probe, and how much memory the sweep covered.
     proof = "".join(bar(esc(t), r["caught"] / r["injected"], f'{r["caught"]} of {r["injected"]} caught', cls="proof")
@@ -726,7 +731,7 @@ chip-integrity run --name {slug}</pre>
 </div><aside class="toc"><div class="fh">ON THIS PAGE</div>{toc}</aside></div>"""
     body = re.sub(r'<section id="([a-z]+)">', r'<section id="\1" class="reveal">', body)
     head = f'<script type="application/ld+json">{json.dumps(ld)}</script>'
-    return render("chips/index", f"{title} | Chip Integrity", desc, url, body, "../", built, head)
+    return render("chips/index", f"{title} | Chip Integrity", desc, url, body, "../", built, head, og=f"chips-{slug}")
 
 
 def chips_index(chip_map, built):
@@ -742,11 +747,62 @@ def chips_index(chip_map, built):
                   f"{SITE}/chips/index.html", body, "../", built)
 
 
+def finding_page(slug, built):
+    date, title, summary = next((d, t, m) for sl, d, t, m in FINDINGS if sl == slug)
+    body = (f'<div class="wrap"><div class="pagehead"><div class="crumb"><a href="../index.html">chipintegrity.org</a> / '
+            f'<a href="index.html">findings</a> / {slug}</div><div class="kicker">FINDING, {nice_date(date).upper()}</div>'
+            f'<h1>{esc(title)}</h1><p class="lede">{esc(summary)}</p></div><section class="reveal"><article class="post">'
+            + add_terms(read_site(f"findings/{slug}.html"), glossary(read_site("pages/learn.html")), "../")
+            + '</article></section></div>')
+    return render("findings/index", f"{title} | Chip Integrity", summary, f"{SITE}/findings/{slug}.html", body, "../",
+                  built, og=f"findings-{slug}")
+
+
+def findings_index(built):
+    cards = "".join(f'<a class="panel finding" href="{sl}.html"><div class="date">{nice_date(d)}</div><h3>{esc(t)}</h3>'
+                    f'<p>{esc(m)}</p></a>' for sl, d, t, m in FINDINGS)
+    body = (f'<div class="wrap"><div class="pagehead"><div class="crumb"><a href="../index.html">chipintegrity.org</a> / '
+            f'findings</div><div class="kicker">FINDINGS</div><h1>What the tests have turned up</h1><p class="lede">Short '
+            f'write-ups of what measuring real chips has shown, each with its evidence. New ones also appear in the '
+            f'<a href="../feed.xml">updates feed</a>.</p></div><section class="reveal"><div class="grid3">{cards}</div>'
+            f'</section></div>')
+    return render("findings/index", "Findings | Chip Integrity", "What testing real AI chips for silent computation "
+                  "errors has turned up, each with its evidence.", f"{SITE}/findings/index.html", body, "../", built,
+                  og="findings")
+
+
+def feed(built):
+    """An Atom feed of findings and releases, newest first."""
+    items = [(d, t, f"{SITE}/findings/{sl}.html", m) for sl, d, t, m in FINDINGS]
+    items += [(d, f"Release {v}: {t}", f"{REPO}/releases/tag/v{v}", t) for v, d, t in RELEASES]
+    items.sort(key=lambda x: x[0], reverse=True)
+    entries = "".join(f"<entry><title>{esc(t)}</title><link href=\"{u}\"/><id>{u}</id><updated>{d}T00:00:00Z</updated>"
+                      f"<summary>{esc(m)}</summary></entry>" for d, t, u, m in items)
+    return (f'<?xml version="1.0" encoding="utf-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom"><title>Chip Integrity'
+            f'</title><subtitle>Findings and releases from an open tester for silent computation errors in AI chips'
+            f'</subtitle><link href="{SITE}/"/><link rel="self" href="{SITE}/feed.xml"/><id>{SITE}/</id><updated>'
+            f'{items[0][0]}T00:00:00Z</updated><author><name>Yasha Khandelwal</name></author>{entries}</feed>\n')
+
+
 # ---- The site: six pages and the chip pages, all through one layout ------------------------------------------
 
 SITE_DIR = os.path.join(ROOT, "site")
-NAV = [("learn", "Learn"), ("method", "Method"), ("results", "Results"), ("chips/index", "Chips"), ("run", "Run it"),
-       ("about", "About")]
+NAV = [("learn", "Learn"), ("method", "Method"), ("results", "Results"), ("chips/index", "Chips"),
+       ("findings/index", "Findings"), ("run", "Run it"), ("about", "About")]
+FINDINGS = [  # newest first: slug, date, title, one-line summary
+    ("nvidia-fault-patterns", "2026-10-15", "NVIDIA's own fault patterns, caught on a real GPU",
+     "The self-test now plants faults shaped like NVIDIA's gate-level measurements. On an RTX 4090 the reference check "
+     "alone flagged all 294."),
+    ("ecc-off", "2026-10-11", "When ECC is off, the memory error counters cannot see anything",
+     "Two rented cards ran with ECC switched off, so their counters could not move. The tester now says so instead of "
+     "calling them quiet."),
+    ("intel-amx-bf16", "2026-10-10", "BF16 matrix multiplies on Intel AMX treat tiny inputs as zero",
+     "Above 16 × 16 × 16, BF16 matrix multiplies on AMX CPUs treat subnormal inputs as zero, whatever "
+     "set_flush_denormal says."),
+]
+RELEASES = [("0.4.2", "2026-10-15", "Self-test faults shaped like NVIDIA's gate-level measurements"),
+            ("0.4.1", "2026-10-11", "The ecc-off verdict, faster exact references, and the RTX 4090 and RTX A5000 rows"),
+            ("0.4.0", "2026-10-10", "Six probes, one command, OCP Test and Validation output")]
 PAGES = {
     "learn": dict(kicker="LEARN", h1="Silent errors in AI chips, from the beginning",
                   title="What a silent error is, and why it matters | Chip Integrity",
@@ -785,12 +841,105 @@ HOME_DESC = ("A GPU can pass its vendor diagnostics and still return wrong numbe
              "published as an OCP Test and Validation file.")
 
 
+GLOSSARY_SKIP = {"fp32, fp16, bf16, FP8, int8"}       # precision names appear in every table; no hover links for them
+NO_TERMS_INSIDE = {"a", "h1", "h2", "h3", "h4", "code", "pre", "script", "style", "svg", "button", "label", "select",
+                   "option", "figcaption", "dt", "dd", "title", "summary", "textarea", "output"}
+
+
+def glossary(learn_src):
+    """[(aliases, slug, definition)] from the glossary on the Learn page."""
+    out = []
+    for dt, dd in re.findall(r"<dt>(.*?)</dt>\s*<dd>(.*?)</dd>", learn_src, re.S):
+        name = re.sub(r"<[^>]+>", "", dt).strip()
+        if name in GLOSSARY_SKIP:
+            continue
+        aliases = [x.strip() for part in name.split(",") for x in re.split(r"[()]", part) if x.strip()]
+        text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", dd)).strip()
+        out.append((aliases, chip_slug(aliases[0]), text))
+    return out
+
+
+def add_terms(html, terms, prefix):
+    """Link the first use of each glossary term on a page to its definition, with the definition on hover."""
+    used, stack, out = set(), [], []
+    pairs = sorted(((a, slug, d) for aliases, slug, d in terms for a in aliases), key=lambda x: -len(x[0]))
+    for tok in re.split(r"(<[^>]+>)", html):
+        if tok.startswith("<"):
+            m = re.match(r"<(/?)([a-zA-Z0-9]+)", tok)
+            if m and not m.group(1) and 'class="kicker"' in tok:      # small capitals labels never carry links
+                stack.append(m.group(2).lower())
+            elif m and m.group(2).lower() in NO_TERMS_INSIDE and not tok.endswith("/>"):
+                if m.group(1):
+                    if stack and stack[-1] == m.group(2).lower():
+                        stack.pop()
+                else:
+                    stack.append(m.group(2).lower())
+            elif m and m.group(1) and stack and stack[-1] == m.group(2).lower() and m.group(2).lower() not in NO_TERMS_INSIDE:
+                stack.pop()                                               # the end of a kicker label
+            out.append(tok)
+            continue
+        if not stack:
+            for alias, slug, text in pairs:
+                if slug in used:
+                    continue
+                mm = re.search(rf"(?<![\w-]){re.escape(alias)}s?(?![\w-])", tok, re.I if len(alias) > 4 else 0)
+                if mm:
+                    used.add(slug)
+                    tok = (tok[:mm.start()] + f'<a class="term" href="{prefix}learn.html#g-{slug}" data-def="{esc(text)}">'
+                           + mm.group(0) + "</a>" + tok[mm.end():])
+                    break
+        out.append(tok)
+    return "".join(out)
+
+
+def make_og(name, kicker, title, sub):
+    """A 1200 x 630 share image, drawn only where Pillow is installed; the images are committed with the site."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError:
+        return False
+    fonts = os.path.join(SITE_DIR, "og-fonts")
+    big, small, mono = (ImageFont.truetype(os.path.join(fonts, f), size) for f, size in
+                        (("IBMPlexSans-SemiBold.ttf", 64), ("IBMPlexSans-Regular.ttf", 30), ("IBMPlexMono-Regular.ttf", 22)))
+    im = Image.new("RGB", (1200, 630), "#080D18")
+    d = ImageDraw.Draw(im)
+    for x in range(13, 1200, 26):
+        for y in range(13, 630, 26):
+            d.point((x, y), fill="#152036")
+    s = 1.0
+    for x in (23, 32, 41):                                   # the chip mark, as in the logo
+        for (x0, y0, x1, y1) in ((x, 7, x, 14), (x, 50, x, 57), (7, x, 14, x), (50, x, 57, x)):
+            d.line([(72 + x0 * s, 64 + y0 * s), (72 + x1 * s, 64 + y1 * s)], fill="#39B9EE", width=3)
+    d.rounded_rectangle([72 + 14, 64 + 14, 72 + 50, 64 + 50], radius=5, outline="#39B9EE", width=3)
+    d.rounded_rectangle([72 + 37.5, 64 + 20, 72 + 44, 64 + 26.5], radius=1, fill="#2BD7B3")
+    d.text((150, 80), "CHIPINTEGRITY.ORG", font=mono, fill="#E8ECF4")
+    d.text((72, 190), kicker.upper(), font=mono, fill="#39B9EE")
+    words, lines, line = title.split(), [], ""
+    for w in words:
+        if d.textlength(f"{line} {w}".strip(), font=big) > 1050 and line:
+            lines.append(line)
+            line = w
+        else:
+            line = f"{line} {w}".strip()
+    lines.append(line)
+    y = 232
+    for ln in lines[:3]:
+        d.text((72, y), ln, font=big, fill="#E8ECF4")
+        y += 78
+    d.text((72, y + 18), sub, font=small, fill="#93A0BA")
+    d.line([(72, 560), (1128, 560)], fill="#1A2540", width=1)
+    d.text((72, 578), "Open tests for silent computation errors in AI chips", font=mono, fill="#8291AD")
+    os.makedirs(os.path.join(ROOT, "docs", "og"), exist_ok=True)
+    im.save(os.path.join(ROOT, "docs", "og", f"{name}.png"), optimize=True)
+    return True
+
+
 def read_site(name):
     with open(os.path.join(SITE_DIR, name), encoding="utf-8") as f:
         return f.read()
 
 
-def render(page, title, desc, canonical, body, prefix, built, head_extra=""):
+def render(page, title, desc, canonical, body, prefix, built, head_extra="", og=None):
     """Wrap a page body in the shared layout. prefix is how far the page sits below the site root."""
     current = ' aria-current="page"'
     nav = "\n".join(f'<a href="{prefix}{key}.html"{current if key == page else ""}>{label}</a>' for key, label in NAV)
@@ -798,8 +947,9 @@ def render(page, title, desc, canonical, body, prefix, built, head_extra=""):
     version, doi = citation()
     cite = (f'Yasha Khandelwal, ai-chip-integrity, version {esc(version)}, 2026, '
             f'<a href="https://doi.org/{esc(doi)}">https://doi.org/{esc(doi)}</a>')
+    og = og or {"index": "home", "chips/index": "chips", "findings/index": "findings"}.get(page, page)
     html = read_site("layout.html")
-    for key, value in (("TITLE", esc(title)), ("DESC", esc(desc)), ("CANONICAL", canonical), ("P", prefix),
+    for key, value in (("OG", f"{SITE}/og/{og}.png"), ("TITLE", esc(title)), ("DESC", esc(desc)), ("CANONICAL", canonical), ("P", prefix),
                        ("PAGE", page), ("NAV", nav), ("FOOTNAV", foot), ("CITE", cite), ("BUILT", built),
                        ("HEAD_EXTRA", head_extra), ("BODY", body)):
         html = html.replace("{{" + key + "}}", value)
@@ -815,8 +965,12 @@ def site_page(name, fills, built):
         version, doi = citation()
         ld = re.sub(r'"version": "[^"]*"', f'"version": "{version}"', read_site("home-ld.json.html"))
         ld = re.sub(r'"identifier": "https://doi\.org/[^"]*"', f'"identifier": "https://doi.org/{doi}"', ld)
+        body = add_terms(body, glossary(read_site("pages/learn.html")), "")
         return render("index", HOME_TITLE, HOME_DESC, f"{SITE}/", body, "", built, ld)
     meta = PAGES[name]
+    if name == "learn":
+        body = re.sub(r"<dt>(.*?)</dt>", lambda m: f'<dt id="g-{chip_slug(re.split(r"[,(]", re.sub("<[^>]+>", "", m.group(1)))[0].strip())}">{m.group(1)}</dt>', body)
+    body = add_terms(body, glossary(read_site("pages/learn.html")), "")
     head = (f'<div class="pagehead"><div class="kicker">{meta["kicker"]}</div><h1>{meta["h1"]}</h1>'
             f'<p class="lede">{meta["intro"]}</p><div class="learnh">ON THIS PAGE YOU WILL LEARN</div><ol class="learn">'
             + "".join(f"<li>{x}</li>" for x in meta["learn"]) + "</ol></div>")
@@ -826,7 +980,8 @@ def site_page(name, fills, built):
 
 def sitemap(devices, built):
     urls = ([(f"{SITE}/", "1.0")] + [(f"{SITE}/{p}.html", "0.9") for p in PAGES]
-            + [(f"{SITE}/chips/index.html", "0.9"), (f"{SITE}/llms.txt", "0.6")]) + [(f"{SITE}/chips/{chip_slug(d)}.html", "0.8") for d in devices]
+            + [(f"{SITE}/chips/index.html", "0.9"), (f"{SITE}/findings/index.html", "0.9"), (f"{SITE}/llms.txt", "0.6")]
+            + [(f"{SITE}/findings/{sl}.html", "0.8") for sl, *_ in FINDINGS]) + [(f"{SITE}/chips/{chip_slug(d)}.html", "0.8") for d in devices]
     body = "\n".join(f"  <url><loc>{u}</loc><lastmod>{built}</lastmod><changefreq>weekly</changefreq>"
                      f"<priority>{p}</priority></url>" for u, p in urls)
     return f'<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n{body}\n</urlset>\n'
@@ -861,7 +1016,10 @@ def main():
     fills = {
         "CHIPS": str(len(chips)), "RUNS": f"{total_runs:,}", "WORDS": f"{total_words / 1e9:.1f} billion",
         "WORDS_NUM": f"{total_words / 1e9:.1f}", "FAULTS": str(faults), "CAUGHT": f"{total_caught} of {total_injected}",
-        "CAUGHT_NUM": str(total_caught), "CHIP_CARDS": cards,
+        "CAUGHT_NUM": str(total_caught), "CHIP_CARDS": cards, "CHIP_JSON": json.dumps(
+            [dict(name=d, slug=chip_slug(d), **chip_stats(chip_map[d]),
+                  budget=[[l, round(r, 4)] for r, l in chip_budget(chip_map[d], {r["file"]: r for r in runs})[0]])
+             for d in devices]).replace("</", "<\\/"),
         "COMPUTE_ROWS": compute_rows(compute), "MEMORY_ROWS": memory_rows(memory),
         "CHECKSUM_ROWS": checksum_rows(checksum) or '<tr><td colspan="11">No rows yet. The checksum probe is new; rows are added as the files come in.</td></tr>',
         "PATTERN_ROWS": pattern_rows(pattern) or '<tr><td colspan="10">No rows yet. The data pattern probe is new; rows are added as the files come in.</td></tr>',
@@ -871,7 +1029,9 @@ def main():
     for name in ["index"] + list(PAGES):
         with open(os.path.join(docs, f"{name}.html"), "w", encoding="utf-8") as f:
             f.write(site_page(name, fills, built))
-    os.makedirs(os.path.join(docs, "assets"), exist_ok=True)
+    if os.path.isdir(os.path.join(docs, "assets")):
+        shutil.rmtree(os.path.join(docs, "assets"))
+    shutil.copytree(os.path.join(SITE_DIR, "assets"), os.path.join(docs, "assets"))
     for src, dst in (("style.css", "site.css"), ("site.js", "site.js")):
         shutil.copyfile(os.path.join(SITE_DIR, src), os.path.join(docs, "assets", dst))
     runs_by_file = {r["file"]: r for r in runs}
@@ -883,6 +1043,26 @@ def main():
             f.write(chip_page(d, chip_map, runs_by_file, built))
     with open(os.path.join(CHIPS_DIR, "index.html"), "w", encoding="utf-8") as f:
         f.write(chips_index(chip_map, built))
+    fdir = os.path.join(docs, "findings")
+    if os.path.isdir(fdir):
+        shutil.rmtree(fdir)
+    os.makedirs(fdir)
+    for slug, *_ in FINDINGS:
+        with open(os.path.join(fdir, f"{slug}.html"), "w", encoding="utf-8") as f:
+            f.write(finding_page(slug, built))
+    with open(os.path.join(fdir, "index.html"), "w", encoding="utf-8") as f:
+        f.write(findings_index(built))
+    with open(os.path.join(docs, "feed.xml"), "w", encoding="utf-8") as f:
+        f.write(feed(built))
+    shots = [("home", "Open source, MIT", "Does this AI chip still give the right answer?", "Open, vendor-neutral tests for silent computation errors")]
+    shots += [(n, m["kicker"], m["h1"], "chipintegrity.org") for n, m in PAGES.items()]
+    shots += [("chips", "Evidence", "Every chip measured", "One page per chip, from public result files"),
+              ("findings", "Findings", "What the tests have turned up", "Each with its evidence")]
+    shots += [(f"findings-{sl}", "Finding", t, nice_date(d)) for sl, d, t, _ in FINDINGS]
+    shots += [(f"chips-{chip_slug(d)}", "Chip result", d, "Silent computation error test results") for d in devices]
+    drawn = all(make_og(*shot) for shot in shots)
+    if not drawn:
+        print("Pillow is not installed, so the share images in docs/og were left as they are")
     with open(os.path.join(ROOT, "docs", "sitemap.xml"), "w", encoding="utf-8") as f:
         f.write(sitemap(devices, built))
     llms_path = os.path.join(ROOT, "docs", "llms.txt")

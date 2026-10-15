@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Findings | Chip Integrity</title>
+<meta name="description" content="What testing real AI chips for silent computation errors has turned up, each with its evidence.">
+<meta name="author" content="Yasha Khandelwal">
+<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
+<link rel="canonical" href="https://chipintegrity.org/findings/index.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Findings | Chip Integrity">
+<meta property="og:description" content="What testing real AI chips for silent computation errors has turned up, each with its evidence.">
+<meta property="og:url" content="https://chipintegrity.org/findings/index.html">
+<link rel="stylesheet" href="../assets/site.css">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="alternate" type="application/atom+xml" title="Chip Integrity updates" href="../feed.xml">
+<meta property="og:image" content="https://chipintegrity.org/og/findings.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://chipintegrity.org/og/findings.png">
+
+</head>
+<body data-page="findings/index">
+<a class="skip" href="#content">Skip to content</a>
+<header class="top">
+<div class="topin">
+<a class="brand" href="../index.html"><img src="../assets/logo.svg" alt=""><span>chip<b>integrity</b>.org</span></a>
+<button class="menu" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+<nav id="nav" aria-label="Site">
+<a href="../learn.html">Learn</a>
+<a href="../method.html">Method</a>
+<a href="../results.html">Results</a>
+<a href="../chips/index.html">Chips</a>
+<a href="../findings/index.html" aria-current="page">Findings</a>
+<a href="../run.html">Run it</a>
+<a href="../about.html">About</a>
+</nav>
+<a class="gh" href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>
+</div>
+</header>
+<main id="content">
+<div class="wrap"><div class="pagehead"><div class="crumb"><a href="../index.html">chipintegrity.org</a> / findings</div><div class="kicker">FINDINGS</div><h1>What the tests have turned up</h1><p class="lede">Short write-ups of what measuring real chips has shown, each with its evidence. New ones also appear in the <a href="../feed.xml">updates feed</a>.</p></div><section class="reveal"><div class="grid3"><a class="panel finding" href="nvidia-fault-patterns.html"><div class="date">15 October 2026</div><h3>NVIDIA's own fault patterns, caught on a real GPU</h3><p>The self-test now plants faults shaped like NVIDIA's gate-level measurements. On an RTX 4090 the reference check alone flagged all 294.</p></a><a class="panel finding" href="ecc-off.html"><div class="date">11 October 2026</div><h3>When ECC is off, the memory error counters cannot see anything</h3><p>Two rented cards ran with ECC switched off, so their counters could not move. The tester now says so instead of calling them quiet.</p></a><a class="panel finding" href="intel-amx-bf16.html"><div class="date">10 October 2026</div><h3>BF16 matrix multiplies on Intel AMX treat tiny inputs as zero</h3><p>Above 16 × 16 × 16, BF16 matrix multiplies on AMX CPUs treat subnormal inputs as zero, whatever set_flush_denormal says.</p></a></div></section></div>
+</main>
+<footer class="foot">
+<div class="footin">
+<div><div class="brand">chip<b>integrity</b>.org</div><p>Open tests for silent computation errors in AI chips. MIT licensed. Every number on this site is read from a public result file.</p></div>
+<div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="../index.html">Home</a><a href="../learn.html">Learn</a><a href="../method.html">Method</a><a href="../results.html">Results</a><a href="../chips/index.html">Chips</a><a href="../findings/index.html">Findings</a><a href="../run.html">Run it</a><a href="../about.html">About</a></nav></div>
+<div><div class="fh">CITE</div><p>Yasha Khandelwal, ai-chip-integrity, version 0.4.2, 2026, <a href="https://doi.org/10.5281/zenodo.23393790">https://doi.org/10.5281/zenodo.23393790</a></p></div>
+</div>
+<div class="footbase">Page generated from the result files on 2026-10-15. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>
+</footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

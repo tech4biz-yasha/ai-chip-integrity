@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Chip Integrity">
+<rect width="64" height="64" rx="14" fill="#080D18"/>
+<path d="M23 7v7M32 7v7M41 7v7M23 50v7M32 50v7M41 50v7M7 23h7M7 32h7M7 41h7M50 23h7M50 32h7M50 41h7" stroke="#39B9EE" stroke-width="3" stroke-linecap="round"/>
+<rect x="14" y="14" width="36" height="36" rx="5" fill="none" stroke="#39B9EE" stroke-width="3"/>
+<g fill="#2BD7B3" fill-opacity=".3"><rect x="20" y="20" width="6.5" height="6.5" rx="1"/><rect x="28.75" y="20" width="6.5" height="6.5" rx="1"/><rect x="20" y="28.75" width="6.5" height="6.5" rx="1"/><rect x="28.75" y="28.75" width="6.5" height="6.5" rx="1"/><rect x="37.5" y="28.75" width="6.5" height="6.5" rx="1"/><rect x="20" y="37.5" width="6.5" height="6.5" rx="1"/><rect x="28.75" y="37.5" width="6.5" height="6.5" rx="1"/><rect x="37.5" y="37.5" width="6.5" height="6.5" rx="1"/></g>
+<rect x="37.5" y="20" width="6.5" height="6.5" rx="1" fill="#2BD7B3"/>
+</svg>

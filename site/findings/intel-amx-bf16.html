@@ -1,0 +1,8 @@
+<h2>What happens</h2>
+<p>On Intel CPUs with AMX-BF16, for example 4th Gen Xeon Scalable processors, the BF16 matrix multiplications that PyTorch sends to oneDNN run on AMX instructions. Those instructions treat denormal inputs as zero and flush denormal outputs to zero, whatever the flush-to-zero and denormals-are-zero settings say, so <code>torch.set_flush_denormal(False)</code> does not change it.</p>
+<p>PyTorch only sends a BF16 matrix multiplication to oneDNN when m × k × n is larger than 16 × 16 × 16. Smaller products run in PyTorch's own CPU kernel, which keeps denormals by default. So on the same machine, the same tiny inputs can give a non-zero answer in a small matrix multiplication and zero in a larger one.</p>
+<h2>How the tester sees it</h2>
+<p>The data pattern probe feeds the matrix multiply subnormal inputs on purpose and records whether the device keeps or flushes them, so a flushing device is reported as exactly that, and never as a silent error.</p>
+<h2>Where it stands</h2>
+<p>It is reported to PyTorch as issue #200531, labelled triaged, with a documentation change ready that adds a section to the numerical accuracy notes and a note to the <code>set_flush_denormal</code> docstring.</p>
+<p><a href="https://github.com/pytorch/pytorch/issues/200531">The PyTorch issue</a></p>

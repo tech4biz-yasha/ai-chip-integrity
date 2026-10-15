@@ -12,22 +12,29 @@
 <meta property="og:title" content="Research, standards and how to cite | Chip Integrity">
 <meta property="og:description" content="The checks build on published work in numerical analysis and hardware reliability, and write their results in an open industry format. This page lists that work, who maintains the project, and how to cite it.">
 <meta property="og:url" content="https://chipintegrity.org/about.html">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="alternate" type="application/atom+xml" title="Chip Integrity updates" href="feed.xml">
+<meta property="og:image" content="https://chipintegrity.org/og/about.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://chipintegrity.org/og/about.png">
 
 </head>
 <body data-page="about">
 <a class="skip" href="#content">Skip to content</a>
 <header class="top">
 <div class="topin">
-<a class="brand" href="index.html">chip<b>integrity</b>.org</a>
+<a class="brand" href="index.html"><img src="assets/logo.svg" alt=""><span>chip<b>integrity</b>.org</span></a>
 <button class="menu" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
 <nav id="nav" aria-label="Site">
 <a href="learn.html">Learn</a>
 <a href="method.html">Method</a>
 <a href="results.html">Results</a>
 <a href="chips/index.html">Chips</a>
+<a href="findings/index.html">Findings</a>
 <a href="run.html">Run it</a>
 <a href="about.html" aria-current="page">About</a>
 </nav>
@@ -40,15 +47,15 @@
 <div class="kicker">TAKE PART</div>
 <h2>Research and standards this builds on</h2>
 <ul class="plain">
-<li><b>Zheng et al., OSDI 2026.</b> SDCs in the Wild: characterising and diagnosing SDC-defective GPUs in production LLM training. The source of the finding that microbenchmark screening misses most faulty units. <a href="https://www.usenix.org/conference/osdi26/presentation/zheng">usenix.org</a></li>
+<li><b>Zheng et al., OSDI 2026.</b> <a class="term" href="learn.html#g-silent-error" data-def="A wrong result from a chip with no crash, no error flag and no log entry. The chip does not know it happened.">SDCs</a> in the Wild: characterising and diagnosing SDC-defective GPUs in production LLM training. The source of the finding that microbenchmark screening misses most faulty units. <a href="https://www.usenix.org/conference/osdi26/presentation/zheng">usenix.org</a></li>
 <li><b>Lei et al., OSDI 2026.</b> Safeguarding LLM Training at Scale: online SDC detection and insights from 35 million GPU hours. <a href="https://www.usenix.org/conference/osdi26/presentation/lei">usenix.org</a></li>
-<li><b>Tung, Huang, Saxena, Shirvani, Hukerikar, Jain, Tyagi and Gongalore, DSN 2026.</b> The Anatomy of Silent Data Corruption: GPU error pattern study and modeling guidance. Gate-level fault injection on a data-center GPU: half of all corruptions are zeroed values, under 40% of bit-flip corruptions are single-bit, and corruptions repeat at warp-aligned spacings. The self-test's gpu-sdc faults follow its measurements. <a href="https://arxiv.org/abs/2605.04213">arxiv.org</a></li>
+<li><b>Tung, Huang, Saxena, Shirvani, Hukerikar, Jain, Tyagi and Gongalore, DSN 2026.</b> The Anatomy of Silent Data Corruption: GPU error pattern study and modeling guidance. Gate-level <a class="term" href="learn.html#g-fault-injection" data-def="Deliberately corrupting a value to confirm the checks notice. Used here as a self-test on every published row.">fault injection</a> on a data-center GPU: half of all corruptions are zeroed values, under 40% of bit-flip corruptions are single-bit, and corruptions repeat at warp-aligned spacings. The self-test's gpu-sdc faults follow its measurements. <a href="https://arxiv.org/abs/2605.04213">arxiv.org</a></li>
 <li><b>Higham, Accuracy and Stability of Numerical Algorithms.</b> The componentwise rounding error bound for inner products used by the reference check.</li>
 <li><b>Huang and Abraham, 1984.</b> Algorithm-based fault tolerance for matrix operations, IEEE Transactions on Computers. The row and column checksums behind probe 6.</li>
-<li><b>Fasi, Higham, Mikaitis and Pranesh, 2021.</b> Numerical behavior of NVIDIA tensor cores. The measurement that tensor cores accumulate with truncation, which sets the fp16 and bf16 bound. <a href="https://peerj.com/articles/cs-330">peerj.com</a></li>
+<li><b>Fasi, Higham, Mikaitis and Pranesh, 2021.</b> Numerical behavior of NVIDIA <a class="term" href="learn.html#g-tensor-core" data-def="A unit on NVIDIA GPUs that multiplies small matrices in one step. fp16, bf16, FP8 and int8 matrix multiplies run through tensor cores; fp32 runs through the regular floating point units.">tensor cores</a>. The measurement that tensor cores accumulate with truncation, which sets the fp16 and bf16 bound. <a href="https://peerj.com/articles/cs-330">peerj.com</a></li>
 <li><b>DeepSeek-AI, 2024.</b> DeepSeek-V3 technical report. Reports that Hopper's FP8 tensor cores keep 14 bits when they add, which is why the FP8 inputs here are chosen so every sum fits in 13. <a href="https://arxiv.org/abs/2412.19437">arxiv.org</a></li>
-<li><b>Valpey and Pai, 2025.</b> Modeling three generations of tensor cores. A formal model of rounding and accumulation order on Volta, Turing and Ampere. <a href="https://arxiv.org/abs/2502.15999">arxiv.org</a></li>
-<li><b>OCP Test and Validation.</b> The open diagnostic output format and reference implementation all six probes write to. <a href="https://github.com/opencomputeproject/ocp-diag-core">ocp-diag-core</a></li>
+<li><b>Valpey and Pai, 2025.</b> Modeling three generations of tensor cores. A formal model of rounding and <a class="term" href="learn.html#g-accumulation" data-def="The running sum inside a dot product. Even when the inputs are fp16, the sum is normally kept in fp32, which is what the reference bound assumes and what the tester enforces on CUDA.">accumulation</a> order on Volta, Turing and Ampere. <a href="https://arxiv.org/abs/2502.15999">arxiv.org</a></li>
+<li><b><a class="term" href="learn.html#g-ocp-test-and-validation" data-def="The Open Compute Project's open format for hardware diagnostic output, used by cloud operators so that any test's results can be read by any fleet tool. All six probes write it.">OCP Test and Validation</a>.</b> The open diagnostic output format and reference implementation all six probes write to. <a href="https://github.com/opencomputeproject/ocp-diag-core">ocp-diag-core</a></li>
 </ul>
 </section>
 
@@ -66,7 +73,7 @@ https://github.com/tech4biz-yasha/ai-chip-integrity</pre>
 <footer class="foot">
 <div class="footin">
 <div><div class="brand">chip<b>integrity</b>.org</div><p>Open tests for silent computation errors in AI chips. MIT licensed. Every number on this site is read from a public result file.</p></div>
-<div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="index.html">Home</a><a href="learn.html">Learn</a><a href="method.html">Method</a><a href="results.html">Results</a><a href="chips/index.html">Chips</a><a href="run.html">Run it</a><a href="about.html">About</a></nav></div>
+<div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="index.html">Home</a><a href="learn.html">Learn</a><a href="method.html">Method</a><a href="results.html">Results</a><a href="chips/index.html">Chips</a><a href="findings/index.html">Findings</a><a href="run.html">Run it</a><a href="about.html">About</a></nav></div>
 <div><div class="fh">CITE</div><p>Yasha Khandelwal, ai-chip-integrity, version 0.4.2, 2026, <a href="https://doi.org/10.5281/zenodo.23393790">https://doi.org/10.5281/zenodo.23393790</a></p></div>
 </div>
 <div class="footbase">Page generated from the result files on 2026-10-15. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>

@@ -25,6 +25,34 @@
 <p>Vendor diagnostics run a fixed stress pattern for a short time and look for crashes and error counters. The research on real fleets says that is not enough. ByteDance's team reported that screening GPUs with synthetic microbenchmarks missed over 60 percent of the units that later corrupted real training runs, because the faults depend on the data being processed, show up with age, and are specific to individual units. A test that exercises one pattern for a few seconds can pass a chip that fails on the next pattern an hour later.</p>
 </section>
 
+<section id="bitflip">
+<div class="kicker">TRY IT</div>
+<h2>Flip a bit and watch the number change</h2>
+<p class="lede">Inside the chip every number is a row of bits. Click any bit below to flip it, the way a faulty transistor would, and see what happens to the value.</p>
+<div class="bx" id="bx">
+<div class="bxrow"><label for="bxval">Starting value</label><input id="bxval" type="text" value="6.0" inputmode="decimal" autocomplete="off">
+<label for="bxfmt">Format</label><select id="bxfmt"><option value="fp32">FP32</option><option value="bf16">BF16</option><option value="fp16">FP16</option></select>
+<button type="button" id="bxreset" class="btn ghost">Reset</button></div>
+<div class="bxbits" id="bxbits" role="group" aria-label="The bits of the number, sign first"></div>
+<div class="bxlegend"><span class="s">sign</span><span class="e">exponent</span><span class="m">mantissa, the digits of the number</span></div>
+<div class="bxout"><div><div class="k">Value now</div><div class="v" id="bxnow"></div></div><div><div class="k">Change</div><div class="v" id="bxdelta"></div></div><div><div class="k">Relative change</div><div class="v" id="bxrel"></div></div></div>
+<p class="note" id="bxsay" aria-live="polite">Click a bit to flip it.</p>
+</div>
+</section>
+
+<section id="allowance">
+<div class="kicker">TRY IT</div>
+<h2>How much rounding a long sum is allowed</h2>
+<p class="lede">Adding up many products in floating point always rounds a little, and the rounding allowed grows with the length of the sum. Slide the length and see which mantissa bits could flip and still hide inside that allowance.</p>
+<div class="bx" id="bud">
+<div class="bxrow"><label for="budk">Terms in the sum</label><input id="budk" type="range" min="4" max="16" step="1" value="12" aria-describedby="budsay"><output id="budkv" for="budk"></output></div>
+<div class="budbars" id="budbars" aria-hidden="true"></div>
+<div class="budaxis" aria-hidden="true"><span>bit 0, the lowest</span><span>bit 22, the highest</span></div>
+<p class="note" id="budsay" aria-live="polite"></p>
+</div>
+<p class="note">This uses the textbook bound from Higham's book for a sum of positive terms added in FP32: the error can be as large as γ<sub>K</sub> = Ku/(1 − Ku) of the sum, where K is the number of terms and u = 2<sup>−24</sup>. A flip of mantissa bit b changes a value by about 2<sup>b−23</sup> of itself. The tester's own bound also allows for the rounding of the output and each device's order of adding, so its exact numbers differ, but the picture is the same: a low-bit flip can hide inside the allowance, which is why every run is also compared with the first one bit for bit.</p>
+</section>
+
 <section id="why">
 <div class="kicker">LEARN, PART 2 OF 5</div>
 <h2>Why it matters</h2>

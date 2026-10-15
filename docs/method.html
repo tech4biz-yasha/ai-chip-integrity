@@ -12,22 +12,29 @@
 <meta property="og:title" content="How a chip is tested | Chip Integrity">
 <meta property="og:description" content="Every probe follows the same idea: run real AI maths many times, check each answer two ways, and prove the checks work by planting faults on purpose. This page walks through each probe, how a verdict is read, the self-test, and what a PASS can and cannot tell you.">
 <meta property="og:url" content="https://chipintegrity.org/method.html">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="alternate" type="application/atom+xml" title="Chip Integrity updates" href="feed.xml">
+<meta property="og:image" content="https://chipintegrity.org/og/method.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://chipintegrity.org/og/method.png">
 
 </head>
 <body data-page="method">
 <a class="skip" href="#content">Skip to content</a>
 <header class="top">
 <div class="topin">
-<a class="brand" href="index.html">chip<b>integrity</b>.org</a>
+<a class="brand" href="index.html"><img src="assets/logo.svg" alt=""><span>chip<b>integrity</b>.org</span></a>
 <button class="menu" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
 <nav id="nav" aria-label="Site">
 <a href="learn.html">Learn</a>
 <a href="method.html" aria-current="page">Method</a>
 <a href="results.html">Results</a>
 <a href="chips/index.html">Chips</a>
+<a href="findings/index.html">Findings</a>
 <a href="run.html">Run it</a>
 <a href="about.html">About</a>
 </nav>
@@ -64,7 +71,7 @@
 <h3>The reference check, in plain words</h3>
 <p>Floating point arithmetic rounds at every step, so two correct computers can legitimately differ in the last digit. The question is how different they are allowed to be. Numerical analysis has a proven answer: for a dot product of length K, the rounding error can never exceed a bound that depends only on K, the precision and how the hardware rounds. Every element of the chip's result is compared with a float64 reference and must sit inside that bound. For int8 the arithmetic is exact, so the bound is zero.</p>
 <div class="formula">|C − R| ≤ acc + u_out·(|R| + acc)<br>acc = g·(|A|@|B|)<br>g = n·u / (1 − n·u)<br>fp32: n = K, u = 2⁻²⁴<br>fp16, bf16: n = 2K, u = 2⁻²³<br>u_out: 2⁻²⁴ fp32, 2⁻¹¹ fp16, 2⁻⁸ bf16<br>int8, FP8: exact, bound 0</div>
-<p>fp32 runs on the FP32 fused multiply-add units with TF32 off. fp16 and bf16 run on tensor cores, which round by truncation rather than to nearest and add in blocks, as Fasi, Higham, Mikaitis and Pranesh measured, so they get the wider allowance. Every fp16 and bf16 row measured with v0.2.0 also passed a bound four times tighter than this one. An element outside the bound is a wrong answer, not a difference of opinion about tolerance.</p>
+<p>fp32 runs on the FP32 fused multiply-add units with TF32 off. fp16 and bf16 run on <a class="term" href="learn.html#g-tensor-core" data-def="A unit on NVIDIA GPUs that multiplies small matrices in one step. fp16, bf16, FP8 and int8 matrix multiplies run through tensor cores; fp32 runs through the regular floating point units.">tensor cores</a>, which round by truncation rather than to nearest and add in blocks, as Fasi, Higham, Mikaitis and Pranesh measured, so they get the wider allowance. Every fp16 and bf16 row measured with v0.2.0 also passed a bound four times tighter than this one. An element outside the bound is a wrong answer, not a difference of opinion about tolerance.</p>
 </div>
 <div class="panel">
 <h3>The repeat check, in plain words</h3>
@@ -78,7 +85,7 @@
 <div style="padding:22px 24px 10px">
 <div style="font-family:var(--mono);font-size:12px;color:var(--dim);margin-bottom:10px">DEVICE MEMORY, ONE PATTERN PASS</div>
 <div style="height:18px;background:#15213A;border:1px solid var(--line2);position:relative;overflow:hidden"><div class="fill" style="height:100%;background:linear-gradient(90deg,#1E6F94,#39B9EE);width:0"></div></div>
-<div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:8px"><span>write the pattern into every word</span><span>dwell 2 s</span><span>read back, compare exactly</span></div>
+<div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:8px"><span>write the pattern into every word</span><span><a class="term" href="learn.html#g-dwell" data-def="The pause between writing memory and reading it back. Weak cells lose their value over time, so a longer dwell catches more of them.">dwell</a> 2 s</span><span>read back, compare exactly</span></div>
 </div>
 <div style="padding:4px 24px 18px">
 <div style="font-family:var(--mono);font-size:12px;color:var(--dim);margin:14px 0 10px">SIX PATTERNS, IN ORDER</div>
@@ -122,7 +129,7 @@
 </div>
 <p>FP8 keeps its inputs in {&minus;1, 0, 1} so its answers stay exact, so it runs the alternate and sparse patterns only.</p>
 <h3>Probe 11: error counters</h3>
-<p>A silent error is one the chip does not notice. So every run of the other probes reads the chip's own error counters at its start and its end: ECC counts, remapped memory rows and retired pages, with temperature, clock and power beside them. Then it asks whether the hardware noticed what the probe noticed. Wrong answers with every counter quiet are a silent error in the strict sense, the case ECC and the error logs cannot see. The counters come from NVIDIA's management library, so on other chips the probe records that none are available. On a card with ECC switched off, as on the RTX 4090 and RTX A5000 measured here, the counters cannot record memory errors at all, and the probe says so instead of calling them quiet.</p>
+<p>A <a class="term" href="learn.html#g-silent-error" data-def="A wrong result from a chip with no crash, no error flag and no log entry. The chip does not know it happened.">silent error</a> is one the chip does not notice. So every run of the other probes reads the chip's own error counters at its start and its end: ECC counts, remapped memory rows and retired pages, with temperature, clock and power beside them. Then it asks whether the hardware noticed what the probe noticed. Wrong answers with every counter quiet are a silent error in the strict sense, the case ECC and the error logs cannot see. The counters come from NVIDIA's management library, so on other chips the probe records that none are available. On a card with ECC switched off, as on the RTX 4090 and RTX A5000 measured here, the counters cannot record memory errors at all, and the probe says so instead of calling them quiet.</p>
 </section>
 
 <section id="verdicts" class="reveal">
@@ -143,7 +150,7 @@
 <div class="v bad">hardware-noticed</div><div>Wrong answers, and a counter moved too.</div>
 <div class="v warn">corrected-during-run</div><div>Every answer was right, but the hardware corrected errors during the run. Worth watching on a healthy chip.</div>
 <div class="v bad">uncorrected-during-run</div><div>The hardware recorded uncorrected errors. A fault even if the answers held.</div>
-<div class="v warn">ecc-off</div><div>ECC is switched off on the device, so its memory error counters cannot move and their silence proves nothing. The probes' own checks still stand.</div>
+<div class="v warn">ecc-off</div><div><a class="term" href="learn.html#g-ecc" data-def="Error-correcting code. Extra bits stored with memory that let the hardware detect and usually correct a single flipped bit. ECC covers memory, not the arithmetic units, and not every chip has it on all memory.">ECC</a> is switched off on the device, so its memory error counters cannot move and their silence proves nothing. The probes' own checks still stand.</div>
 <div class="v">counters-unavailable</div><div>The device has no error counters to read, such as an Apple GPU or a CPU. Never fails a run.</div>
 </div>
 <h3>Memory probe</h3>
@@ -162,10 +169,10 @@
 <div class="kicker">EVIDENCE</div>
 <h2>The self-test</h2>
 <p class="lede">A clean table is only worth something if the tester can show it would have seen a fault. So every row is paired with an injection run.</p>
-<svg class="flow" viewBox="0 0 990 150" role="img" aria-label="run on the chip then plant a fault then check it twice then caught"><rect class="node" x="10" y="26" width="220" height="86" rx="6"/><text class="lab" x="28" y="60">RUN ON THE CHIP</text><text class="sub" x="28" y="86">result copied back</text><path class="wire draw" d="M230 69 L260 69"/><rect class="node" x="260" y="26" width="220" height="86" rx="6"/><text class="lab" x="278" y="60">PLANT A FAULT</text><text class="sub" x="278" y="86">one bit, or NVIDIA's pattern</text><path class="wire draw" d="M480 69 L510 69"/><rect class="node" x="510" y="26" width="220" height="86" rx="6"/><text class="lab" x="528" y="60">CHECK IT TWICE</text><text class="sub" x="528" y="86">bound and repeat</text><path class="wire draw" d="M730 69 L760 69"/><rect class="node" x="760" y="26" width="220" height="86" rx="6"/><text class="lab okt" x="778" y="60">CAUGHT</text><text class="sub" x="778" y="86">or the step fails</text><circle class="dot move" cx="120" cy="69" r="6" style="--d:750px"/></svg>
+<div class="flowwrap"><svg class="flow" viewBox="0 0 990 150" role="img" aria-label="run on the chip then plant a fault then check it twice then caught"><rect class="node" x="10" y="26" width="220" height="86" rx="6"/><text class="lab" x="28" y="60">RUN ON THE CHIP</text><text class="sub" x="28" y="86">result copied back</text><path class="wire draw" d="M230 69 L260 69"/><rect class="node" x="260" y="26" width="220" height="86" rx="6"/><text class="lab" x="278" y="60">PLANT A FAULT</text><text class="sub" x="278" y="86">one bit, or NVIDIA's pattern</text><path class="wire draw" d="M480 69 L510 69"/><rect class="node" x="510" y="26" width="220" height="86" rx="6"/><text class="lab" x="528" y="60">CHECK IT TWICE</text><text class="sub" x="528" y="86">bound and repeat</text><path class="wire draw" d="M730 69 L760 69"/><rect class="node" x="760" y="26" width="220" height="86" rx="6"/><text class="lab okt" x="778" y="60">CAUGHT</text><text class="sub" x="778" y="86">or the step fails</text><circle class="dot move" cx="120" cy="69" r="6" style="--d:750px"/></svg></div>
 
 <div class="grid2">
-<div class="panel"><h3>Compute self-test</h3><p>In five of the fifty runs a fault is planted before the checks run, and all five must be caught. Since v0.4.2 the five alternate between two kinds. Three flip one random bit of one random output element, which can be anywhere: sign, exponent or the lowest mantissa bit. Two follow NVIDIA's gate-level fault injection study of a data-center GPU (Tung et al., DSN 2026): one warp-aligned group of 32 outputs is hit at a regular spacing, and each value hit is zeroed, has several bits flipped, or, rarely, turns into NaN or infinity, in the proportions that study measured. On the chips measured so far, with the v0.2.0 bound, the reference check alone caught 46 of every 60 single-bit flips and the repeat check caught all 60. That is why there are two checks.</p></div>
+<div class="panel"><h3>Compute self-test</h3><p>In five of the fifty runs a fault is planted before the checks run, and all five must be caught. Since v0.4.2 the five alternate between two kinds. Three flip one random bit of one random output element, which can be anywhere: sign, exponent or the lowest mantissa bit. Two follow NVIDIA's gate-level <a class="term" href="learn.html#g-fault-injection" data-def="Deliberately corrupting a value to confirm the checks notice. Used here as a self-test on every published row.">fault injection</a> study of a data-center GPU (Tung et al., DSN 2026): one warp-aligned group of 32 outputs is hit at a regular spacing, and each value hit is zeroed, has several bits flipped, or, rarely, turns into NaN or infinity, in the proportions that study measured. On the chips measured so far, with the v0.2.0 bound, the reference check alone caught 46 of every 60 single-bit flips and the repeat check caught all 60. That is why there are two checks.</p></div>
 <div class="panel"><h3>Memory self-test</h3><p>After each pattern is written, five random bits in five random words of real device memory are flipped. The sweep must locate all of them by address. Because the flips happen in device memory, this exercises the actual read-back path, not only the comparison code.</p></div>
 </div>
 <div class="panel"><h3>NVIDIA's fault patterns on a real GPU</h3><p>The faults in NVIDIA's study are permanent: a broken unit gives the same wrong answer on every run, so comparing runs cannot catch them and the reference check has to. On 15 October 2026 the compute probe ran on a rented RTX 4090 with only the NVIDIA-shaped faults, 49 in each of six precisions (fp32, fp16, bf16, int8, FP8 and fast-accumulation FP8) at 1024×1024×1024. The reference check alone flagged all 294. Because it judges each run on its own, the same faults would be flagged if they repeated on every run. <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/evidence/rtx4090_gpu_sdc_reference.jsonl">Result file</a></p></div>
@@ -187,7 +194,7 @@
 <footer class="foot">
 <div class="footin">
 <div><div class="brand">chip<b>integrity</b>.org</div><p>Open tests for silent computation errors in AI chips. MIT licensed. Every number on this site is read from a public result file.</p></div>
-<div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="index.html">Home</a><a href="learn.html">Learn</a><a href="method.html">Method</a><a href="results.html">Results</a><a href="chips/index.html">Chips</a><a href="run.html">Run it</a><a href="about.html">About</a></nav></div>
+<div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="index.html">Home</a><a href="learn.html">Learn</a><a href="method.html">Method</a><a href="results.html">Results</a><a href="chips/index.html">Chips</a><a href="findings/index.html">Findings</a><a href="run.html">Run it</a><a href="about.html">About</a></nav></div>
 <div><div class="fh">CITE</div><p>Yasha Khandelwal, ai-chip-integrity, version 0.4.2, 2026, <a href="https://doi.org/10.5281/zenodo.23393790">https://doi.org/10.5281/zenodo.23393790</a></p></div>
 </div>
 <div class="footbase">Page generated from the result files on 2026-10-15. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>

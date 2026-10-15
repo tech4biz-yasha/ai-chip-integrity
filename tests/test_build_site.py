@@ -163,8 +163,8 @@ def test_every_link_on_every_page_opens_from_a_plain_folder():
     import os
     import re
     docs = pathlib.Path(build_site.ROOT) / "docs"
-    pages = sorted(docs.glob("*.html")) + sorted((docs / "chips").glob("*.html"))
-    assert len(pages) >= 13
+    pages = sorted(docs.glob("*.html")) + sorted((docs / "chips").glob("*.html")) + sorted((docs / "findings").glob("*.html"))
+    assert len(pages) >= 17
     for page in pages:
         html = page.read_text()
         for link in re.findall(r'(?:href|src)="([^"]+)"', html):
@@ -176,3 +176,27 @@ def test_every_link_on_every_page_opens_from_a_plain_folder():
             assert target.is_file(), f"{page.relative_to(docs)}: {link} does not open a file"
             if frag:
                 assert f'id="{frag}"' in target.read_text(), f"{page.relative_to(docs)}: {link} has no #{frag}"
+
+
+def test_every_page_has_a_share_image_and_the_feed_is_valid():
+    """Links shared on LinkedIn, X or Slack show the page's own image, and the updates feed parses as Atom."""
+    import re
+    import xml.etree.ElementTree as ET
+    docs = pathlib.Path(build_site.ROOT) / "docs"
+    pages = sorted(docs.glob("*.html")) + sorted((docs / "chips").glob("*.html")) + sorted((docs / "findings").glob("*.html"))
+    for page in pages:
+        m = re.search(r'<meta property="og:image" content="https://chipintegrity\.org/(og/[^"]+\.png)">', page.read_text())
+        assert m and (docs / m.group(1)).is_file(), f"{page.name}: no share image"
+    root = ET.parse(docs / "feed.xml").getroot()
+    entries = root.findall("{http://www.w3.org/2005/Atom}entry")
+    assert len(entries) == len(build_site.FINDINGS) + len(build_site.RELEASES)
+
+
+def test_glossary_terms_link_to_their_definitions():
+    learn = (pathlib.Path(build_site.ROOT) / "docs" / "learn.html").read_text()
+    method = (pathlib.Path(build_site.ROOT) / "docs" / "method.html").read_text()
+    terms = build_site.glossary(build_site.read_site("pages/learn.html"))
+    assert len(terms) >= 10
+    for _, slug, _ in terms:
+        assert f'id="g-{slug}"' in learn, slug
+    assert 'class="term" href="learn.html#g-' in method

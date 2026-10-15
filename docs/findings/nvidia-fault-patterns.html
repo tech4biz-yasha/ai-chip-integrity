@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NVIDIA's own fault patterns, caught on a real GPU | Chip Integrity</title>
+<meta name="description" content="The self-test now plants faults shaped like NVIDIA's gate-level measurements. On an RTX 4090 the reference check alone flagged all 294.">
+<meta name="author" content="Yasha Khandelwal">
+<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
+<link rel="canonical" href="https://chipintegrity.org/findings/nvidia-fault-patterns.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="NVIDIA's own fault patterns, caught on a real GPU | Chip Integrity">
+<meta property="og:description" content="The self-test now plants faults shaped like NVIDIA's gate-level measurements. On an RTX 4090 the reference check alone flagged all 294.">
+<meta property="og:url" content="https://chipintegrity.org/findings/nvidia-fault-patterns.html">
+<link rel="stylesheet" href="../assets/site.css">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="alternate" type="application/atom+xml" title="Chip Integrity updates" href="../feed.xml">
+<meta property="og:image" content="https://chipintegrity.org/og/findings-nvidia-fault-patterns.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://chipintegrity.org/og/findings-nvidia-fault-patterns.png">
+
+</head>
+<body data-page="findings/index">
+<a class="skip" href="#content">Skip to content</a>
+<header class="top">
+<div class="topin">
+<a class="brand" href="../index.html"><img src="../assets/logo.svg" alt=""><span>chip<b>integrity</b>.org</span></a>
+<button class="menu" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+<nav id="nav" aria-label="Site">
+<a href="../learn.html">Learn</a>
+<a href="../method.html">Method</a>
+<a href="../results.html">Results</a>
+<a href="../chips/index.html">Chips</a>
+<a href="../findings/index.html" aria-current="page">Findings</a>
+<a href="../run.html">Run it</a>
+<a href="../about.html">About</a>
+</nav>
+<a class="gh" href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>
+</div>
+</header>
+<main id="content">
+<div class="wrap"><div class="pagehead"><div class="crumb"><a href="../index.html">chipintegrity.org</a> / <a href="index.html">findings</a> / nvidia-fault-patterns</div><div class="kicker">FINDING, 15 OCTOBER 2026</div><h1>NVIDIA's own fault patterns, caught on a real GPU</h1><p class="lede">The self-test now plants faults shaped like NVIDIA's gate-level measurements. On an RTX 4090 the reference check alone flagged all 294.</p></div><section class="reveal"><article class="post"><h2>What NVIDIA measured</h2>
+<p>Tung, Huang, Saxena, Shirvani, Hukerikar, Jain, Tyagi and Gongalore ran a gate-level stuck-at <a class="term" href="../learn.html#g-fault-injection" data-def="Deliberately corrupting a value to confirm the checks notice. Used here as a self-test on every published row.">fault injection</a> campaign on a production-class data-center GPU, over three million simulator hours across 63 CUDA micro-benchmarks, and published it in the DSN 2026 Industry Track. Three of their findings change how a tester should plant faults:</p>
+<ol class="plainlist"><li>NaN and infinities are only 1.01% of silent corruptions. Half of all corrupted values, 50.68%, are simply set to zero.</li><li>Single-bit flips are under 40% of bit-flip corruptions. Most flip several bits, and low bits more often than high ones.</li><li>Corrupted outputs repeat at warp-aligned periods of 2, 4, 8 or 16, so one fault hits a group of values.</li></ol>
+<figure class="fig2"><svg class="warp" viewBox="0 0 984 92" role="img" aria-label="One warp-aligned chunk of 32 outputs, with every fourth output corrupted"><rect x="12" y="20" width="24" height="24" rx="3" class="wc "/><rect x="42" y="20" width="24" height="24" rx="3" class="wc zero"/><rect x="72" y="20" width="24" height="24" rx="3" class="wc "/><rect x="102" y="20" width="24" height="24" rx="3" class="wc "/><rect x="132" y="20" width="24" height="24" rx="3" class="wc "/><rect x="162" y="20" width="24" height="24" rx="3" class="wc flip"/><rect x="192" y="20" width="24" height="24" rx="3" class="wc "/><rect x="222" y="20" width="24" height="24" rx="3" class="wc "/><rect x="252" y="20" width="24" height="24" rx="3" class="wc "/><rect x="282" y="20" width="24" height="24" rx="3" class="wc zero"/><rect x="312" y="20" width="24" height="24" rx="3" class="wc "/><rect x="342" y="20" width="24" height="24" rx="3" class="wc "/><rect x="372" y="20" width="24" height="24" rx="3" class="wc "/><rect x="402" y="20" width="24" height="24" rx="3" class="wc flip"/><rect x="432" y="20" width="24" height="24" rx="3" class="wc "/><rect x="462" y="20" width="24" height="24" rx="3" class="wc "/><rect x="492" y="20" width="24" height="24" rx="3" class="wc "/><rect x="522" y="20" width="24" height="24" rx="3" class="wc zero"/><rect x="552" y="20" width="24" height="24" rx="3" class="wc "/><rect x="582" y="20" width="24" height="24" rx="3" class="wc "/><rect x="612" y="20" width="24" height="24" rx="3" class="wc "/><rect x="642" y="20" width="24" height="24" rx="3" class="wc flip"/><rect x="672" y="20" width="24" height="24" rx="3" class="wc "/><rect x="702" y="20" width="24" height="24" rx="3" class="wc "/><rect x="732" y="20" width="24" height="24" rx="3" class="wc "/><rect x="762" y="20" width="24" height="24" rx="3" class="wc zero"/><rect x="792" y="20" width="24" height="24" rx="3" class="wc "/><rect x="822" y="20" width="24" height="24" rx="3" class="wc "/><rect x="852" y="20" width="24" height="24" rx="3" class="wc "/><rect x="882" y="20" width="24" height="24" rx="3" class="wc flip"/><rect x="912" y="20" width="24" height="24" rx="3" class="wc "/><rect x="942" y="20" width="24" height="24" rx="3" class="wc "/><text x="12" y="74" class="cap">ONE WARP-ALIGNED CHUNK OF 32 OUTPUTS, PERIOD 4</text><text x="972" y="74" text-anchor="end" class="cap">EACH HIT IS ZEROED, BIT-FLIPPED, OR RARELY NAN OR INFINITY</text></svg><figcaption>An example fault from the model: every fourth output in one 32-wide chunk is hit. The period can be 2, 4, 8 or 16, and each hit draws its own outcome.</figcaption></figure>
+<h2>What the tester now does</h2>
+<p>Since version 0.4.2, the self-tests of the compute, transformer kernel and data pattern probes plant faults shaped that way, alternating with single random <a class="term" href="../learn.html#g-bit-flip" data-def="One binary digit changing value. In a floating point number a flipped high bit can change the value by orders of magnitude; a flipped low bit changes it by less than one part in a million.">bit flips</a>. The paper gives its flip-count histogram only as a chart, so two parts are an approximation, stated openly: 35% of bit-flip outcomes are single-bit, under the 40% ceiling it reports, and the rest flip two to eight bits.</p>
+<h2>What it found on a real GPU</h2>
+<p>NVIDIA's faults are permanent: a broken unit gives the same wrong answer on every run, so comparing runs cannot catch them, and the reference check has to. On 15 October 2026 the compute probe ran on a rented RTX 4090 with PyTorch 2.8.0 and only the NVIDIA-shaped faults, 49 in each of six precisions at 1024×1024×1024. The reference check alone flagged all 294. A smoke run of every probe on the same card caught all 153 planted faults, 55 of them NVIDIA-shaped.</p>
+<p><a href="https://arxiv.org/abs/2605.04213">The paper on arXiv</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/releases/tag/v0.4.2">Release 0.4.2</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/evidence/rtx4090_gpu_sdc_reference.jsonl">The result file</a></p>
+</article></section></div>
+</main>
+<footer class="foot">
+<div class="footin">
+<div><div class="brand">chip<b>integrity</b>.org</div><p>Open tests for silent computation errors in AI chips. MIT licensed. Every number on this site is read from a public result file.</p></div>
+<div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="../index.html">Home</a><a href="../learn.html">Learn</a><a href="../method.html">Method</a><a href="../results.html">Results</a><a href="../chips/index.html">Chips</a><a href="../findings/index.html">Findings</a><a href="../run.html">Run it</a><a href="../about.html">About</a></nav></div>
+<div><div class="fh">CITE</div><p>Yasha Khandelwal, ai-chip-integrity, version 0.4.2, 2026, <a href="https://doi.org/10.5281/zenodo.23393790">https://doi.org/10.5281/zenodo.23393790</a></p></div>
+</div>
+<div class="footbase">Page generated from the result files on 2026-10-15. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>
+</footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

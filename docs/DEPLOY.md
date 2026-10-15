@@ -4,7 +4,10 @@ This folder is a complete static site. No build step, no server code, no databas
 
 Files
 - index.html      the home page; learn.html, method.html, results.html, run.html and about.html are the other pages
-- assets/         site.css and site.js, shared by every page (fonts load from Google Fonts)
+- assets/         site.css, site.js, the logo and icons, and the IBM Plex fonts (self-hosted, no outside requests)
+- findings/       one page per finding and findings/index.html
+- og/             the share image for every page, shown when a link is posted on LinkedIn, X or Slack
+- feed.xml        updates feed (Atom), served as application/atom+xml
 - chips/          one page per measured chip (chips/<chip>.html) and chips/index.html listing them all
 - robots.txt      allows all crawlers, points to the sitemap
 - sitemap.xml

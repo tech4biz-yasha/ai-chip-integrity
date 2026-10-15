@@ -1,0 +1,7 @@
+<h2>What the counters are for</h2>
+<p>Alongside every run, the tester reads the chip's own error counters before and after, so a wrong answer can be set against what the hardware itself noticed. When the counters stay still and the answers are right, the result is reported as quiet counters.</p>
+<h2>What was wrong with that on two cards</h2>
+<p>The RTX 4090 and RTX A5000 were measured on rented pods that reported ECC switched off. With ECC off, the memory error counters cannot record anything at all, so "quiet" would suggest the hardware looked and saw nothing, when it could not look.</p>
+<h2>What changed</h2>
+<p>Since version 0.4.1 the cross-check records <code>ecc-off</code> in that case, and both cards' rows on this site carry that label. Their answers were all correct either way; the change is about saying honestly what the counters could and could not see.</p>
+<p><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/releases/tag/v0.4.1">Release 0.4.1</a></p>

@@ -12,22 +12,29 @@
 <meta property="og:title" content="Measured results | Chip Integrity">
 <meta property="og:description" content="Every row on this page is generated from a result file in the repository, and every chip also has its own page with the full detail. Nothing here is modelled or estimated.">
 <meta property="og:url" content="https://chipintegrity.org/results.html">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="alternate" type="application/atom+xml" title="Chip Integrity updates" href="feed.xml">
+<meta property="og:image" content="https://chipintegrity.org/og/results.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://chipintegrity.org/og/results.png">
 
 </head>
 <body data-page="results">
 <a class="skip" href="#content">Skip to content</a>
 <header class="top">
 <div class="topin">
-<a class="brand" href="index.html">chip<b>integrity</b>.org</a>
+<a class="brand" href="index.html"><img src="assets/logo.svg" alt=""><span>chip<b>integrity</b>.org</span></a>
 <button class="menu" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
 <nav id="nav" aria-label="Site">
 <a href="learn.html">Learn</a>
 <a href="method.html">Method</a>
 <a href="results.html" aria-current="page">Results</a>
 <a href="chips/index.html">Chips</a>
+<a href="findings/index.html">Findings</a>
 <a href="run.html">Run it</a>
 <a href="about.html">About</a>
 </nav>
@@ -36,6 +43,18 @@
 </header>
 <main id="content">
 <div class="wrap"><div class="pagehead"><div class="kicker">EVIDENCE</div><h1>Results from every chip measured</h1><p class="lede">Every row on this page is generated from a result file in the repository, and every chip also has its own page with the full detail. Nothing here is modelled or estimated.</p><div class="learnh">ON THIS PAGE YOU WILL LEARN</div><ol class="learn"><li>Which chips have been measured, and when</li><li>What each probe found on each chip</li><li>Where to download every raw result file</li></ol></div>
+<section id="compare" class="reveal">
+<div class="kicker">EXPLORE</div>
+<h2>Compare two chips</h2>
+<p class="lede">Pick two chips to see, side by side, how close each came to its proven error limit in every precision and kernel, and how many planted faults each caught.</p>
+<div class="bx" id="cmp">
+<div class="bxrow"><label for="cmpa">Chip</label><select id="cmpa"></select><label for="cmpb">against</label><select id="cmpb"></select></div>
+<div id="cmpout" aria-live="polite"></div>
+</div>
+<script type="application/json" id="chipdata">[{"name": "Apple GPU (MPS) arm64", "slug": "apple-gpu-mps-arm64", "runs": 1785, "words": 1476395008, "faults": 0, "caught": 264, "injected": 264, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["BF16 matrix multiply", 0.8694], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["FP16 matrix multiply", 0.5093], ["Attention BF16", 0.1866], ["GELU FP32", 0.1439], ["RoPE FP32", 0.1232], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0097], ["Softmax FP32", 0.0054], ["FP32 matrix multiply", 0.0053], ["Attention FP32", 0.0008], ["Layer norm FP32", 0.0008]]}, {"name": "NVIDIA A100-SXM4-80GB", "slug": "nvidia-a100-sxm4-80gb", "runs": 600, "words": 16911433728, "faults": 0, "caught": 90, "injected": 90, "budget": [["BF16 matrix multiply", 0.8694], ["FP16 matrix multiply", 0.5093], ["FP32 matrix multiply", 0.0014]]}, {"name": "NVIDIA GeForce RTX 4090", "slug": "nvidia-geforce-rtx-4090", "runs": 2515, "words": 4966055936, "faults": 0, "caught": 351, "injected": 351, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["BF16 matrix multiply", 0.6569], ["FP16 matrix multiply", 0.207], ["Attention BF16", 0.1889], ["GELU FP32", 0.1623], ["RoPE FP32", 0.1221], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0389], ["FP32 matrix multiply", 0.0053], ["Softmax FP32", 0.0053], ["Attention FP32", 0.0012], ["Layer norm FP32", 0.0008]]}, {"name": "NVIDIA H100 80GB HBM3", "slug": "nvidia-h100-80gb-hbm3", "runs": 2515, "words": 16844324864, "faults": 0, "caught": 351, "injected": 351, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["BF16 matrix multiply", 0.6569], ["FP16 matrix multiply", 0.207], ["Attention BF16", 0.1889], ["GELU FP32", 0.1623], ["RoPE FP32", 0.1221], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0389], ["FP32 matrix multiply", 0.0053], ["Softmax FP32", 0.0053], ["Attention FP32", 0.0012], ["Layer norm FP32", 0.0008]]}, {"name": "NVIDIA H200", "slug": "nvidia-h200", "runs": 600, "words": 29863444480, "faults": 0, "caught": 90, "injected": 90, "budget": [["BF16 matrix multiply", 0.8694], ["FP16 matrix multiply", 0.5093], ["FP32 matrix multiply", 0.0053]]}, {"name": "NVIDIA RTX A5000", "slug": "nvidia-rtx-a5000", "runs": 2055, "words": 4966055936, "faults": 0, "caught": 297, "injected": 297, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["BF16 matrix multiply", 0.6569], ["FP16 matrix multiply", 0.207], ["Attention BF16", 0.1889], ["GELU FP32", 0.1623], ["RoPE FP32", 0.1221], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0195], ["Softmax FP32", 0.0053], ["FP32 matrix multiply", 0.0024], ["Attention FP32", 0.0012], ["Layer norm FP32", 0.0008]]}]</script>
+<noscript><p class="note">The comparison needs JavaScript. Every number is also in the tables below and on each chip page.</p></noscript>
+</section>
+
 <section id="results" class="reveal">
 <div class="kicker">EVIDENCE</div>
 <h2>Measured results</h2>
@@ -43,6 +62,7 @@
 <h3 id="chips">One page per chip</h3>
 <p class="note">Each chip has its own page with every step of every probe, the setup, the self-test and the result files. <a href="chips/index.html">All chips on one page</a>.</p>
 <div class="grid3"><a class="panel chipcard" href="chips/apple-gpu-mps-arm64.html"><h3>Apple GPU (MPS) arm64</h3><p>Tested 10 October 2026. 1,785 compute runs, 0 silent faults, 264 of 264 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-a100-sxm4-80gb.html"><h3>NVIDIA A100-SXM4-80GB</h3><p>Tested 7 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-geforce-rtx-4090.html"><h3>NVIDIA GeForce RTX 4090</h3><p>Tested 11 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-h100-80gb-hbm3.html"><h3>NVIDIA H100 80GB HBM3</h3><p>Tested 10 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-h200.html"><h3>NVIDIA H200</h3><p>Tested 8 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-rtx-a5000.html"><h3>NVIDIA RTX A5000</h3><p>Tested 11 October 2026. 2,055 compute runs, 0 silent faults, 297 of 297 planted faults caught.</p></a></div>
+<div class="bxrow filter"><label for="rowfilter">Filter the tables</label><input id="rowfilter" type="text" placeholder="a chip, for example H100" autocomplete="off"></div>
 <h3>Compute probe</h3>
 <div class="tablewrap"><table>
 <thead><tr><th>Device</th><th>Date</th><th>Shapes (M×K×N)</th><th>Precisions</th><th>Runs</th><th>Silent faults</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
@@ -69,7 +89,7 @@
 <td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/a100_clean.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/a100_inject.jsonl">self-test</a></td>
 </tr>
 <tr>
-<td>NVIDIA GeForce RTX 4090<span class="sub">PyTorch 2.8.0+cu128 · tool v0.3.2 · ECC off, so the error counters cannot see memory errors</span></td>
+<td>NVIDIA GeForce RTX 4090<span class="sub">PyTorch 2.8.0+cu128 · tool v0.3.2 · <a class="term" href="learn.html#g-ecc" data-def="Error-correcting code. Extra bits stored with memory that let the hardware detect and usually correct a single flipped bit. ECC covers memory, not the arithmetic units, and not every chip has it on all memory.">ECC</a> off, so the error counters cannot see memory errors</span></td>
 <td class="date">2026-10-11</td>
 <td>1024x1024x1024<br>4096x4096x4096<br>32x4096x11008</td>
 <td>fp32, fp16, bf16, int8, fp8, fp8fast</td>
@@ -278,7 +298,7 @@
 <p class="note">Subnormal inputs says whether the chip kept or flushed subnormal inputs to zero, per precision and measured at each shape. Either is allowed; the probe measures which, then checks the chip against that exact model. Mixed means a kernel kept them in some places and flushed them in others.</p>
 <h3>Memory probe</h3>
 <div class="tablewrap"><table>
-<thead><tr><th>Device</th><th>Date</th><th>Memory tested</th><th>Patterns</th><th>Dwell</th><th>Bad words</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
+<thead><tr><th>Device</th><th>Date</th><th>Memory tested</th><th>Patterns</th><th><a class="term" href="learn.html#g-dwell" data-def="The pause between writing memory and reading it back. Weak cells lose their value over time, so a longer dwell catches more of them.">Dwell</a></th><th>Bad words</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
 <tbody><tr>
 <td>NVIDIA H100 80GB HBM3<span class="sub">tool v0.1.1 · error counters quiet</span></td>
 <td class="date">2026-10-10</td>
@@ -353,7 +373,7 @@
 <footer class="foot">
 <div class="footin">
 <div><div class="brand">chip<b>integrity</b>.org</div><p>Open tests for silent computation errors in AI chips. MIT licensed. Every number on this site is read from a public result file.</p></div>
-<div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="index.html">Home</a><a href="learn.html">Learn</a><a href="method.html">Method</a><a href="results.html">Results</a><a href="chips/index.html">Chips</a><a href="run.html">Run it</a><a href="about.html">About</a></nav></div>
+<div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="index.html">Home</a><a href="learn.html">Learn</a><a href="method.html">Method</a><a href="results.html">Results</a><a href="chips/index.html">Chips</a><a href="findings/index.html">Findings</a><a href="run.html">Run it</a><a href="about.html">About</a></nav></div>
 <div><div class="fh">CITE</div><p>Yasha Khandelwal, ai-chip-integrity, version 0.4.2, 2026, <a href="https://doi.org/10.5281/zenodo.23393790">https://doi.org/10.5281/zenodo.23393790</a></p></div>
 </div>
 <div class="footbase">Page generated from the result files on 2026-10-15. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>

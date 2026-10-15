@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>When ECC is off, the memory error counters cannot see anything | Chip Integrity</title>
+<meta name="description" content="Two rented cards ran with ECC switched off, so their counters could not move. The tester now says so instead of calling them quiet.">
+<meta name="author" content="Yasha Khandelwal">
+<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
+<link rel="canonical" href="https://chipintegrity.org/findings/ecc-off.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="When ECC is off, the memory error counters cannot see anything | Chip Integrity">
+<meta property="og:description" content="Two rented cards ran with ECC switched off, so their counters could not move. The tester now says so instead of calling them quiet.">
+<meta property="og:url" content="https://chipintegrity.org/findings/ecc-off.html">
+<link rel="stylesheet" href="../assets/site.css">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="alternate" type="application/atom+xml" title="Chip Integrity updates" href="../feed.xml">
+<meta property="og:image" content="https://chipintegrity.org/og/findings-ecc-off.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://chipintegrity.org/og/findings-ecc-off.png">
+
+</head>
+<body data-page="findings/index">
+<a class="skip" href="#content">Skip to content</a>
+<header class="top">
+<div class="topin">
+<a class="brand" href="../index.html"><img src="../assets/logo.svg" alt=""><span>chip<b>integrity</b>.org</span></a>
+<button class="menu" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+<nav id="nav" aria-label="Site">
+<a href="../learn.html">Learn</a>
+<a href="../method.html">Method</a>
+<a href="../results.html">Results</a>
+<a href="../chips/index.html">Chips</a>
+<a href="../findings/index.html" aria-current="page">Findings</a>
+<a href="../run.html">Run it</a>
+<a href="../about.html">About</a>
+</nav>
+<a class="gh" href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>
+</div>
+</header>
+<main id="content">
+<div class="wrap"><div class="pagehead"><div class="crumb"><a href="../index.html">chipintegrity.org</a> / <a href="index.html">findings</a> / ecc-off</div><div class="kicker">FINDING, 11 OCTOBER 2026</div><h1>When ECC is off, the memory error counters cannot see anything</h1><p class="lede">Two rented cards ran with ECC switched off, so their counters could not move. The tester now says so instead of calling them quiet.</p></div><section class="reveal"><article class="post"><h2>What the counters are for</h2>
+<p>Alongside every run, the tester reads the chip's own error counters before and after, so a wrong answer can be set against what the hardware itself noticed. When the counters stay still and the answers are right, the result is reported as quiet counters.</p>
+<h2>What was wrong with that on two cards</h2>
+<p>The RTX 4090 and RTX A5000 were measured on rented pods that reported <a class="term" href="../learn.html#g-ecc" data-def="Error-correcting code. Extra bits stored with memory that let the hardware detect and usually correct a single flipped bit. ECC covers memory, not the arithmetic units, and not every chip has it on all memory.">ECC</a> switched off. With ECC off, the memory error counters cannot record anything at all, so "quiet" would suggest the hardware looked and saw nothing, when it could not look.</p>
+<h2>What changed</h2>
+<p>Since version 0.4.1 the cross-check records <code>ecc-off</code> in that case, and both cards' rows on this site carry that label. Their answers were all correct either way; the change is about saying honestly what the counters could and could not see.</p>
+<p><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/releases/tag/v0.4.1">Release 0.4.1</a></p>
+</article></section></div>
+</main>
+<footer class="foot">
+<div class="footin">
+<div><div class="brand">chip<b>integrity</b>.org</div><p>Open tests for silent computation errors in AI chips. MIT licensed. Every number on this site is read from a public result file.</p></div>
+<div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="../index.html">Home</a><a href="../learn.html">Learn</a><a href="../method.html">Method</a><a href="../results.html">Results</a><a href="../chips/index.html">Chips</a><a href="../findings/index.html">Findings</a><a href="../run.html">Run it</a><a href="../about.html">About</a></nav></div>
+<div><div class="fh">CITE</div><p>Yasha Khandelwal, ai-chip-integrity, version 0.4.2, 2026, <a href="https://doi.org/10.5281/zenodo.23393790">https://doi.org/10.5281/zenodo.23393790</a></p></div>
+</div>
+<div class="footbase">Page generated from the result files on 2026-10-15. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>
+</footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

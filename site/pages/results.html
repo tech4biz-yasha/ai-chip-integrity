@@ -1,4 +1,16 @@
 {{INTRO}}
+<section id="compare">
+<div class="kicker">EXPLORE</div>
+<h2>Compare two chips</h2>
+<p class="lede">Pick two chips to see, side by side, how close each came to its proven error limit in every precision and kernel, and how many planted faults each caught.</p>
+<div class="bx" id="cmp">
+<div class="bxrow"><label for="cmpa">Chip</label><select id="cmpa"></select><label for="cmpb">against</label><select id="cmpb"></select></div>
+<div id="cmpout" aria-live="polite"></div>
+</div>
+<script type="application/json" id="chipdata">{{CHIP_JSON}}</script>
+<noscript><p class="note">The comparison needs JavaScript. Every number is also in the tables below and on each chip page.</p></noscript>
+</section>
+
 <section id="results">
 <div class="kicker">EVIDENCE</div>
 <h2>Measured results</h2>
@@ -6,6 +18,7 @@
 <h3 id="chips">One page per chip</h3>
 <p class="note">Each chip has its own page with every step of every probe, the setup, the self-test and the result files. <a href="chips/index.html">All chips on one page</a>.</p>
 <div class="grid3">{{CHIP_CARDS}}</div>
+<div class="bxrow filter"><label for="rowfilter">Filter the tables</label><input id="rowfilter" type="text" placeholder="a chip, for example H100" autocomplete="off"></div>
 <h3>Compute probe</h3>
 <div class="tablewrap"><table>
 <thead><tr><th>Device</th><th>Date</th><th>Shapes (M×K×N)</th><th>Precisions</th><th>Runs</th><th>Silent faults</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>

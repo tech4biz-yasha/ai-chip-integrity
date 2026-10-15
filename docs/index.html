@@ -12,9 +12,15 @@
 <meta property="og:title" content="Chip Integrity: an open tester for silent computation errors in AI chips">
 <meta property="og:description" content="A GPU can pass its vendor diagnostics and still return wrong numbers with no error raised. Chip Integrity is an open, vendor-neutral tester that checks whether an AI chip computed correctly, with every result published as an OCP Test and Validation file.">
 <meta property="og:url" content="https://chipintegrity.org/">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="alternate" type="application/atom+xml" title="Chip Integrity updates" href="feed.xml">
+<meta property="og:image" content="https://chipintegrity.org/og/home.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://chipintegrity.org/og/home.png">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -67,13 +73,14 @@
 <a class="skip" href="#content">Skip to content</a>
 <header class="top">
 <div class="topin">
-<a class="brand" href="index.html">chip<b>integrity</b>.org</a>
+<a class="brand" href="index.html"><img src="assets/logo.svg" alt=""><span>chip<b>integrity</b>.org</span></a>
 <button class="menu" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
 <nav id="nav" aria-label="Site">
 <a href="learn.html">Learn</a>
 <a href="method.html">Method</a>
 <a href="results.html">Results</a>
 <a href="chips/index.html">Chips</a>
+<a href="findings/index.html">Findings</a>
 <a href="run.html">Run it</a>
 <a href="about.html">About</a>
 </nav>
@@ -122,11 +129,11 @@
 <div class="kicker">HOW IT WORKS</div>
 <h2>Three steps behind every result</h2>
 <p class="lede">The same three steps run on every chip, so a result on one chip means the same thing as a result on any other.</p>
-<svg class="flow" viewBox="0 0 740 150" role="img" aria-label="1  run real ai maths then 2  check every answer then 3  prove and publish"><rect class="node" x="10" y="26" width="220" height="86" rx="6"/><text class="lab" x="28" y="60">1  RUN REAL AI MATHS</text><text class="sub" x="28" y="86">dozens of runs per step</text><path class="wire draw" d="M230 69 L260 69"/><rect class="node" x="260" y="26" width="220" height="86" rx="6"/><text class="lab" x="278" y="60">2  CHECK EVERY ANSWER</text><text class="sub" x="278" y="86">proven bound, bit for bit</text><path class="wire draw" d="M480 69 L510 69"/><rect class="node" x="510" y="26" width="220" height="86" rx="6"/><text class="lab" x="528" y="60">3  PROVE AND PUBLISH</text><text class="sub" x="528" y="86">planted faults, OCP files</text></svg>
+<div class="flowwrap"><svg class="flow" viewBox="0 0 740 150" role="img" aria-label="1  run real ai maths then 2  check every answer then 3  prove and publish"><rect class="node" x="10" y="26" width="220" height="86" rx="6"/><text class="lab" x="28" y="60">1  RUN REAL AI MATHS</text><text class="sub" x="28" y="86">dozens of runs per step</text><path class="wire draw" d="M230 69 L260 69"/><rect class="node" x="260" y="26" width="220" height="86" rx="6"/><text class="lab" x="278" y="60">2  CHECK EVERY ANSWER</text><text class="sub" x="278" y="86">proven bound, bit for bit</text><path class="wire draw" d="M480 69 L510 69"/><rect class="node" x="510" y="26" width="220" height="86" rx="6"/><text class="lab" x="528" y="60">3  PROVE AND PUBLISH</text><text class="sub" x="528" y="86">planted faults, OCP files</text></svg></div>
 <div class="cols3">
 <div><div class="num">01</div><h3>Run real AI maths, many times</h3><p>Matrix multiplies in every precision, the kernels inside a transformer, data patterns built to reach particular bits, and a sweep of the device memory. Every step runs dozens of times.</p></div>
 <div><div class="num">02</div><h3>Check every answer two ways</h3><p>Each output is compared with an exact or float64 reference under a proven rounding-error bound, and with the first run bit for bit. A wrong answer has to get past both.</p></div>
-<div><div class="num">03</div><h3>Prove the checks work, then publish</h3><p>Next to every clean run, a self-test plants faults on purpose and every one must be caught. Everything is written in the OCP Test and Validation format and published with the result.</p></div>
+<div><div class="num">03</div><h3>Prove the checks work, then publish</h3><p>Next to every clean run, a self-test plants faults on purpose and every one must be caught. Everything is written in the <a class="term" href="learn.html#g-ocp-test-and-validation" data-def="The Open Compute Project's open format for hardware diagnostic output, used by cloud operators so that any test's results can be read by any fleet tool. All six probes write it.">OCP Test and Validation</a> format and published with the result.</p></div>
 </div>
 <p><a href="method.html">Read the full method</a></p>
 </div></section>
@@ -160,7 +167,7 @@
 <footer class="foot">
 <div class="footin">
 <div><div class="brand">chip<b>integrity</b>.org</div><p>Open tests for silent computation errors in AI chips. MIT licensed. Every number on this site is read from a public result file.</p></div>
-<div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="index.html">Home</a><a href="learn.html">Learn</a><a href="method.html">Method</a><a href="results.html">Results</a><a href="chips/index.html">Chips</a><a href="run.html">Run it</a><a href="about.html">About</a></nav></div>
+<div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="index.html">Home</a><a href="learn.html">Learn</a><a href="method.html">Method</a><a href="results.html">Results</a><a href="chips/index.html">Chips</a><a href="findings/index.html">Findings</a><a href="run.html">Run it</a><a href="about.html">About</a></nav></div>
 <div><div class="fh">CITE</div><p>Yasha Khandelwal, ai-chip-integrity, version 0.4.2, 2026, <a href="https://doi.org/10.5281/zenodo.23393790">https://doi.org/10.5281/zenodo.23393790</a></p></div>
 </div>
 <div class="footbase">Page generated from the result files on 2026-10-15. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>
