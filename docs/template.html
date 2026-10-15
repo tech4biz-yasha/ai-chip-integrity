@@ -33,7 +33,7 @@
       "@id": "https://chipintegrity.org/#code",
       "name": "ai-chip-integrity",
       "codeRepository": "https://github.com/tech4biz-yasha/ai-chip-integrity",
-      "identifier": "https://doi.org/10.5281/zenodo.23302804",
+      "identifier": "https://doi.org/10.5281/zenodo.23393790",
       "version": "0.4.2",
       "programmingLanguage": "Python",
       "license": "https://opensource.org/licenses/MIT",
@@ -449,6 +449,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 70px;color:var(--muted);f
 <div class="panel"><h3>Compute self-test</h3><p>In five of the fifty runs a fault is planted before the checks run, and all five must be caught. Since v0.4.2 the five alternate between two kinds. Three flip one random bit of one random output element, which can be anywhere: sign, exponent or the lowest mantissa bit. Two follow NVIDIA's gate-level fault injection study of a data-center GPU (Tung et al., DSN 2026): one warp-aligned group of 32 outputs is hit at a regular spacing, and each value hit is zeroed, has several bits flipped, or, rarely, turns into NaN or infinity, in the proportions that study measured. On the chips measured so far, with the v0.2.0 bound, the reference check alone caught 46 of every 60 single-bit flips and the repeat check caught all 60. That is why there are two checks.</p></div>
 <div class="panel"><h3>Memory self-test</h3><p>After each pattern is written, five random bits in five random words of real device memory are flipped. The sweep must locate all of them by address. Because the flips happen in device memory, this exercises the actual read-back path, not only the comparison code.</p></div>
 </div>
+<div class="panel"><h3>NVIDIA's fault patterns on a real GPU</h3><p>The faults in NVIDIA's study are permanent: a broken unit gives the same wrong answer on every run, so comparing runs cannot catch them and the reference check has to. On 15 October 2026 the compute probe ran on a rented RTX 4090 with only the NVIDIA-shaped faults, 49 in each of six precisions (fp32, fp16, bf16, int8, FP8 and fast-accumulation FP8) at 1024×1024×1024. The reference check alone flagged all 294. Because it judges each run on its own, the same faults would be flagged if they repeated on every run. <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/evidence/rtx4090_gpu_sdc_reference.jsonl">Result file</a></p></div>
 </section>
 
 <section id="limits">
@@ -532,7 +533,7 @@ docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-int
 <h2>About and cite</h2>
 <p>Chip Integrity is maintained by Yasha Khandelwal, Bengaluru. The code is MIT licensed. The project stays vendor neutral: the same tests run on every chip, and a row is published only with its result file.</p>
 <pre>Yasha Khandelwal. ai-chip-integrity: an open tester for silent computation errors in AI chips.
-Version 0.4.2, 2026. https://doi.org/10.5281/zenodo.23302804
+Version 0.4.2, 2026. https://doi.org/10.5281/zenodo.23393790
 https://github.com/tech4biz-yasha/ai-chip-integrity</pre>
 <p>Questions, rows and findings: <a href="mailto:yasha.khandelwal@tech4biz.io">yasha.khandelwal@tech4biz.io</a> or an issue on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</p>
 </section>
