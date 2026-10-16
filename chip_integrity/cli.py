@@ -3,6 +3,7 @@
     chip-integrity run                  every probe and its self-test, ten OCP result files
     chip-integrity run --quick          a smoke test with small sizes, about a minute on a laptop
     chip-integrity screen [options]     one probe with its own options (also memcheck, kernels, abft, patterns)
+    chip-integrity soak [options]       hours under load (probe 7), started on its own because it runs as long as asked
     chip-integrity --version            the suite version and every probe's version
 
 ``run`` starts each probe in its own Python process, exactly as running the ten commands in the README
@@ -33,7 +34,10 @@ PROBES = [
     ("memcheck", "memory", 5, "{name}_memcheck.jsonl", "{name}_memcheck_inject.jsonl"),
 ]
 PROBE_NAMES = [p[0] for p in PROBES]
-VERSIONED = PROBE_NAMES + ["counters"]
+# Probes that `run` leaves out because they take as long as you ask; each is started on its own.
+STANDALONE = [("soak", "hours under load")]
+STANDALONE_NAMES = [s[0] for s in STANDALONE]
+VERSIONED = PROBE_NAMES + STANDALONE_NAMES + ["counters"]
 
 # Small sizes for --quick. They exercise every code path, but the files are a smoke test, not a row.
 QUICK = {
@@ -65,7 +69,8 @@ def build_parser():
         formatter_class=argparse.RawDescriptionHelpFormatter,   # keeps the version line on one line
         description="Open tests for silent computation errors in AI chips.\n"
                     "Use `chip-integrity run` for every probe, or name one probe to run it with its own options.",
-        epilog="Probes: " + ", ".join(PROBE_NAMES) + ".\nExample: chip-integrity screen --help",
+        epilog="Probes: " + ", ".join(PROBE_NAMES) + ". Started on their own: " + ", ".join(STANDALONE_NAMES)
+               + ".\nExample: chip-integrity screen --help",
     )
     p.add_argument("--version", action="version", version=version_line(), help="print the suite and probe versions")
     sub = p.add_subparsers(dest="command", metavar="command")
@@ -78,6 +83,9 @@ def build_parser():
     run.add_argument("--skip", default="", help="comma list of probes to leave out, from " + ",".join(PROBE_NAMES))
     for name in PROBE_NAMES:
         sub.add_parser(name, help=f"run the {name} probe with its own options", add_help=False)
+    for name, what in STANDALONE:
+        sub.add_parser(name, help=f"run the {name} probe ({what}) with its own options; not part of run",
+                       add_help=False)
     return p
 
 
@@ -138,7 +146,7 @@ def run(args, runner=subprocess.call):
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else list(argv)
-    if argv and argv[0] in PROBE_NAMES:
+    if argv and argv[0] in PROBE_NAMES + STANDALONE_NAMES:
         # One probe, with its own options, run in this process exactly as `python <probe>.py` would.
         module = importlib.import_module(f"chip_integrity.{argv[0]}")
         sys.argv = [f"chip-integrity {argv[0]}"] + argv[1:]   # so the probe's usage line names the subcommand

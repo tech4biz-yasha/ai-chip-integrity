@@ -48,3 +48,7 @@ jobs:
         run: docker build -t chip-integrity:ci .
       - name: Every probe and its self-test inside the image, at quick sizes
         run: docker run --rm chip-integrity:ci run --quick --device cpu --out-dir /results
+      - name: Probe 7 under load inside the image for a few seconds, clean and with planted faults
+        run: |
+          docker run --rm chip-integrity:ci soak --device cpu --minutes 0.1 --window-s 2 --out /tmp/soak.jsonl
+          docker run --rm chip-integrity:ci soak --device cpu --minutes 0.1 --window-s 2 --inject 3 --out /tmp/soak_inject.jsonl
