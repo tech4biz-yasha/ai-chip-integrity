@@ -7,4 +7,4 @@ Run every probe and its self-test with one command:
 Each probe also runs on its own, for example ``chip-integrity screen --help``.
 """
 
-__version__ = "0.4.2"
+__version__ = "0.4.3"

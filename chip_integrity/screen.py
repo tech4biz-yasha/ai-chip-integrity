@@ -103,6 +103,45 @@ def device_label(dev):
     return "CPU " + (platform.processor() or platform.machine())
 
 
+def driver_version(dev):
+    """The GPU driver version as the system reports it, or None where there is no driver to ask. NVML first, then
+    nvidia-smi, so a pod without the Python bindings still records it."""
+    if dev.type != "cuda":
+        return None
+    try:
+        import pynvml
+        pynvml.nvmlInit()
+        v = pynvml.nvmlSystemGetDriverVersion()
+        return v.decode() if isinstance(v, bytes) else str(v)
+    except Exception:
+        pass
+    try:
+        import subprocess
+        out = subprocess.run(["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+                             capture_output=True, text=True, timeout=10).stdout
+        return out.strip().splitlines()[0].strip() or None
+    except Exception:
+        return None
+
+
+def software_versions(dev):
+    """Every version a reader needs to repeat a result file: PyTorch, Python, and on CUDA the CUDA runtime PyTorch
+    was built with and the driver on the machine. Written into the OCP dutInfo by every probe."""
+    out = [("torch", torch.__version__), ("python", platform.python_version())]
+    if dev.type == "cuda":
+        if torch.version.cuda:
+            out.append(("cuda", torch.version.cuda))
+        drv = driver_version(dev)
+        if drv:
+            out.append(("nvidia-driver", drv))
+    return out
+
+
+def add_software_infos(dut, dev):
+    for name, version in software_versions(dev):
+        dut.add_software_info(name=name, version=version)
+
+
 def lock_down_math(dev):
     torch.use_deterministic_algorithms(True, warn_only=True)
     torch.set_float32_matmul_precision("highest")
@@ -426,8 +465,7 @@ def main(argv=None):
     )
     dut = tv.Dut(id=socket.gethostname())
     hw = dut.add_hardware_info(name=device_label(dev))
-    dut.add_software_info(name="torch", version=torch.__version__)
-    dut.add_software_info(name="python", version=platform.python_version())
+    add_software_infos(dut, dev)
 
     print(f"Device: {device_label(dev)} ({dev})  runs={args.iters}  inject={args.inject}")
     all_ok = True

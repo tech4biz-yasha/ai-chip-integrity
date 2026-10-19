@@ -22,7 +22,6 @@ short summary on the terminal.
 
 import argparse
 import os
-import platform
 import random
 import socket
 import sys
@@ -33,7 +32,7 @@ import ocptv.output as tv  # noqa: E402
 
 from chip_integrity import counters  # noqa: E402
 
-from chip_integrity.screen import FileWriter, pick_device, device_label
+from chip_integrity.screen import FileWriter, pick_device, device_label, add_software_infos
 
 VERSION = "0.1.1"
 WORD = 4
@@ -197,8 +196,7 @@ def main(argv=None):
                                  "inject": args.inject})
     dut = tv.Dut(id=socket.gethostname())
     hw = dut.add_hardware_info(name=device_label(dev))
-    dut.add_software_info(name="torch", version=torch.__version__)
-    dut.add_software_info(name="python", version=platform.python_version())
+    add_software_infos(dut, dev)
 
     print(f"Device: {device_label(dev)} ({dev})  testing {got / 2**30:.2f} GiB"
           + (f" of {total / 2**30:.1f} GiB" if total else "") + f"  dwell={args.dwell}s  passes={args.passes}  inject={args.inject}")

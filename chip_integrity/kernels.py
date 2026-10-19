@@ -32,7 +32,6 @@ probe. Output: OCP Test & Validation JSON to --out.
 import argparse
 import math
 import os
-import platform
 import random
 import socket
 import sys
@@ -48,7 +47,7 @@ import ocptv.output as tv  # noqa: E402
 from chip_integrity import arith  # noqa: E402
 from chip_integrity import counters  # noqa: E402
 
-from chip_integrity.screen import (FileWriter, pick_device, device_label, lock_down_math, fault_models,  # noqa: E402
+from chip_integrity.screen import (FileWriter, pick_device, device_label, lock_down_math, fault_models, add_software_infos,  # noqa: E402
                                    plant_fault, INJECT_MODELS, NONDET_SHARE, NONDET_MIN)
 
 VERSION = "0.2.3"
@@ -469,8 +468,7 @@ def main(argv=None):
                                                        "for fp32" if dev.type == "cuda" else "device default")})
     dut = tv.Dut(id=socket.gethostname())
     hw = dut.add_hardware_info(name=device_label(dev))
-    dut.add_software_info(name="torch", version=torch.__version__)
-    dut.add_software_info(name="python", version=platform.python_version())
+    add_software_infos(dut, dev)
 
     print(f"Device: {device_label(dev)} ({dev})  size={args.size}  runs={args.iters}  inject={args.inject}")
     all_ok = True

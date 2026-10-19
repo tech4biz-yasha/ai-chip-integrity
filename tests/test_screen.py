@@ -261,3 +261,19 @@ def test_output_matches_official_ocp_schema(tmp_path):
     screen.main(BASE + ["--dtypes", "fp32,fp16,int8", "--inject", "2", "--out", str(out)])
     for obj in strict_load(out):
         validator.validate(obj)
+
+
+def test_software_versions_name_torch_python_and_on_cuda_the_driver(monkeypatch):
+    """Every file records what a reader needs to repeat it. On the CPU that is PyTorch and Python; on CUDA the
+    CUDA runtime and the driver join them, and a missing driver answer leaves the list short rather than wrong."""
+    import platform
+    import torch
+    cpu = dict(screen.software_versions(torch.device("cpu")))
+    assert cpu == {"torch": torch.__version__, "python": platform.python_version()}
+    assert screen.driver_version(torch.device("cpu")) is None
+    monkeypatch.setattr(screen, "driver_version", lambda dev: "580.126.09")
+    monkeypatch.setattr(torch.version, "cuda", "12.8")
+    cuda = dict(screen.software_versions(torch.device("cuda")))
+    assert cuda["cuda"] == "12.8" and cuda["nvidia-driver"] == "580.126.09"
+    monkeypatch.setattr(screen, "driver_version", lambda dev: None)
+    assert "nvidia-driver" not in dict(screen.software_versions(torch.device("cuda")))

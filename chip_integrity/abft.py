@@ -25,7 +25,6 @@ detection. Output: OCP Test and Validation JSON to --out.
 
 import argparse
 import math
-import platform
 import random
 import socket
 import sys
@@ -234,8 +233,7 @@ def main(argv=None):
                                  "inject": args.inject, "bound_model": arith.MODEL_ID})
     dut = tv.Dut(id=socket.gethostname())
     hw = dut.add_hardware_info(name=screen.device_label(dev))
-    dut.add_software_info(name="torch", version=torch.__version__)
-    dut.add_software_info(name="python", version=platform.python_version())
+    screen.add_software_infos(dut, dev)
 
     print(f"Device: {screen.device_label(dev)} ({dev})  runs={args.iters}  inject={args.inject}")
     all_ok = True
