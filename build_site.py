@@ -600,11 +600,11 @@ def chip_page(device, chip_map, runs_by_file, built):
     url = f"{SITE}/chips/{slug}.html"
     files = [(r.get(k), lbl) for name, r in sorted(rows.items()) for k, lbl in (("clean_file", "result"), ("inject_file", "self-test"))
              if r.get(k)]
-    title = f"{device}: silent computation error test results"
+    title = f"{device}: silent data corruption (SDC) test results"
     desc = (f'{device} tested by Chip Integrity: {st["runs"]:,} compute runs checked element by element, '
             f'{st["faults"]} silent faults found, {st["caught"]} of {st["injected"]} planted faults caught. '
             f'Every result file is public.')
-    ld = {"@context": "https://schema.org", "@type": "Dataset", "name": f"Silent computation error tests: {device}",
+    ld = {"@context": "https://schema.org", "@type": "Dataset", "name": f"Silent data corruption (SDC) tests: {device}",
           "description": desc, "url": url, "license": "https://opensource.org/licenses/MIT", "isAccessibleForFree": True,
           "creator": {"@type": "Person", "name": "Yasha Khandelwal"}, "dateModified": dates[-1],
           "measurementTechnique": "OCP Test and Validation output from ai-chip-integrity",
@@ -835,10 +835,10 @@ PAGES = {
                         "to cite it.",
                   learn=["The papers and standards the checks rely on", "Who maintains the project", "How to cite the tool"]),
 }
-HOME_TITLE = "Chip Integrity: an open tester for silent computation errors in AI chips"
-HOME_DESC = ("A GPU can pass its vendor diagnostics and still return wrong numbers with no error raised. Chip Integrity is "
-             "an open, vendor-neutral tester that checks whether an AI chip computed correctly, with every result "
-             "published as an OCP Test and Validation file.")
+HOME_TITLE = "Chip Integrity: open silent data corruption (SDC) tester for GPUs and AI chips"
+HOME_DESC = ("Silent data corruption (SDC): a GPU can pass its vendor diagnostics and still return wrong numbers with no "
+             "error raised. Chip Integrity is an open, vendor-neutral SDC tester for GPUs and AI accelerators that checks "
+             "whether a chip computed correctly, with every result published as an OCP Test and Validation file.")
 
 
 GLOSSARY_SKIP = {"fp32, fp16, bf16, FP8, int8"}       # precision names appear in every table; no hover links for them
@@ -965,6 +965,7 @@ def site_page(name, fills, built):
         version, doi = citation()
         ld = re.sub(r'"version": "[^"]*"', f'"version": "{version}"', read_site("home-ld.json.html"))
         ld = re.sub(r'"identifier": "https://doi\.org/[^"]*"', f'"identifier": "https://doi.org/{doi}"', ld)
+        ld = ld.replace("{{CHIP_NAMES}}", fills["CHIP_NAMES"])
         body = add_terms(body, glossary(read_site("pages/learn.html")), "")
         return render("index", HOME_TITLE, HOME_DESC, f"{SITE}/", body, "", built, ld)
     meta = PAGES[name]
@@ -1014,7 +1015,7 @@ def main():
     assert len({chip_slug(d) for d in devices}) == len(devices), "two chips share a page address"
     cards = "".join(chip_card(d, chip_map[d], f"chips/{chip_slug(d)}.html") for d in devices)
     fills = {
-        "CHIPS": str(len(chips)), "RUNS": f"{total_runs:,}", "WORDS": f"{total_words / 1e9:.1f} billion",
+        "CHIPS": str(len(chips)), "CHIP_NAMES": ", ".join(devices), "RUNS": f"{total_runs:,}", "WORDS": f"{total_words / 1e9:.1f} billion",
         "WORDS_NUM": f"{total_words / 1e9:.1f}", "FAULTS": str(faults), "CAUGHT": f"{total_caught} of {total_injected}",
         "CAUGHT_NUM": str(total_caught), "CHIP_CARDS": cards, "CHIP_JSON": json.dumps(
             [dict(name=d, slug=chip_slug(d), **chip_stats(chip_map[d]),

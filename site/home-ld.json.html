@@ -7,7 +7,8 @@
       "@id": "https://chipintegrity.org/#site",
       "url": "https://chipintegrity.org/",
       "name": "Chip Integrity",
-      "description": "An open, vendor-neutral tester for silent computation errors in AI chips, with results in OCP Test and Validation format.",
+      "alternateName": ["AI Chip Integrity", "ai-chip-integrity", "chipintegrity.org"],
+      "description": "An open, vendor-neutral tester for silent data corruption (SDC) in GPUs and AI chips, with results in OCP Test and Validation format.",
       "author": {"@id": "https://chipintegrity.org/#person"}
     },
     {
@@ -26,12 +27,15 @@
       "@type": "Dataset",
       "@id": "https://chipintegrity.org/#results",
       "name": "Chip Integrity measured results",
-      "description": "Silent computation error measurements for AI chips (NVIDIA H200, NVIDIA H100, NVIDIA A100, NVIDIA GeForce RTX 4090, NVIDIA RTX A5000, Apple GPU) from the compute, kernel, checksum, data pattern, memory and error counter probes, each row backed by an OCP Test and Validation result file.",
-      "url": "https://chipintegrity.org/#results",
+      "description": "Silent data corruption (SDC) measurements for AI chips ({{CHIP_NAMES}}) from the compute, kernel, checksum, data pattern, memory and error counter probes, each row backed by an OCP Test and Validation result file.",
+      "url": "https://chipintegrity.org/results.html",
+      "identifier": "https://doi.org/10.5281/zenodo.23393790",
+      "isAccessibleForFree": true,
+      "distribution": [{"@type": "DataDownload", "encodingFormat": "application/x-ndjson", "contentUrl": "https://github.com/tech4biz-yasha/ai-chip-integrity/tree/main/results"}],
       "license": "https://opensource.org/licenses/MIT",
       "creator": {"@id": "https://chipintegrity.org/#person"},
       "isBasedOn": "https://github.com/tech4biz-yasha/ai-chip-integrity",
-      "keywords": ["silent data corruption", "GPU reliability", "AI accelerator testing", "silent errors", "OCP Test and Validation", "GPU health check", "H100", "A100", "FP8", "ABFT"],
+      "keywords": ["silent data corruption", "SDC", "GPU silent data corruption test", "GPU reliability", "AI accelerator testing", "silent errors", "OCP Test and Validation", "GPU health check", "H100", "A100", "FP8", "ABFT"],
       "measurementTechnique": "Matrix multiply and transformer kernels against a float64 reference with derived componentwise rounding bounds and bit-for-bit repeat comparison; pattern sweep over most of the device memory with exact read-back; software fault injection self-test on every row"
     },
     {

@@ -46,7 +46,7 @@
 <section id="method" class="reveal">
 <div class="kicker">LEARN, PART 3 OF 5</div>
 <h2>How a chip is tested here</h2>
-<p class="lede">Six probes so far, numbered as on the roadmap. Probe 1 makes the chip multiply matrices and judges every output element. Probe 2 fills the chip's memory with known values and reads every one back. Probe 3 checks the other kernels inside a transformer the same way as probe 1. Probe 6 has the chip compute checksums inside the same multiply, so a wrong element can be caught and located without any reference. Probe 9 feeds the matrix multiply inputs built to reach particular bits. Probe 11 reads the chip's own error counters around every run and asks whether the hardware noticed. The compute, kernel and pattern probes run two independent checks on every output, and the checksum probe adds a third, so a fault has to hide from all of them.</p>
+<p class="lede">Six probes have measured rows so far, numbered as on the roadmap; probe 7, hours under load, is built and its first rows come next. Probe 1 makes the chip multiply matrices and judges every output element. Probe 2 fills the chip's memory with known values and reads every one back. Probe 3 checks the other kernels inside a transformer the same way as probe 1. Probe 6 has the chip compute checksums inside the same multiply, so a wrong element can be caught and located without any reference. Probe 9 feeds the matrix multiply inputs built to reach particular bits. Probe 11 reads the chip's own error counters around every run and asks whether the hardware noticed. The compute, kernel and pattern probes run two independent checks on every output, and the checksum probe adds a third, so a fault has to hide from all of them.</p>
 
 <h3>Probe 1: compute</h3>
 <p>The chip multiplies two fixed matrices, A and B, fifty times at each of three shapes and four precisions, plus FP8. Two checks run on every output.</p>
@@ -193,11 +193,11 @@
 </main>
 <footer class="foot">
 <div class="footin">
-<div><div class="brand">chip<b>integrity</b>.org</div><p>Open tests for silent computation errors in AI chips. MIT licensed. Every number on this site is read from a public result file.</p></div>
+<div><div class="brand">chip<b>integrity</b>.org</div><p>Open tests for silent data corruption (SDC) in GPUs and AI chips. MIT licensed. Every number on this site is read from a public result file.</p></div>
 <div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="index.html">Home</a><a href="learn.html">Learn</a><a href="method.html">Method</a><a href="results.html">Results</a><a href="chips/index.html">Chips</a><a href="findings/index.html">Findings</a><a href="run.html">Run it</a><a href="about.html">About</a></nav></div>
 <div><div class="fh">CITE</div><p>Yasha Khandelwal, ai-chip-integrity, version 0.4.2, 2026, <a href="https://doi.org/10.5281/zenodo.23393790">https://doi.org/10.5281/zenodo.23393790</a></p></div>
 </div>
-<div class="footbase">Page generated from the result files on 2026-10-15. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>
+<div class="footbase">Page generated from the result files on 2026-10-19. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>
 </footer>
 <script src="assets/site.js"></script>
 </body>

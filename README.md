@@ -2,7 +2,9 @@
 
 [![CI](https://github.com/tech4biz-yasha/ai-chip-integrity/actions/workflows/ci.yml/badge.svg)](https://github.com/tech4biz-yasha/ai-chip-integrity/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/ai-chip-integrity)](https://pypi.org/project/ai-chip-integrity/) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23393790.svg)](https://doi.org/10.5281/zenodo.23393790)
 
-An open tester for silent computation errors in AI chips.
+An open tester for silent data corruption (SDC) in GPUs and AI chips: wrong answers that come back with no error raised.
+
+Results, one page per chip and the findings so far: [chipintegrity.org](https://chipintegrity.org).
 
 It runs a fixed calculation on a GPU, NPU or CPU many times and proves, element by element, whether the chip returned the right answer every time. Results come out in the Open Compute Project Test and Validation format, so they drop straight into fleet tooling.
 
@@ -485,6 +487,10 @@ Every probe ends its run with a `device_error_counters` step from `counters.py`:
 
 ## Roadmap
 
+The suite is the first stage of one ladder: measure silent errors, then prevent them in software, then put the prevention in silicon. Every stage uses the same maths, the same fault library and the same chips. Versions below are targets, not promises; measured results live in `results/`.
+
+### Stage 1. Yardstick (now to December 2026, 0.5.x)
+
 Twelve probes, each aimed at one part of the chip. Seven are built: 1, 2, 3, 6, 7, 9 and 11.
 
 1. **Matrix multiply** (`screen.py`). Done for fp32, fp16, bf16, int8 and FP8 (E4M3, exact, from v0.3.0). FP4 follows once a Blackwell card is measured.
@@ -501,6 +507,28 @@ Twelve probes, each aimed at one part of the chip. Seven are built: 1, 2, 3, 6, 
 12. **Recovery.** After a detected fault, reset and rerun on the same card to see whether the fault clears. Likely needs bare-metal access, since a GPU reset needs root on the host.
 
 Around the probes: a fleet mode that runs every probe across many devices and collects the files, side by side runs against vendor diagnostics on the same device, and a rulebook for submitting rows to the public table.
+
+Chips still to measure: B200, Jetson Orin, Apple Neural Engine, one AMD MI-series and one Intel Gaudi. Stage 1 is done when one outside operator runs the suite in CI and one vendor or operator thread is open on a measured row.
+
+### Stage 2. Verification runtime (January to June 2027, 0.6 to 0.8)
+
+Check the vendor's matrix multiplies while a model runs, with a stated miss probability and a measured overhead and coverage table per chip and precision, published next to the results. Integer matrix multiplies already have a published verifier that locates and repairs a wrong element (SProbe, arXiv 2609.19743); the new work here is floating point, where the check must allow for legitimate rounding without letting a real fault through. Done when one production user runs it and the method paper is on Zenodo with the overhead table.
+
+### Stage 3. Fault library and verified-compute levels (through 2027)
+
+A public fault library recording fault class, bit position, precision, chip, condition (heat, clock margin, radiation beam or orbit), outcome and detection method. Verified-compute levels L0 to L3 for a chip and for a fleet, defined from the library and issued from measured rows, with paid assessments against them. Done when one standards body document or one vendor page references the levels.
+
+### Stage 4. Orbital proof (2027 to 2028)
+
+Fly the runtime on a rideshare payload, measure in orbit and publish the row next to a proton-beam column, then choose checkpoint interval, replication and voting from measured fault rates rather than assumed ones. Done when one on-orbit run has a published row and a named operator uses the result.
+
+### Stage 5. Silicon IP (2028 onwards)
+
+A hardware checksum unit for tensor-core datapaths: RTL, verification and licensing terms. Done when one chip vendor evaluates the block under licence.
+
+### Rules for every stage
+
+Nothing is claimed that was not measured on real hardware; the result files are the record. Kernels and probes stay open; fleet features, assessments and IP are the paid tiers.
 
 ## Contributing a row
 

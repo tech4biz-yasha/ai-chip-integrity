@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Chip Integrity: an open tester for silent computation errors in AI chips</title>
-<meta name="description" content="A GPU can pass its vendor diagnostics and still return wrong numbers with no error raised. Chip Integrity is an open, vendor-neutral tester that checks whether an AI chip computed correctly, with every result published as an OCP Test and Validation file.">
+<title>Chip Integrity: open silent data corruption (SDC) tester for GPUs and AI chips</title>
+<meta name="description" content="Silent data corruption (SDC): a GPU can pass its vendor diagnostics and still return wrong numbers with no error raised. Chip Integrity is an open, vendor-neutral SDC tester for GPUs and AI accelerators that checks whether a chip computed correctly, with every result published as an OCP Test and Validation file.">
 <meta name="author" content="Yasha Khandelwal">
 <meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
 <link rel="canonical" href="https://chipintegrity.org/">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Chip Integrity: an open tester for silent computation errors in AI chips">
-<meta property="og:description" content="A GPU can pass its vendor diagnostics and still return wrong numbers with no error raised. Chip Integrity is an open, vendor-neutral tester that checks whether an AI chip computed correctly, with every result published as an OCP Test and Validation file.">
+<meta property="og:title" content="Chip Integrity: open silent data corruption (SDC) tester for GPUs and AI chips">
+<meta property="og:description" content="Silent data corruption (SDC): a GPU can pass its vendor diagnostics and still return wrong numbers with no error raised. Chip Integrity is an open, vendor-neutral SDC tester for GPUs and AI accelerators that checks whether a chip computed correctly, with every result published as an OCP Test and Validation file.">
 <meta property="og:url" content="https://chipintegrity.org/">
 <link rel="stylesheet" href="assets/site.css">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
@@ -30,7 +30,8 @@
       "@id": "https://chipintegrity.org/#site",
       "url": "https://chipintegrity.org/",
       "name": "Chip Integrity",
-      "description": "An open, vendor-neutral tester for silent computation errors in AI chips, with results in OCP Test and Validation format.",
+      "alternateName": ["AI Chip Integrity", "ai-chip-integrity", "chipintegrity.org"],
+      "description": "An open, vendor-neutral tester for silent data corruption (SDC) in GPUs and AI chips, with results in OCP Test and Validation format.",
       "author": {"@id": "https://chipintegrity.org/#person"}
     },
     {
@@ -49,12 +50,15 @@
       "@type": "Dataset",
       "@id": "https://chipintegrity.org/#results",
       "name": "Chip Integrity measured results",
-      "description": "Silent computation error measurements for AI chips (NVIDIA H200, NVIDIA H100, NVIDIA A100, NVIDIA GeForce RTX 4090, NVIDIA RTX A5000, Apple GPU) from the compute, kernel, checksum, data pattern, memory and error counter probes, each row backed by an OCP Test and Validation result file.",
-      "url": "https://chipintegrity.org/#results",
+      "description": "Silent data corruption (SDC) measurements for AI chips (Apple GPU (MPS) arm64, NVIDIA A100-SXM4-80GB, NVIDIA GeForce RTX 4090, NVIDIA H100 80GB HBM3, NVIDIA H200, NVIDIA RTX A5000) from the compute, kernel, checksum, data pattern, memory and error counter probes, each row backed by an OCP Test and Validation result file.",
+      "url": "https://chipintegrity.org/results.html",
+      "identifier": "https://doi.org/10.5281/zenodo.23393790",
+      "isAccessibleForFree": true,
+      "distribution": [{"@type": "DataDownload", "encodingFormat": "application/x-ndjson", "contentUrl": "https://github.com/tech4biz-yasha/ai-chip-integrity/tree/main/results"}],
       "license": "https://opensource.org/licenses/MIT",
       "creator": {"@id": "https://chipintegrity.org/#person"},
       "isBasedOn": "https://github.com/tech4biz-yasha/ai-chip-integrity",
-      "keywords": ["silent data corruption", "GPU reliability", "AI accelerator testing", "silent errors", "OCP Test and Validation", "GPU health check", "H100", "A100", "FP8", "ABFT"],
+      "keywords": ["silent data corruption", "SDC", "GPU silent data corruption test", "GPU reliability", "AI accelerator testing", "silent errors", "OCP Test and Validation", "GPU health check", "H100", "A100", "FP8", "ABFT"],
       "measurementTechnique": "Matrix multiply and transformer kernels against a float64 reference with derived componentwise rounding bounds and bit-for-bit repeat comparison; pattern sweep over most of the device memory with exact read-back; software fault injection self-test on every row"
     },
     {
@@ -93,7 +97,7 @@
 <div class="reveal">
 <div class="kicker">OPEN SOURCE · MIT · OCP TEST AND VALIDATION OUTPUT</div>
 <h1>Does this AI chip still give the right answer?</h1>
-<p class="lede">A GPU can pass every vendor diagnostic and still return wrong numbers with no error raised. Chip Integrity is an open, vendor-neutral tester that checks whether a chip computed correctly, and publishes the evidence as a file anyone can check.</p>
+<p class="lede">A GPU can pass every vendor diagnostic and still return wrong numbers with no error raised, which is called <a class="term" href="learn.html#g-silent-error" data-def="A wrong result from a chip with no crash, no error flag and no log entry. The chip does not know it happened.">silent data corruption</a> (SDC). Chip Integrity is an open, vendor-neutral tester that checks whether a chip computed correctly, and publishes the evidence as a file anyone can check.</p>
 <div class="ctas"><a class="btn" href="results.html">See the chips measured</a><a class="btn ghost" href="learn.html">What is a silent error?</a></div>
 </div>
 <div class="fig" aria-hidden="true">
@@ -166,11 +170,11 @@
 </main>
 <footer class="foot">
 <div class="footin">
-<div><div class="brand">chip<b>integrity</b>.org</div><p>Open tests for silent computation errors in AI chips. MIT licensed. Every number on this site is read from a public result file.</p></div>
+<div><div class="brand">chip<b>integrity</b>.org</div><p>Open tests for silent data corruption (SDC) in GPUs and AI chips. MIT licensed. Every number on this site is read from a public result file.</p></div>
 <div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="index.html">Home</a><a href="learn.html">Learn</a><a href="method.html">Method</a><a href="results.html">Results</a><a href="chips/index.html">Chips</a><a href="findings/index.html">Findings</a><a href="run.html">Run it</a><a href="about.html">About</a></nav></div>
 <div><div class="fh">CITE</div><p>Yasha Khandelwal, ai-chip-integrity, version 0.4.2, 2026, <a href="https://doi.org/10.5281/zenodo.23393790">https://doi.org/10.5281/zenodo.23393790</a></p></div>
 </div>
-<div class="footbase">Page generated from the result files on 2026-10-15. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>
+<div class="footbase">Page generated from the result files on 2026-10-19. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>
 </footer>
 <script src="assets/site.js"></script>
 </body>
