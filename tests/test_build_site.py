@@ -29,7 +29,7 @@ def test_newer_version_replaces_older_row(tmp_path):
     make_kernel_file(old, "0.1.0", "softmax,gelu")
     make_kernel_file(new, kernels.VERSION, ",".join(kernels.KERNELS))
     for order in ([old, new], [new, old]):
-        _, _, rows, _, _ = build_site.summarise([build_site.parse(str(p)) for p in order])
+        _, _, rows, _, _, _ = build_site.summarise([build_site.parse(str(p)) for p in order])
         assert len(rows) == 1
         row = rows[0]
         assert row["version"] == kernels.VERSION
@@ -42,7 +42,7 @@ def test_kernel_row_renders_rope_and_attention_sizes(tmp_path):
     inj = tmp_path / "k_inject.jsonl"
     make_kernel_file(clean, kernels.VERSION, ",".join(kernels.KERNELS))
     make_kernel_file(inj, kernels.VERSION, ",".join(kernels.KERNELS), inject=2)
-    _, _, rows, _, _ = build_site.summarise([build_site.parse(str(p)) for p in (clean, inj)])
+    _, _, rows, _, _, _ = build_site.summarise([build_site.parse(str(p)) for p in (clean, inj)])
     html = build_site.kernel_rows(rows)
     assert "rope 32×128" in html and "attention 8×8×128" in html
     assert f'{2 * len(kernels.KERNELS) * 3} of {2 * len(kernels.KERNELS) * 3}' in html
@@ -64,7 +64,7 @@ def test_pattern_rows_render_with_flush_policy(tmp_path, monkeypatch):
     clean, inj = tmp_path / "p.jsonl", tmp_path / "p_inject.jsonl"
     patterns.main(["--device", "cpu", "--shapes", "32x64x32", "--iters", "3", "--out", str(clean)])
     patterns.main(["--device", "cpu", "--shapes", "32x64x32", "--iters", "3", "--inject", "1", "--out", str(inj)])
-    _, _, _, rows, _ = build_site.summarise([build_site.parse(str(p)) for p in (clean, inj)])
+    _, _, _, rows, _, _ = build_site.summarise([build_site.parse(str(p)) for p in (clean, inj)])
     assert len(rows) == 1 and rows[0]["patterns"] == build_site.PATTERN_ORDER and "bf16" in rows[0]["flushed"]
     html = build_site.pattern_rows(rows)
     steps = sum(len(v) for v in patterns.APPLIES.values())
@@ -78,7 +78,7 @@ def test_checksum_rows_render(tmp_path):
     clean, inj = tmp_path / "a.jsonl", tmp_path / "a_inject.jsonl"
     abft.main(["--device", "cpu", "--shapes", "32x64x24", "--iters", "3", "--out", str(clean)])
     abft.main(["--device", "cpu", "--shapes", "32x64x24", "--iters", "4", "--inject", "2", "--out", str(inj)])
-    *_, rows = build_site.summarise([build_site.parse(str(p)) for p in (clean, inj)])
+    *_, rows, _ = build_site.summarise([build_site.parse(str(p)) for p in (clean, inj)])
     assert len(rows) == 1 and rows[0]["precisions"] == ["fp32", "fp16", "bf16"] and rows[0]["missed"] == 0
     html = build_site.checksum_rows(rows)
     assert "6 of 6" in html and "no-silent-errors" in html
@@ -99,7 +99,7 @@ def test_mixed_subnormal_policy_is_shown(tmp_path, monkeypatch):
     out = tmp_path / "p.jsonl"
     patterns.main(["--device", "cpu", "--shapes", "32x64x24", "--iters", "3", "--dtypes", "fp32",
                    "--patterns", "subnormal,alternate", "--out", str(out)])
-    *_, rows, _ = build_site.summarise([build_site.parse(str(out))])
+    *_, rows, _, _ = build_site.summarise([build_site.parse(str(out))])
     assert rows[0]["mixed"] == ["fp32"] and "mixed: fp32" in build_site.pattern_rows(rows)
 
 
@@ -113,9 +113,9 @@ def site_from_repo():
     """The parsed result files in results/ and the chip map the pages are built from."""
     import glob, os
     runs = [build_site.parse(p) for p in sorted(glob.glob(os.path.join(build_site.RESULTS, "*.jsonl")))]
-    compute, memory, kernel, pattern, checksum = build_site.summarise(runs)
+    compute, memory, kernel, pattern, checksum, soak = build_site.summarise(runs)
     return runs, build_site.chip_rows({"compute": compute, "memory": memory, "kernel": kernel, "pattern": pattern,
-                                       "checksum": checksum})
+                                       "checksum": checksum, "soak": soak})
 
 
 def test_every_chip_gets_its_own_page_with_its_files():
@@ -200,3 +200,46 @@ def test_glossary_terms_link_to_their_definitions():
     for _, slug, _ in terms:
         assert f'id="g-{slug}"' in learn, slug
     assert 'class="term" href="learn.html#g-' in method
+
+
+def test_soak_rows_render_with_conditions(tmp_path):
+    """A soak file becomes one row and one probe-7 section, with its runs kept apart from the element-checked
+    compute runs, and a planted-fault file fills the self-test cell."""
+    from chip_integrity import soak
+    clean, inj = tmp_path / "s.jsonl", tmp_path / "s_inject.jsonl"
+    for path, inject in ((clean, "0"), (inj, "2")):
+        assert soak.main(["--device", "cpu", "--shape", "48x40x32", "--minutes", "0.01", "--window-s", "0.2",
+                          "--dtypes", "fp32", "--inject", inject, "--out", str(path)]) == 0
+    runs = [build_site.parse(str(p)) for p in (clean, inj)]
+    *_, rows = build_site.summarise(runs)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["runs"] > 0 and row["windows"] >= 1 and row["faults"] == 0 and row["precisions"] == ["fp32"]
+    assert row["injected"] > 0 and row["caught"] == row["injected"]
+    html = build_site.soak_rows(rows)
+    assert f'{row["runs"]:,}' in html and f'{row["caught"]} of {row["injected"]}' in html
+    assert "no telemetry on this device" in html and "no-silent-errors" in html
+    chip_map = build_site.chip_rows({"soak": rows})
+    st = build_site.chip_stats(chip_map[row["device"]])
+    assert st["runs"] == 0 and st["soak_runs"] == row["runs"]
+    page = build_site.chip_page(row["device"], chip_map, {r["file"]: r for r in runs}, "2026-01-01")
+    assert "PROBE 7" in page and f'{row["runs"]:,} runs in {row["windows"]} windows' in page
+
+
+def test_driver_and_cuda_versions_are_read_from_the_file(tmp_path):
+    """Files written since v0.4.3 carry the CUDA runtime and driver; the chip page lists them."""
+    from chip_integrity import screen
+    out = tmp_path / "c.jsonl"
+    screen.main(["--device", "cpu", "--size", "16", "--iters", "2", "--dtypes", "fp32", "--out", str(out)])
+    lines = [json.loads(line) for line in open(out)]
+    start = next(o["testRunArtifact"]["testRunStart"] for o in lines
+                 if "testRunArtifact" in o and "testRunStart" in o["testRunArtifact"])
+    start["dutInfo"]["softwareInfos"] += [{"softwareInfoId": "x_2", "name": "cuda", "version": "12.8"},
+                                          {"softwareInfoId": "x_3", "name": "nvidia-driver", "version": "580.126.09"}]
+    out.write_text("".join(json.dumps(o) + "\n" for o in lines))
+    r = build_site.parse(str(out))
+    assert r["driver"] == "580.126.09" and r["cuda"] == "12.8"
+    compute, *_ = build_site.summarise([r])
+    chip_map = build_site.chip_rows({"compute": compute})
+    page = build_site.chip_page(r["device"], chip_map, {r["file"]: r}, "2026-01-01")
+    assert "NVIDIA driver" in page and "580.126.09" in page and "CUDA runtime" in page and "12.8" in page

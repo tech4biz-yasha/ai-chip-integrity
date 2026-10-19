@@ -51,7 +51,7 @@
 <div class="bxrow"><label for="cmpa">Chip</label><select id="cmpa"></select><label for="cmpb">against</label><select id="cmpb"></select></div>
 <div id="cmpout" aria-live="polite"></div>
 </div>
-<script type="application/json" id="chipdata">[{"name": "Apple GPU (MPS) arm64", "slug": "apple-gpu-mps-arm64", "runs": 1785, "words": 1476395008, "faults": 0, "caught": 264, "injected": 264, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["BF16 matrix multiply", 0.8694], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["FP16 matrix multiply", 0.5093], ["Attention BF16", 0.1866], ["GELU FP32", 0.1439], ["RoPE FP32", 0.1232], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0097], ["Softmax FP32", 0.0054], ["FP32 matrix multiply", 0.0053], ["Attention FP32", 0.0008], ["Layer norm FP32", 0.0008]]}, {"name": "NVIDIA A100-SXM4-80GB", "slug": "nvidia-a100-sxm4-80gb", "runs": 600, "words": 16911433728, "faults": 0, "caught": 90, "injected": 90, "budget": [["BF16 matrix multiply", 0.8694], ["FP16 matrix multiply", 0.5093], ["FP32 matrix multiply", 0.0014]]}, {"name": "NVIDIA GeForce RTX 4090", "slug": "nvidia-geforce-rtx-4090", "runs": 2515, "words": 4966055936, "faults": 0, "caught": 351, "injected": 351, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["BF16 matrix multiply", 0.6569], ["FP16 matrix multiply", 0.207], ["Attention BF16", 0.1889], ["GELU FP32", 0.1623], ["RoPE FP32", 0.1221], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0389], ["FP32 matrix multiply", 0.0053], ["Softmax FP32", 0.0053], ["Attention FP32", 0.0012], ["Layer norm FP32", 0.0008]]}, {"name": "NVIDIA H100 80GB HBM3", "slug": "nvidia-h100-80gb-hbm3", "runs": 2515, "words": 16844324864, "faults": 0, "caught": 351, "injected": 351, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["BF16 matrix multiply", 0.6569], ["FP16 matrix multiply", 0.207], ["Attention BF16", 0.1889], ["GELU FP32", 0.1623], ["RoPE FP32", 0.1221], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0389], ["FP32 matrix multiply", 0.0053], ["Softmax FP32", 0.0053], ["Attention FP32", 0.0012], ["Layer norm FP32", 0.0008]]}, {"name": "NVIDIA H200", "slug": "nvidia-h200", "runs": 600, "words": 29863444480, "faults": 0, "caught": 90, "injected": 90, "budget": [["BF16 matrix multiply", 0.8694], ["FP16 matrix multiply", 0.5093], ["FP32 matrix multiply", 0.0053]]}, {"name": "NVIDIA RTX A5000", "slug": "nvidia-rtx-a5000", "runs": 2055, "words": 4966055936, "faults": 0, "caught": 297, "injected": 297, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["BF16 matrix multiply", 0.6569], ["FP16 matrix multiply", 0.207], ["Attention BF16", 0.1889], ["GELU FP32", 0.1623], ["RoPE FP32", 0.1221], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0195], ["Softmax FP32", 0.0053], ["FP32 matrix multiply", 0.0024], ["Attention FP32", 0.0012], ["Layer norm FP32", 0.0008]]}]</script>
+<script type="application/json" id="chipdata">[{"name": "Apple GPU (MPS) arm64", "slug": "apple-gpu-mps-arm64", "runs": 1785, "words": 1476395008, "faults": 0, "caught": 264, "injected": 264, "soak_runs": 0, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["BF16 matrix multiply", 0.8694], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["FP16 matrix multiply", 0.5093], ["Attention BF16", 0.1866], ["GELU FP32", 0.1439], ["RoPE FP32", 0.1232], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0097], ["Softmax FP32", 0.0054], ["FP32 matrix multiply", 0.0053], ["Attention FP32", 0.0008], ["Layer norm FP32", 0.0008]]}, {"name": "NVIDIA A100-SXM4-80GB", "slug": "nvidia-a100-sxm4-80gb", "runs": 600, "words": 16911433728, "faults": 0, "caught": 90, "injected": 90, "soak_runs": 0, "budget": [["BF16 matrix multiply", 0.8694], ["FP16 matrix multiply", 0.5093], ["FP32 matrix multiply", 0.0014]]}, {"name": "NVIDIA B200", "slug": "nvidia-b200", "runs": 2515, "words": 38117834752, "faults": 0, "caught": 351, "injected": 351, "soak_runs": 1096120, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["BF16 matrix multiply", 0.6569], ["FP16 matrix multiply", 0.207], ["Attention BF16", 0.1889], ["GELU FP32", 0.1623], ["RoPE FP32", 0.1221], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0389], ["FP32 matrix multiply", 0.0053], ["Softmax FP32", 0.0053], ["Attention FP32", 0.0012], ["Layer norm FP32", 0.0008]]}, {"name": "NVIDIA GeForce RTX 4090", "slug": "nvidia-geforce-rtx-4090", "runs": 2515, "words": 4966055936, "faults": 0, "caught": 351, "injected": 351, "soak_runs": 0, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["BF16 matrix multiply", 0.6569], ["FP16 matrix multiply", 0.207], ["Attention BF16", 0.1889], ["GELU FP32", 0.1623], ["RoPE FP32", 0.1221], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0389], ["FP32 matrix multiply", 0.0053], ["Softmax FP32", 0.0053], ["Attention FP32", 0.0012], ["Layer norm FP32", 0.0008]]}, {"name": "NVIDIA H100 80GB HBM3", "slug": "nvidia-h100-80gb-hbm3", "runs": 2515, "words": 16844324864, "faults": 0, "caught": 351, "injected": 351, "soak_runs": 0, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["BF16 matrix multiply", 0.6569], ["FP16 matrix multiply", 0.207], ["Attention BF16", 0.1889], ["GELU FP32", 0.1623], ["RoPE FP32", 0.1221], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0389], ["FP32 matrix multiply", 0.0053], ["Softmax FP32", 0.0053], ["Attention FP32", 0.0012], ["Layer norm FP32", 0.0008]]}, {"name": "NVIDIA H200", "slug": "nvidia-h200", "runs": 600, "words": 29863444480, "faults": 0, "caught": 90, "injected": 90, "soak_runs": 0, "budget": [["BF16 matrix multiply", 0.8694], ["FP16 matrix multiply", 0.5093], ["FP32 matrix multiply", 0.0053]]}, {"name": "NVIDIA RTX A5000", "slug": "nvidia-rtx-a5000", "runs": 2055, "words": 4966055936, "faults": 0, "caught": 297, "injected": 297, "soak_runs": 0, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["BF16 matrix multiply", 0.6569], ["FP16 matrix multiply", 0.207], ["Attention BF16", 0.1889], ["GELU FP32", 0.1623], ["RoPE FP32", 0.1221], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0195], ["Softmax FP32", 0.0053], ["FP32 matrix multiply", 0.0024], ["Attention FP32", 0.0012], ["Layer norm FP32", 0.0008]]}]</script>
 <noscript><p class="note">The comparison needs JavaScript. Every number is also in the tables below and on each chip page.</p></noscript>
 </section>
 
@@ -61,7 +61,7 @@
 <p class="lede">Every row comes from a result file in the repository, and the tables are generated from those files. Nothing here is modelled or estimated.</p>
 <h3 id="chips">One page per chip</h3>
 <p class="note">Each chip has its own page with every step of every probe, the setup, the self-test and the result files. <a href="chips/index.html">All chips on one page</a>.</p>
-<div class="grid3"><a class="panel chipcard" href="chips/apple-gpu-mps-arm64.html"><h3>Apple GPU (MPS) arm64</h3><p>Tested 10 October 2026. 1,785 compute runs, 0 silent faults, 264 of 264 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-a100-sxm4-80gb.html"><h3>NVIDIA A100-SXM4-80GB</h3><p>Tested 7 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-geforce-rtx-4090.html"><h3>NVIDIA GeForce RTX 4090</h3><p>Tested 11 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-h100-80gb-hbm3.html"><h3>NVIDIA H100 80GB HBM3</h3><p>Tested 10 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-h200.html"><h3>NVIDIA H200</h3><p>Tested 8 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-rtx-a5000.html"><h3>NVIDIA RTX A5000</h3><p>Tested 11 October 2026. 2,055 compute runs, 0 silent faults, 297 of 297 planted faults caught.</p></a></div>
+<div class="grid3"><a class="panel chipcard" href="chips/apple-gpu-mps-arm64.html"><h3>Apple GPU (MPS) arm64</h3><p>Tested 10 October 2026. 1,785 compute runs, 0 silent faults, 264 of 264 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-a100-sxm4-80gb.html"><h3>NVIDIA A100-SXM4-80GB</h3><p>Tested 7 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-b200.html"><h3>NVIDIA B200</h3><p>Tested 19 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-geforce-rtx-4090.html"><h3>NVIDIA GeForce RTX 4090</h3><p>Tested 11 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-h100-80gb-hbm3.html"><h3>NVIDIA H100 80GB HBM3</h3><p>Tested 10 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-h200.html"><h3>NVIDIA H200</h3><p>Tested 8 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-rtx-a5000.html"><h3>NVIDIA RTX A5000</h3><p>Tested 11 October 2026. 2,055 compute runs, 0 silent faults, 297 of 297 planted faults caught.</p></a></div>
 <div class="bxrow filter"><label for="rowfilter">Filter the tables</label><input id="rowfilter" type="text" placeholder="a chip, for example H100" autocomplete="off"></div>
 <h3>Compute probe</h3>
 <div class="tablewrap"><table>
@@ -87,6 +87,17 @@
 <td>60 of 60</td>
 <td class="ok">no-silent-errors</td>
 <td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/a100_clean.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/a100_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA B200<span class="sub">PyTorch 2.8.0+cu128 · tool v0.3.4 · error counters quiet</span></td>
+<td class="date">2026-10-19</td>
+<td>1024x1024x1024<br>4096x4096x4096<br>32x4096x11008</td>
+<td>fp32, fp16, bf16, int8, fp8, fp8fast</td>
+<td>900</td>
+<td>0</td>
+<td>90 of 90</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/b200_clean.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/b200_inject.jsonl">self-test</a></td>
 </tr>
 <tr>
 <td>NVIDIA GeForce RTX 4090<span class="sub">PyTorch 2.8.0+cu128 · tool v0.3.2 · <a class="term" href="learn.html#g-ecc" data-def="Error-correcting code. Extra bits stored with memory that let the hardware detect and usually correct a single flipped bit. ECC covers memory, not the arithmetic units, and not every chip has it on all memory.">ECC</a> off, so the error counters cannot see memory errors</span></td>
@@ -149,6 +160,18 @@
 <td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_kernels_v022.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_kernels_v022_inject.jsonl">self-test</a></td>
 </tr>
 <tr>
+<td>NVIDIA B200<span class="sub">PyTorch 2.8.0+cu128 · tool v0.2.3 · error counters quiet</span></td>
+<td class="date">2026-10-19</td>
+<td>softmax, layernorm, gelu, rope, attention<span class="sub">4096×4096; rope 4096×128; attention 8×1024×128 · attention: efficient (fp32); flash (fp16, bf16)</span></td>
+<td>fp32, fp16, bf16</td>
+<td>375</td>
+<td>0.999</td>
+<td>0</td>
+<td>45 of 45</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/b200_kernels.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/b200_kernels_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
 <td>NVIDIA GeForce RTX 4090<span class="sub">PyTorch 2.8.0+cu128 · tool v0.2.2 · ECC off, so the error counters cannot see memory errors</span></td>
 <td class="date">2026-10-11</td>
 <td>softmax, layernorm, gelu, rope, attention<span class="sub">4096×4096; rope 4096×128; attention 8×1024×128 · attention: efficient (fp32); flash (fp16, bf16)</span></td>
@@ -201,6 +224,19 @@
 <td>18 of 18</td>
 <td class="ok">no-silent-errors</td>
 <td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_abft.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_abft_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA B200<span class="sub">PyTorch 2.8.0+cu128 · tool v0.1.0 · error counters quiet</span></td>
+<td class="date">2026-10-19</td>
+<td>1024x1024x1024<br>32x4096x11008</td>
+<td>fp32, fp16, bf16</td>
+<td>120</td>
+<td>0</td>
+<td>0</td>
+<td>827.15</td>
+<td>18 of 18</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/b200_abft.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/b200_abft_inject.jsonl">self-test</a></td>
 </tr>
 <tr>
 <td>NVIDIA GeForce RTX 4090<span class="sub">PyTorch 2.8.0+cu128 · tool v0.1.0 · ECC off, so the error counters cannot see memory errors</span></td>
@@ -257,6 +293,18 @@
 <td>kept</td>
 <td class="ok">no-silent-errors</td>
 <td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_patterns.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/h100_patterns_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>NVIDIA B200<span class="sub">PyTorch 2.8.0+cu128 · tool v0.1.4 · error counters quiet</span></td>
+<td class="date">2026-10-19</td>
+<td>wide, mantissa, cancel, alternate, sparse, subnormal, near_max, extremes</td>
+<td>fp32, fp16, bf16, int8, fp8, fp8fast</td>
+<td>1,120</td>
+<td>0</td>
+<td>168 of 168</td>
+<td>kept</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/b200_patterns.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/b200_patterns_inject.jsonl">self-test</a></td>
 </tr>
 <tr>
 <td>NVIDIA GeForce RTX 4090<span class="sub">PyTorch 2.8.0+cu128 · tool v0.1.2 · ECC off, so the error counters cannot see memory errors</span></td>
@@ -322,6 +370,17 @@
 <td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/a100_memcheck.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/a100_memcheck_inject.jsonl">self-test</a></td>
 </tr>
 <tr>
+<td>NVIDIA B200<span class="sub">tool v0.1.1 · error counters quiet</span></td>
+<td class="date">2026-10-19</td>
+<td>142.00 GiB of 178.35 GiB<span class="sub">38,117,834,752 words</span></td>
+<td>6</td>
+<td>2.0 s</td>
+<td>0</td>
+<td>30 of 30</td>
+<td class="ok">no-memory-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/b200_memcheck.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/b200_memcheck_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
 <td>NVIDIA GeForce RTX 4090<span class="sub">tool v0.1.1 · ECC off, so the error counters cannot see memory errors</span></td>
 <td class="date">2026-10-11</td>
 <td>18.50 GiB of 23.52 GiB<span class="sub">4,966,055,936 words</span></td>
@@ -366,7 +425,25 @@
 <td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/mac_memcheck.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/mac_memcheck_inject.jsonl">self-test</a></td>
 </tr></tbody>
 </table></div>
-<p class="note">Rented data centre GPUs are young, monitored and already screened, so clean rows are the expected result there. The research says faults concentrate in aged units and appear under data-dependent, long, hot workloads. Those are the next probes on the roadmap, and where the first real findings are expected.</p>
+<h3>Hours under load probe</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Device</th><th>Date</th><th>Length</th><th>Shape (M×K×N)</th><th>Precisions</th><th>Runs</th><th>Conditions during the soak</th><th>Silent faults</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
+<tbody><tr>
+<td>NVIDIA B200<span class="sub">PyTorch 2.8.0+cu128 · tool v0.1.0 · error counters quiet</span></td>
+<td class="date">2026-10-19</td>
+<td>10 min, 10 windows</td>
+<td>8192x4096x8192</td>
+<td>fp32, fp16, bf16, int8, fp8</td>
+<td>1,096,120</td>
+<td>32–60 °C, 1477–1965 MHz, up to 1014.2 W, sw-power-cap</td>
+<td>0</td>
+<td>not run</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/b200_soak.jsonl">clean</a></td>
+</tr></tbody>
+</table></div>
+<p class="note">Every run under load is compared bit for bit with a first result that was checked against the proven bound, so these runs are counted apart from the element-by-element compute runs above. Conditions come from the chip's own telemetry (NVML on NVIDIA GPUs): the temperature, SM clock and power range across the whole soak, and the reasons the driver gave for running below full clock. sw-power-cap means the chip sat at its software power limit and lowered its clock to stay there, which is the state marginal silicon is most likely to fail in.</p>
+<p class="note">Rented data centre GPUs are young, monitored and already screened, so clean rows are the expected result there. The research says faults concentrate in aged units and appear under data-dependent, long, hot workloads. The hours-under-load probe is the first step towards those conditions; longer soaks on older units are where the first real findings are expected.</p>
 </section>
 </div>
 </main>
@@ -374,7 +451,7 @@
 <div class="footin">
 <div><div class="brand">chip<b>integrity</b>.org</div><p>Open tests for silent data corruption (SDC) in GPUs and AI chips. MIT licensed. Every number on this site is read from a public result file.</p></div>
 <div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="index.html">Home</a><a href="learn.html">Learn</a><a href="method.html">Method</a><a href="results.html">Results</a><a href="chips/index.html">Chips</a><a href="findings/index.html">Findings</a><a href="run.html">Run it</a><a href="about.html">About</a></nav></div>
-<div><div class="fh">CITE</div><p>Yasha Khandelwal, ai-chip-integrity, version 0.4.2, 2026, <a href="https://doi.org/10.5281/zenodo.23393790">https://doi.org/10.5281/zenodo.23393790</a></p></div>
+<div><div class="fh">CITE</div><p>Yasha Khandelwal, ai-chip-integrity, version 0.4.3, 2026, <a href="https://doi.org/10.5281/zenodo.23393790">https://doi.org/10.5281/zenodo.23393790</a></p></div>
 </div>
 <div class="footbase">Page generated from the result files on 2026-10-19. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>
 </footer>

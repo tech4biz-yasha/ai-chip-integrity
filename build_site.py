@@ -57,7 +57,8 @@ def parse(path):
     return {
         "file": os.path.relpath(path, ROOT), "run": start["name"], "version": start["version"],
         "params": start.get("parameters", {}), "result": end["result"], "date": ts[:10],
-        "device": hw, "torch": sw.get("torch", ""), "steps": named, "counters": counter_step,
+        "device": hw, "torch": sw.get("torch", ""), "driver": sw.get("nvidia-driver", ""), "cuda": sw.get("cuda", ""),
+        "steps": named, "counters": counter_step,
     }
 
 
@@ -105,7 +106,7 @@ def row_for(table, r, **base):
 
 def summarise(runs):
     """Group runs by device and probe into table rows."""
-    compute, memory, kernel, pattern, checksum = {}, {}, {}, {}, {}
+    compute, memory, kernel, pattern, checksum, soak = {}, {}, {}, {}, {}, {}
     for r in runs:
         inject = int(r["params"].get("inject", 0)) > 0
         if r["run"] == "ai-chip-integrity-screen":
@@ -205,6 +206,34 @@ def summarise(runs):
                 row["verdicts"] = sorted({s["_verdict"] for s in live.values()})
                 row["clean_file"] = r["file"]
                 row["counters"] = counter_verdict(r.get("counters"))
+        elif r["run"] == "ai-chip-integrity-soak":
+            row = row_for(soak, r, torch=r["torch"])
+            if row is None:
+                continue
+            windows = {n: s for n, s in r["steps"].items() if n.startswith("soak_window_")}
+            summary = r["steps"].get("soak_summary", {})
+            if inject:
+                row["injected"] = sum(s.get("injected_runs", 0) for s in windows.values())
+                row["caught"] = sum(s.get("injected_runs_detected", 0) for s in windows.values())
+                row["inject_file"] = r["file"]
+            else:
+                row["runs"] = summary.get("runs", sum(s.get("runs", 0) for s in windows.values()))
+                row["windows"] = summary.get("windows", len(windows))
+                row["minutes"] = summary.get("minutes_run", 0)
+                row["shape"] = r["params"].get("shape", "")
+                row["precisions"] = sorted({s.get("precision", n.split("_")[-1]) for n, s in windows.items()},
+                                           key=lambda p: (PRECISION_ORDER.index(p) if p in PRECISION_ORDER else 99, p))
+                row["differing"] = summary.get("differing_runs", sum(s.get("differing_runs", 0) for s in windows.values()))
+                row["faults"] = sum(s.get("differing_runs_outside_bound", 0) for s in windows.values())
+                row["telemetry"] = bool(summary.get("telemetry_available", any(s.get("telemetry_available") for s in windows.values())))
+                row["temp"] = (summary.get("temperature_c_min"), summary.get("temperature_c_max"))
+                row["clock"] = (summary.get("sm_clock_mhz_min"), summary.get("sm_clock_mhz_max"))
+                row["power"] = (summary.get("power_w_min"), summary.get("power_w_max"))
+                row["reasons"] = summary.get("clock_event_reasons", "")
+                row["interrupted"] = bool(summary.get("interrupted"))
+                row["verdicts"] = sorted({s["_verdict"] for s in windows.values()} | ({summary["_verdict"]} if "_verdict" in summary else set()))
+                row["clean_file"] = r["file"]
+                row["counters"] = counter_verdict(r.get("counters"))
         elif r["run"] == "ai-chip-integrity-memcheck":
             row = row_for(memory, r)
             if row is None:
@@ -227,7 +256,7 @@ def summarise(runs):
     order = lambda d: (0 if "H100" in d else 1 if "A100" in d else 2 if "NVIDIA" in d else 3, d)
     return ([compute[k] for k in sorted(compute, key=order)], [memory[k] for k in sorted(memory, key=order)],
             [kernel[k] for k in sorted(kernel, key=order)], [pattern[k] for k in sorted(pattern, key=order)],
-            [checksum[k] for k in sorted(checksum, key=order)])
+            [checksum[k] for k in sorted(checksum, key=order)], [soak[k] for k in sorted(soak, key=order)])
 
 
 def esc(s):
@@ -405,13 +434,57 @@ def memory_rows(rows):
     return "\n".join(out)
 
 
+def soak_conditions(r):
+    """Temperature, clock and power range across the soak, as the file records them; empty without telemetry."""
+    if not r.get("telemetry"):
+        return "no telemetry on this device"
+    parts = []
+    if r["temp"][0] is not None:
+        parts.append(f'{r["temp"][0]:g}–{r["temp"][1]:g} °C')
+    if r["clock"][0] is not None:
+        parts.append(f'{r["clock"][0]:g}–{r["clock"][1]:g} MHz')
+    if r["power"][0] is not None:
+        parts.append(f'up to {r["power"][1]:g} W')
+    if r.get("reasons"):
+        parts.append(esc(r["reasons"]))
+    return ", ".join(parts)
+
+
+def soak_rows(rows):
+    out = []
+    for r in rows:
+        if "runs" not in r:
+            continue
+        verdict = ", ".join(r["verdicts"])
+        ok = set(r["verdicts"]) <= {"no-silent-errors"} and not counters_note(r)[1] and not r["interrupted"]
+        caught = f'{r.get("caught", 0)} of {r.get("injected", 0)}' if "injected" in r else "not run"
+        files = f'<a href="{REPO}/blob/main/{r["clean_file"]}">clean</a>'
+        if "inject_file" in r:
+            files += f' · <a href="{REPO}/blob/main/{r["inject_file"]}">self-test</a>'
+        length = f'{r["minutes"]:.0f} min, {r["windows"]} windows' + (" (interrupted)" if r["interrupted"] else "")
+        out.append(f"""<tr>
+<td>{esc(r['device'])}<span class="sub">PyTorch {esc(r['torch'])} · tool v{esc(r['version'])}{counters_note(r)[0]}</span></td>
+<td class="date">{esc(min(r['dates']))}</td>
+<td>{esc(length)}</td>
+<td>{esc(r['shape'])}</td>
+<td>{esc(", ".join(r['precisions']))}</td>
+<td>{r['runs']:,}</td>
+<td>{soak_conditions(r)}</td>
+<td>{r['faults']}</td>
+<td>{caught}</td>
+<td class="{'ok' if ok else 'bad'}">{esc(verdict)}</td>
+<td>{files}</td>
+</tr>""")
+    return "\n".join(out)
+
+
 # ---- One page per chip --------------------------------------------------------------------------------------
 # Every chip in the tables gets its own page at /chips/<slug>/, generated here from the same result files, so the
 # pages can always be rebuilt from the repository and never say more than the files do.
 
 SITE = "https://chipintegrity.org"
 CHIPS_DIR = os.path.join(ROOT, "docs", "chips")
-PASS_VERDICTS = {"no-silent-errors", "injection-self-test-pass", "no-memory-errors"}
+PASS_VERDICTS = {"no-silent-errors", "injection-self-test-pass", "no-memory-errors", "first-result-verified"}
 PROBE_INFO = [  # table, anchor, roadmap number, title, what the probe does
     ("compute", "compute", 1, "Compute probe", "Matrix multiplies at several shapes and precisions. Every output element "
      "is checked against an exact or float64 reference under a proven rounding-error bound, and every run is compared "
@@ -426,7 +499,18 @@ PROBE_INFO = [  # table, anchor, roadmap number, title, what the probe does
      "fed through the same matrix multiply checks."),
     ("memory", "memory", 2, "Memory probe", "Most of the device memory written with six patterns, left to dwell, and "
      "read back word by word."),
+    ("soak", "soak", 7, "Hours under load probe", "One fixed matrix multiply run back to back for as long as asked, one "
+     "precision at a time, every result compared bit for bit with a first result that was checked against the proven "
+     "bound. Each one-minute window records the chip's temperature, clocks, power and throttling reasons beside its "
+     "verdict."),
 ]
+
+
+CHIP_NOTES = {  # facts about a measured unit that its result files do not carry, with where each came from
+    "NVIDIA B200": "NVIDIA driver 580.126.09, read with nvidia-smi on the pod after the run; the files were written "
+                   "by v0.4.2, which did not record the driver (v0.4.3 and later do). Power limit 1000 W, 183,359 MiB "
+                   "total memory, as nvidia-smi reported them.",
+}
 
 
 def chip_slug(device):
@@ -456,8 +540,10 @@ def chip_stats(rows):
     caught = sum(r.get("caught", 0) for r in rows.values())
     words = rows["memory"].get("bytes", 0) // 4 if "memory" in rows else 0
     faults = (sum(rows[k].get("ref_fail", 0) + rows[k].get("rep_fail", 0) for k in ("compute", "kernel", "pattern")
-                  if k in rows) + rows.get("checksum", {}).get("faults", 0) + rows.get("memory", {}).get("bad", 0))
-    return {"runs": runs, "words": words, "faults": faults, "caught": caught, "injected": injected}
+                  if k in rows) + rows.get("checksum", {}).get("faults", 0) + rows.get("memory", {}).get("bad", 0)
+              + rows.get("soak", {}).get("faults", 0))
+    soak_runs = rows["soak"].get("runs", 0) if "soak" in rows else 0
+    return {"runs": runs, "words": words, "faults": faults, "caught": caught, "injected": injected, "soak_runs": soak_runs}
 
 
 def nice_date(d):
@@ -483,7 +569,8 @@ def step_table(run):
             body.append(f'<tr><td><code>{esc(name)}</code></td><td></td><td></td>'
                         f'<td><span class="sub">not supported on this device</span></td></tr>')
             continue
-        size = f'{s["runs"]:,} runs' if "runs" in s else (gib(s["bytes_tested"]) if "bytes_tested" in s else "")
+        size = (f'{s["runs"]:,} runs' if "runs" in s else gib(s["bytes_tested"]) if "bytes_tested" in s
+                else f'{s["repeat_runs"]} repeats' if "repeat_runs" in s else "")
         ratio = s.get("worst_error_over_bound_ratio")
         if ratio is None:
             bound = "exact" if s.get("exact_check") else ""
@@ -503,6 +590,8 @@ def chip_summary(st):
                  f'every repeat matched the first run bit for bit.') if st["runs"] else "No compute rows yet."
         if st["words"]:
             first += f' All {st["words"]:,} memory words read back correctly.'
+        if st["soak_runs"]:
+            first += f' Under sustained load, {st["soak_runs"]:,} more results came back bit-identical.'
     else:
         first = f'{st["faults"]} checks failed on this chip. The probe tables below show which steps and why.'
     return first + (f' The self-tests caught {st["caught"]} of the {st["injected"]} faults planted to prove the checks '
@@ -642,6 +731,8 @@ def chip_page(device, chip_map, runs_by_file, built):
         meta += ", " + ", ".join(nice_date(d) for d in sorted(r["dates"]))
         bad = r.get("ref_fail", 0) + r.get("rep_fail", 0) + r.get("faults", 0) + r.get("bad", 0)
         size = (f'{r.get("bytes", 0) // 4:,} memory words read back' if name == "memory"
+                else f'{r.get("runs", 0):,} runs in {r.get("windows", 0)} windows over {r.get("minutes", 0):.0f} minutes, '
+                     f'{soak_conditions(r)}' if name == "soak"
                 else f'{r.get("runs", 0):,} runs across {r.get("steps", nsteps)} steps')
         verdict = ("No silent faults." if bad == 0 else f"{bad} failed checks.")
         selftest = (f' The self-test caught {r["caught"]} of {r["injected"]} planted faults.' if r.get("injected") else "")
@@ -664,19 +755,26 @@ def chip_page(device, chip_map, runs_by_file, built):
     tiles = []
     for name, anchor, number, ptitle, _ in present:
         r = rows[name]
-        size = (f'{r.get("bytes", 0) // 4 / 1e9:.1f} billion words' if name == "memory" else f'{r.get("runs", 0):,} runs')
+        size = (f'{r.get("bytes", 0) // 4 / 1e9:.1f} billion words' if name == "memory"
+                else f'{r.get("runs", 0):,} runs, {r.get("minutes", 0):.0f} min' if name == "soak"
+                else f'{r.get("runs", 0):,} runs')
         bad = (r.get("ref_fail", 0) + r.get("rep_fail", 0) + r.get("faults", 0) + r.get("bad", 0))
         state = "no silent faults" if bad == 0 else f"{bad} failed checks"
         tiles.append(f'<a class="stat" href="#{anchor}"><div class="n">{ptitle}</div><div class="l">Probe {number} · '
                      f'{size} · {state}</div></a>')
     others = "".join(chip_card(d, r, f"{chip_slug(d)}.html") for d, r in sorted(chip_map.items()) if d != device)
     torch_versions = sorted({r["torch"] for r in rows.values() if r.get("torch")})
+    drivers = sorted({runs_by_file[r["clean_file"]].get("driver", "") for r in rows.values()
+                      if r.get("clean_file") in runs_by_file} - {""})
+    cudas = sorted({runs_by_file[r["clean_file"]].get("cuda", "") for r in rows.values()
+                    if r.get("clean_file") in runs_by_file} - {""})
     counters_seen = sorted({COUNTER_NOTES.get(r["counters"], r["counters"]) for r in rows.values() if r.get("counters")})
     spec = spec_sheet([
         ("The chip", [("Name, as the driver reports it", esc(device)),
                       ("Device memory", gib(total) if mem_run and total else ""),
                       ("Error counters", esc("; ".join(counters_seen)))]),
         ("The software", [("PyTorch", esc(", ".join(torch_versions))),
+                          ("CUDA runtime", esc(", ".join(cudas))), ("NVIDIA driver", esc(", ".join(drivers))),
                           ("Probe versions", ", ".join(f'{t} v{esc(rows[n]["version"])}' for n, _, _, t, _ in present))]),
         ("The test", [("Dates tested", ", ".join(nice_date(d) for d in dates)),
                       ("Result files", f"{len(files)} files in the OCP Test and Validation format")])])
@@ -713,6 +811,7 @@ be caught. <a href="../method.html#selftest">How the self-test works</a>.</p>
 {"".join(sections)}
 <section id="setup"><div class="kicker">EVIDENCE</div><h2>Setup and files</h2>
 {spec}
+{f'<p class="note">{esc(CHIP_NOTES[device])}</p>' if device in CHIP_NOTES else ""}
 <h3>Result files</h3><ul class="files">{file_list}</ul></section>
 <section id="limits"><div class="callout"><div class="kicker">READ BEFORE RELYING ON IT</div><h2>What this result shows</h2>
 <p>These numbers describe one unit of this chip, tested on the dates above. A clean result means no silent error
@@ -800,7 +899,8 @@ FINDINGS = [  # newest first: slug, date, title, one-line summary
      "Above 16 × 16 × 16, BF16 matrix multiplies on AMX CPUs treat subnormal inputs as zero, whatever "
      "set_flush_denormal says."),
 ]
-RELEASES = [("0.4.2", "2026-10-15", "Self-test faults shaped like NVIDIA's gate-level measurements"),
+RELEASES = [("0.4.3", "2026-10-19", "Probe 7, hours under load, the B200 row, and the driver version in every result file"),
+            ("0.4.2", "2026-10-15", "Self-test faults shaped like NVIDIA's gate-level measurements"),
             ("0.4.1", "2026-10-11", "The ecc-off verdict, faster exact references, and the RTX 4090 and RTX A5000 rows"),
             ("0.4.0", "2026-10-10", "Six probes, one command, OCP Test and Validation output")]
 PAGES = {
@@ -999,18 +1099,19 @@ def llms_measured(chip_map):
 
 def main():
     runs = [parse(p) for p in sorted(glob.glob(os.path.join(RESULTS, "*.jsonl")))]
-    compute, memory, kernel, pattern, checksum = summarise(runs)
+    compute, memory, kernel, pattern, checksum, soak = summarise(runs)
     chips = sorted({r["device"] for r in runs})
     total_runs = sum(r.get("runs", 0) for r in compute + kernel + pattern + checksum)
-    total_caught = sum(r.get("caught", 0) for r in compute + kernel + pattern + checksum + memory)
-    total_injected = sum(r.get("injected", 0) for r in compute + kernel + pattern + checksum + memory)
+    total_caught = sum(r.get("caught", 0) for r in compute + kernel + pattern + checksum + memory + soak)
+    total_injected = sum(r.get("injected", 0) for r in compute + kernel + pattern + checksum + memory + soak)
+    total_soak = sum(r.get("runs", 0) for r in soak)
     total_words = sum(r.get("bytes", 0) for r in memory) // 4
     faults = (sum(r.get("ref_fail", 0) + r.get("rep_fail", 0) for r in compute + kernel + pattern) + sum(r.get("faults", 0) for r in checksum)
-              + sum(r.get("bad", 0) for r in memory))
+              + sum(r.get("bad", 0) for r in memory) + sum(r.get("faults", 0) for r in soak))
     built = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     chip_map = chip_rows({"compute": compute, "memory": memory, "kernel": kernel, "pattern": pattern,
-                          "checksum": checksum})
+                          "checksum": checksum, "soak": soak})
     devices = sorted(chip_map)
     assert len({chip_slug(d) for d in devices}) == len(devices), "two chips share a page address"
     cards = "".join(chip_card(d, chip_map[d], f"chips/{chip_slug(d)}.html") for d in devices)
@@ -1021,7 +1122,8 @@ def main():
             [dict(name=d, slug=chip_slug(d), **chip_stats(chip_map[d]),
                   budget=[[l, round(r, 4)] for r, l in chip_budget(chip_map[d], {r["file"]: r for r in runs})[0]])
              for d in devices]).replace("</", "<\\/"),
-        "COMPUTE_ROWS": compute_rows(compute), "MEMORY_ROWS": memory_rows(memory),
+        "SOAK_RUNS": f"{total_soak:,}", "COMPUTE_ROWS": compute_rows(compute), "MEMORY_ROWS": memory_rows(memory),
+        "SOAK_ROWS": soak_rows(soak) or '<tr><td colspan="11">No rows yet. The hours-under-load probe is new; rows are added as the files come in.</td></tr>',
         "CHECKSUM_ROWS": checksum_rows(checksum) or '<tr><td colspan="11">No rows yet. The checksum probe is new; rows are added as the files come in.</td></tr>',
         "PATTERN_ROWS": pattern_rows(pattern) or '<tr><td colspan="10">No rows yet. The data pattern probe is new; rows are added as the files come in.</td></tr>',
         "KERNEL_ROWS": kernel_rows(kernel) or '<tr><td colspan="10">No rows yet. The kernel probe was added after the first four chips were measured; rows are added as the files come in.</td></tr>',
@@ -1072,7 +1174,7 @@ def main():
     llms = re.sub(r"## Measured so far.*?(?=\n## |\Z)", lambda m: llms_measured(chip_map), llms, flags=re.S)
     with open(llms_path, "w", encoding="utf-8") as f:
         f.write(llms)
-    print(f"wrote {os.path.relpath(OUT, ROOT)}: {len(chips)} chips, {total_runs:,} compute runs, "
+    print(f"wrote {os.path.relpath(OUT, ROOT)}: {len(chips)} chips, {total_runs:,} compute runs, {total_soak:,} runs under load, "
           f"{total_words:,} memory words, {total_caught}/{total_injected} injected faults caught; "
           f"{len(PAGES) + 1} pages and {len(devices)} chip pages")
 

@@ -47,5 +47,11 @@
 <thead><tr><th>Device</th><th>Date</th><th>Memory tested</th><th>Patterns</th><th>Dwell</th><th>Bad words</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
 <tbody>{{MEMORY_ROWS}}</tbody>
 </table></div>
-<p class="note">Rented data centre GPUs are young, monitored and already screened, so clean rows are the expected result there. The research says faults concentrate in aged units and appear under data-dependent, long, hot workloads. Those are the next probes on the roadmap, and where the first real findings are expected.</p>
+<h3>Hours under load probe</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Device</th><th>Date</th><th>Length</th><th>Shape (M×K×N)</th><th>Precisions</th><th>Runs</th><th>Conditions during the soak</th><th>Silent faults</th><th>Injected caught</th><th>Verdict</th><th>Files</th></tr></thead>
+<tbody>{{SOAK_ROWS}}</tbody>
+</table></div>
+<p class="note">Every run under load is compared bit for bit with a first result that was checked against the proven bound, so these runs are counted apart from the element-by-element compute runs above. Conditions come from the chip's own telemetry (NVML on NVIDIA GPUs): the temperature, SM clock and power range across the whole soak, and the reasons the driver gave for running below full clock. sw-power-cap means the chip sat at its software power limit and lowered its clock to stay there, which is the state marginal silicon is most likely to fail in.</p>
+<p class="note">Rented data centre GPUs are young, monitored and already screened, so clean rows are the expected result there. The research says faults concentrate in aged units and appear under data-dependent, long, hot workloads. The hours-under-load probe is the first step towards those conditions; longer soaks on older units are where the first real findings are expected.</p>
 </section>

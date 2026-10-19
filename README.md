@@ -8,7 +8,7 @@ Results, one page per chip and the findings so far: [chipintegrity.org](https://
 
 It runs a fixed calculation on a GPU, NPU or CPU many times and proves, element by element, whether the chip returned the right answer every time. Results come out in the Open Compute Project Test and Validation format, so they drop straight into fleet tooling.
 
-**Status: early.** Seven probes so far, numbered as on the roadmap below: `screen.py` v0.3.4 (probe 1, matrix multiply across several shapes, four precisions and exact FP8), `memcheck.py` v0.1.1 (probe 2, a sweep of most of the device memory), `kernels.py` v0.2.3 (probe 3, softmax, layer norm, GELU, rotary embeddings and fused attention), `abft.py` v0.1.0 (probe 6, checksum-protected matrix multiply with proven thresholds), `soak.py` v0.1.0 (probe 7, hours under load, every result checked with the chip's temperature, clocks and power beside it), `patterns.py` v0.1.4 (probe 9, data patterns that drive the matrix multiply) and `counters.py` v0.1.1 (probe 11, the chip's own error counters, read around every run of the other six). One device at a time, six measured chips. Read the limits section before relying on a PASS.
+**Status: early.** Seven probes so far, numbered as on the roadmap below: `screen.py` v0.3.4 (probe 1, matrix multiply across several shapes, four precisions and exact FP8), `memcheck.py` v0.1.1 (probe 2, a sweep of most of the device memory), `kernels.py` v0.2.3 (probe 3, softmax, layer norm, GELU, rotary embeddings and fused attention), `abft.py` v0.1.0 (probe 6, checksum-protected matrix multiply with proven thresholds), `soak.py` v0.1.0 (probe 7, hours under load, every result checked with the chip's temperature, clocks and power beside it), `patterns.py` v0.1.4 (probe 9, data patterns that drive the matrix multiply) and `counters.py` v0.1.1 (probe 11, the chip's own error counters, read around every run of the other six). One device at a time, seven measured chips. Read the limits section before relying on a PASS.
 
 ## Quick start
 
@@ -26,7 +26,7 @@ On many Macs the built-in `python3` is version 3.9, and pip then reports "No mat
 On an NVIDIA GPU host with Docker and the NVIDIA container toolkit, with nothing else installed:
 
 ```
-docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.4.2
+docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.4.3
 ```
 
 ## Why this exists
@@ -43,6 +43,7 @@ Every row comes from a run of this code with the result files in [`results/`](re
 
 | Device | Date | Tool | Shapes (MxKxN) | Runs per step | fp32 | fp16 | bf16 | int8 | FP8 | Injected faults caught | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|---|
+| NVIDIA B200, driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-19 | v0.3.4 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | PASS, exact with full and fast accumulation | 90 of 90 | no-silent-errors |
 | NVIDIA GeForce RTX 4090, driver 580.159.04, PyTorch 2.8.0+cu128, rented pod, ECC off | 2026-10-11 | v0.3.2 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | PASS, exact with full and fast accumulation | 90 of 90 | no-silent-errors |
 | NVIDIA RTX A5000, driver 580.159.04, PyTorch 2.8.0+cu128, rented pod, ECC off | 2026-10-11 | v0.3.2 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | skipped, no FP8 on this card (compute capability 8.6) | 60 of 60 | no-silent-errors |
 | NVIDIA H100 80GB HBM3 (SXM), driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-10 | v0.3.2 | 1024x1024x1024, 4096x4096x4096, 32x4096x11008 | 50 | PASS | PASS | PASS | PASS, exact | PASS, exact with full and fast accumulation | 90 of 90 | no-silent-errors |
@@ -56,6 +57,7 @@ Every row comes from a run of this code with the result files in [`results/`](re
 
 | Device | Date | Tool | Kernels | Size | Runs per step | fp32 | fp16 | bf16 | Injected faults caught | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
+| NVIDIA B200, driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-19 | v0.2.3 | softmax, layer norm, GELU, RoPE, attention | 4096x4096; RoPE 4096 positions x 128; attention 8 heads x 1024 tokens x 128 | 25 | PASS | PASS | PASS | 45 of 45 | no-silent-errors |
 | NVIDIA GeForce RTX 4090, driver 580.159.04, PyTorch 2.8.0+cu128, rented pod, ECC off | 2026-10-11 | v0.2.2 | softmax, layer norm, GELU, RoPE, attention | 4096x4096; RoPE 4096 positions x 128; attention 8 heads x 1024 tokens x 128 | 25 | PASS | PASS | PASS | 45 of 45 | no-silent-errors |
 | NVIDIA RTX A5000, driver 580.159.04, PyTorch 2.8.0+cu128, rented pod, ECC off | 2026-10-11 | v0.2.2 | softmax, layer norm, GELU, RoPE, attention | 4096x4096; RoPE 4096 positions x 128; attention 8 heads x 1024 tokens x 128 | 25 | PASS | PASS | PASS | 45 of 45 | no-silent-errors |
 | NVIDIA H100 80GB HBM3 (SXM), driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-10 | v0.2.2 | softmax, layer norm, GELU, RoPE, attention | 4096x4096; RoPE 4096 positions x 128; attention 8 heads x 1024 tokens x 128 | 25 | PASS | PASS | PASS | 45 of 45 | no-silent-errors |
@@ -70,6 +72,7 @@ Notes on the H100 row: all 375 results across 15 steps were inside the bound and
 
 | Device | Date | Tool | Shapes (MxKxN) | Runs per step | fp32 | fp16 | bf16 | Blind-spot runs | Injected errors located | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
+| NVIDIA B200, driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-19 | v0.1.0 | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | 0 | 18 of 18 | no-silent-errors |
 | NVIDIA GeForce RTX 4090, driver 580.159.04, PyTorch 2.8.0+cu128, rented pod, ECC off | 2026-10-11 | v0.1.0 | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | 0 | 18 of 18 | no-silent-errors |
 | NVIDIA RTX A5000, driver 580.159.04, PyTorch 2.8.0+cu128, rented pod, ECC off | 2026-10-11 | v0.1.0 | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | 0 | 18 of 18 | no-silent-errors |
 | NVIDIA H100 80GB HBM3 (SXM), driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-10 | v0.1.0 | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | 0 | 18 of 18 | no-silent-errors |
@@ -83,6 +86,7 @@ Notes on the H100 row: all 120 runs had every checksum consistent, and every inj
 
 | Device | Date | Tool | Patterns | Shapes (MxKxN) | Runs per step | fp32 | fp16 | bf16 | int8 | FP8 | Subnormal inputs | Injected faults caught | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| NVIDIA B200, driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-19 | v0.1.4 | wide, mantissa, cancel, alternate, sparse, subnormal, near_max, extremes | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | PASS, exact | PASS, exact with full and fast accumulation | kept in fp32, fp16 and bf16 | 168 of 168 | no-silent-errors |
 | NVIDIA GeForce RTX 4090, driver 580.159.04, PyTorch 2.8.0+cu128, rented pod, ECC off | 2026-10-11 | v0.1.2 | wide, mantissa, cancel, alternate, sparse, subnormal, near_max, extremes | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | PASS, exact | PASS, exact with full and fast accumulation | kept in fp32, fp16 and bf16 | 168 of 168 | no-silent-errors |
 | NVIDIA RTX A5000, driver 580.159.04, PyTorch 2.8.0+cu128, rented pod, ECC off | 2026-10-11 | v0.1.2 | wide, mantissa, cancel, alternate, sparse, subnormal, near_max, extremes | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | PASS, exact | skipped, no FP8 on this card | kept in fp32, fp16 and bf16 | 144 of 144 | no-silent-errors |
 | NVIDIA H100 80GB HBM3 (SXM), driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-10 | v0.1.2 | wide, mantissa, cancel, alternate, sparse, subnormal, near_max, extremes | 1024x1024x1024, 32x4096x11008 | 20 | PASS | PASS | PASS | PASS, exact | PASS, exact with full and fast accumulation | kept in fp32, fp16 and bf16 | 168 of 168 | no-silent-errors |
@@ -96,6 +100,7 @@ Notes on the H100 row: all 1,120 results across 56 steps were inside the bound o
 
 | Device | Date | Memory tested | Patterns | Dwell | Bad words | Injected flips located | Verdict |
 |---|---|---|---|---|---|---|---|
+| NVIDIA B200, 178.4 GiB total, rented pod | 2026-10-19 | 142.00 GiB (38,117,834,752 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
 | NVIDIA GeForce RTX 4090, 23.5 GiB total, rented pod, ECC off | 2026-10-11 | 18.50 GiB (4,966,055,936 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
 | NVIDIA RTX A5000, 23.5 GiB total, rented pod, ECC off | 2026-10-11 | 18.50 GiB (4,966,055,936 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
 | NVIDIA H200, 139.8 GiB total, rented pod | 2026-10-08 | 111.25 GiB (29,863,444,480 words) | 6 | 2 s | 0 | 30 of 30 | no-memory-errors |
@@ -107,6 +112,14 @@ Notes on the H100 row: all 1,120 results across 56 steps were inside the bound o
 The H200 sweep took 24.8 s for 111.25 GiB, the A100 sweep took 28.3 s, the H100 sweep took 21.6 s both clean and with injection (21.8 s and 21.7 s in the v0.1.1 run, with every error counter quiet), so about 17 GiB/s of write, read and compare at HBM speed; the Mac sweep took 69 s clean and 85 s with injection. Result files: `results/h200_memcheck.jsonl`, `results/h200_memcheck_inject.jsonl`, `results/a100_memcheck.jsonl`, `results/a100_memcheck_inject.jsonl`, `results/h100_memcheck.jsonl`, `results/h100_memcheck_inject.jsonl`, `results/h100_memcheck_v011.jsonl`, `results/h100_memcheck_v011_inject.jsonl`, `results/mac_memcheck.jsonl` and `results/mac_memcheck_inject.jsonl`.
 
 The H200, A100 and first H100 rows were measured with v0.2.0, before the FP8 steps existed.
+
+**Hours under load (`soak.py`)**
+
+| Device | Date | Tool | Length | Shape (MxKxN) | Precisions | Runs | Conditions during the soak | Silent faults | Injected faults caught | Verdict |
+|---|---|---|---|---|---|---|---|---|---|---|
+| NVIDIA B200, driver 580.126.09, PyTorch 2.8.0+cu128, rented pod | 2026-10-19 | v0.1.0 | 10 min, 10 windows of 60 s | 8192x4096x8192 | bf16, fp16, fp32, int8, FP8 | 1,096,120 | 32 to 60 C, 1477 to 1965 MHz, up to 1014.2 W, `sw-power-cap` in every window | 0 | not run | no-silent-errors |
+
+Notes on the B200 rows: measured on 19 October 2026 on a rented pod, installed from the repository at v0.4.2 and run with `chip-integrity run --name b200` followed by `chip-integrity soak --minutes 10`, on Python 3.12.3. All 2,515 runs across the five short probes were inside their bound or exact, and bit-for-bit identical to their first run, and all 351 planted faults were caught or located. FP8 was exact on every element with both full and fast accumulation at all three shapes, including K = 4096. The worst error over bound was 0.0053 for fp32, 0.21 for fp16 and 0.66 for bf16 in the compute probe, the same three figures as the H100 and the RTX 4090; 0.999 for fp16 softmax in the kernel probe and 0.935 for bf16 sparse in the pattern probe. Attention ran on FlashAttention in fp16 and bf16 and on the memory-efficient kernel in fp32. The card keeps subnormal inputs in fp32, fp16 and bf16. ECC was on: the volatile corrected and uncorrected ECC counts read 0 before and after every run, no rows were remapped, and nothing was pending or failed, so every clean run ended `counters-quiet`. The memory sweep covered 142.00 GiB of the 178.4 GiB the driver reports in 23.7 s, about twice the H100's rate per GiB. The error-counter step reads the chip's temperature and power before and after each run: the compute, kernel, checksum and pattern runs all ended at 32 C and under 237 W, because each run is seconds of GPU work between much longer CPU-side checks, and the memory sweep ended at 45 C and 768 W. The ten-minute soak is the only probe that loaded the chip: it took it to 60 C and 1,014.2 W, at its 1,000 W software power limit, with the driver reporting `sw-power-cap` in every window and the SM clock moving between 1477 and 1965 MHz. All 1,096,120 results under that load were bit-identical to their verified first result, and the first results the soak was checked against used at most a fifth of their bound (bf16, 0.20). The soak self-test was not run on this pod; it is covered by `tests/test_soak.py` on the CPU and will be run on the next rented card. The driver version is not in these files, because v0.4.2 did not record it; it was read with `nvidia-smi` on the pod after the run, and from v0.4.3 every file carries it. Result files: `results/b200_clean.jsonl`, `results/b200_inject.jsonl`, `results/b200_kernels.jsonl`, `results/b200_kernels_inject.jsonl`, `results/b200_abft.jsonl`, `results/b200_abft_inject.jsonl`, `results/b200_patterns.jsonl`, `results/b200_patterns_inject.jsonl`, `results/b200_memcheck.jsonl`, `results/b200_memcheck_inject.jsonl` and `results/b200_soak.jsonl`.
 
 Notes on the H100 v0.3.2 row: all 900 results across 18 steps were inside the bound or exact, and bit-for-bit identical to their first run. FP8 was exact on every element with both full and fast accumulation at all three shapes, including K = 4096. The worst error over bound was 0.0053 for fp32, 0.21 for fp16 and 0.66 for bf16. Result files: `results/h100_v032.jsonl` and `results/h100_v032_inject.jsonl`.
 
@@ -458,9 +471,9 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 
 ## Output format
 
-All six probes write one JSON object per line following the [OCP Test and Validation output spec](https://github.com/opencomputeproject/ocp-diag-core/tree/main/json_spec), version 2.0, written through the official `ocptv` library:
+All seven probes write one JSON object per line following the [OCP Test and Validation output spec](https://github.com/opencomputeproject/ocp-diag-core/tree/main/json_spec), version 2.0, written through the official `ocptv` library:
 
-- `testRunStart` with the parameters used (for `screen.py` and `kernels.py` these include `bound_model`, the id of the arithmetic model in `arith.py`, and for every probe with `--inject-model` the `inject_model` used), the host name as DUT id, the device as a hardware component, and the `torch` and `python` versions as software components
+- `testRunStart` with the parameters used (for `screen.py` and `kernels.py` these include `bound_model`, the id of the arithmetic model in `arith.py`, and for every probe with `--inject-model` the `inject_model` used), the host name as DUT id, the device as a hardware component, and the `torch` and `python` versions as software components, plus on CUDA the `cuda` runtime PyTorch was built with and the `nvidia-driver` version (NVML, or `nvidia-smi` where the bindings are missing), from v0.4.3
 - one test step per shape and precision, named `gemm_<precision>_<MxKxN>` (for example `gemm_fp16_4096x4096x4096`), carrying the measurements `runs`, `shape_mkn`, `exact_check`, `accumulation_factor` (the `g` used in the bound, float precisions only), `seconds`, `reference_check_failed_runs`, `repeat_check_failed_runs`, `worst_error_over_bound_ratio` (float precisions only), `worst_abs_error`, `worst_nonfinite_values`, and in self-test mode `injected_runs`, `injected_runs_detected`, `gpu_sdc_faults_planted` and `gpu_sdc_faults_detected`, with validators on the counts that must be zero or equal to the injected count
 - a `diagnosis` per step with the verdict above
 - `testRunEnd` with the overall PASS or FAIL
@@ -508,7 +521,7 @@ Twelve probes, each aimed at one part of the chip. Seven are built: 1, 2, 3, 6, 
 
 Around the probes: a fleet mode that runs every probe across many devices and collects the files, side by side runs against vendor diagnostics on the same device, and a rulebook for submitting rows to the public table.
 
-Chips still to measure: B200, Jetson Orin, Apple Neural Engine, one AMD MI-series and one Intel Gaudi. Stage 1 is done when one outside operator runs the suite in CI and one vendor or operator thread is open on a measured row.
+Chips still to measure: Jetson Orin, Apple Neural Engine, one AMD MI-series and one Intel Gaudi. Stage 1 is done when one outside operator runs the suite in CI and one vendor or operator thread is open on a measured row.
 
 ### Stage 2. Verification runtime (January to June 2027, 0.6 to 0.8)
 
@@ -539,7 +552,7 @@ Run `chip-integrity run --name NAME` on your device, or the ten probe commands i
 If you use this in research, please cite it as
 
 ```
-Yasha Khandelwal. ai-chip-integrity: an open tester for silent computation errors in AI chips. Version 0.4.2, 2026.
+Yasha Khandelwal. ai-chip-integrity: an open tester for silent computation errors in AI chips. Version 0.4.3, 2026.
 https://doi.org/10.5281/zenodo.23393790
 https://github.com/tech4biz-yasha/ai-chip-integrity
 ```

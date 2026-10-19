@@ -23,6 +23,7 @@ Self-test: every row is paired with an injection run that plants faults and must
 One page per chip, generated from the result files:
 - Apple GPU (MPS) arm64: https://chipintegrity.org/chips/apple-gpu-mps-arm64.html (last tested 2026-10-10; 1,785 compute runs, 0 silent faults, 264 of 264 planted faults caught)
 - NVIDIA A100-SXM4-80GB: https://chipintegrity.org/chips/nvidia-a100-sxm4-80gb.html (last tested 2026-10-07; 600 compute runs, 0 silent faults, 90 of 90 planted faults caught)
+- NVIDIA B200: https://chipintegrity.org/chips/nvidia-b200.html (last tested 2026-10-19; 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught)
 - NVIDIA GeForce RTX 4090: https://chipintegrity.org/chips/nvidia-geforce-rtx-4090.html (last tested 2026-10-11; 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught)
 - NVIDIA H100 80GB HBM3: https://chipintegrity.org/chips/nvidia-h100-80gb-hbm3.html (last tested 2026-10-10; 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught)
 - NVIDIA H200: https://chipintegrity.org/chips/nvidia-h200.html (last tested 2026-10-08; 600 compute runs, 0 silent faults, 90 of 90 planted faults caught)
