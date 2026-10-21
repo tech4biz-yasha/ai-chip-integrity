@@ -512,7 +512,9 @@ CHIP_NOTES = {  # facts about a measured unit that its result files do not carry
         "memory as system_profiler reports it. On this backend bf16, int8 and FP8 matrix multiplies do not exist and were "
         "skipped. The results outside the bound are all repeatable, and for RoPE the probe measured the backend's own sin "
         "and cos at 1.22e-4 absolute error against the model's 9.5e-7 allowance, so there the cause is the function library; "
-        "see the finding on Metal through PyTorch 2.2.2 for what was measured about the other steps.",
+        "see the finding on Metal through PyTorch 2.2.2 for what was measured about the other steps. The full-model probe "
+        "also ran on this GPU: fp32 clean through all 36,504 multiplies of Qwen2.5-0.5B, fp16 outside the bound on 750 "
+        "of them with every run bit-identical; its file is in results/evidence until that probe joins the row.",
     "NVIDIA B200": "NVIDIA driver 580.126.09, read with nvidia-smi on the pod after the run; the files were written "
                    "by v0.4.2, which did not record the driver (v0.4.3 and later do). Power limit 1000 W, 183,359 MiB "
                    "total memory, as nvidia-smi reported them.",
