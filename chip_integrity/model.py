@@ -113,11 +113,9 @@ def load_model(name, attention, seed):
     if name == TINY:
         return tiny_model(seed)
     tf = _transformers()
-    kwargs = {"attn_implementation": attention}
-    try:
-        model = tf.AutoModelForCausalLM.from_pretrained(name, dtype="auto", **kwargs)
-    except TypeError:                                   # transformers before the dtype= spelling
-        model = tf.AutoModelForCausalLM.from_pretrained(name, torch_dtype="auto", **kwargs)
+    # torch_dtype="auto" loads the checkpoint in the dtype it was saved in; the newest transformers spell it
+    # dtype= and warn, but torch_dtype= works on every version from 4.45 to 4.57.
+    model = tf.AutoModelForCausalLM.from_pretrained(name, torch_dtype="auto", attn_implementation=attention)
     tok = tf.AutoTokenizer.from_pretrained(name)
     return model.eval(), tok
 
