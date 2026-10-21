@@ -5,6 +5,7 @@
     chip-integrity screen [options]     one probe with its own options (also memcheck, kernels, abft, patterns)
     chip-integrity soak [options]       hours under load (probe 7), started on its own because it runs as long as asked
     chip-integrity model [options]      full model forward pass (probe 4), started on its own because it downloads a model
+    chip-integrity reduce [options]     reductions (probe 5): sums, running sums, means, row and column sums
     chip-integrity --version            the suite version and every probe's version
 
 ``run`` starts each probe in its own Python process, exactly as running the ten commands in the README
@@ -36,7 +37,7 @@ PROBES = [
 ]
 PROBE_NAMES = [p[0] for p in PROBES]
 # Probes that `run` leaves out because they take as long as you ask; each is started on its own.
-STANDALONE = [("soak", "hours under load"), ("model", "full model forward pass")]
+STANDALONE = [("soak", "hours under load"), ("model", "full model forward pass"), ("reduce", "reductions")]
 STANDALONE_NAMES = [s[0] for s in STANDALONE]
 VERSIONED = PROBE_NAMES + STANDALONE_NAMES + ["counters"]
 
