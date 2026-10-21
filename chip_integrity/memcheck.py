@@ -34,7 +34,7 @@ from chip_integrity import counters  # noqa: E402
 
 from chip_integrity.screen import FileWriter, pick_device, device_label, add_software_infos
 
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 WORD = 4
 MAX_RECORD = 1000
 PATTERNS = ["zeros", "ones", "aaaa", "5555", "hash", "hash_inv"]
@@ -63,6 +63,25 @@ def expected(pattern, start_word, n, dev, seed):
     return to_i32(h)
 
 
+def mps_total_bytes():
+    """What Metal can give us. PyTorch 2.3 and newer report it; older builds (2.2.2 is the last for Intel Macs) do
+    not, so there the GPU's VRAM is read from system_profiler, and failing that 2 GB is assumed."""
+    fn = getattr(torch.mps, "recommended_max_memory", None)
+    if fn is not None:
+        return int(fn())
+    try:
+        import re
+        import subprocess
+        out = subprocess.run(["system_profiler", "SPDisplaysDataType"], capture_output=True, text=True, timeout=20).stdout
+        sizes = [int(m.group(1)) * (2 ** 30 if m.group(2).upper() == "GB" else 2 ** 20)
+                 for m in re.finditer(r"VRAM \([^)]*\):\s*(\d+)\s*(GB|MB)", out)]
+        if sizes:
+            return max(sizes)                        # the discrete GPU, which Metal picks when there is one
+    except Exception:
+        pass
+    return 2 * 2 ** 30
+
+
 def memory_budget_bytes(dev, gb_arg, fraction):
     if gb_arg:
         return int(gb_arg * 2 ** 30)
@@ -70,7 +89,7 @@ def memory_budget_bytes(dev, gb_arg, fraction):
         free, total = torch.cuda.mem_get_info(dev)
         return int(free * fraction)
     if dev.type == "mps":
-        return int(torch.mps.recommended_max_memory() * fraction * 0.6)   # unified memory, leave room for macOS
+        return int(mps_total_bytes() * fraction * 0.6)   # unified or shared memory, leave room for macOS
     return 2 * 2 ** 30
 
 
@@ -78,7 +97,7 @@ def total_device_bytes(dev):
     if dev.type == "cuda":
         return torch.cuda.mem_get_info(dev)[1]
     if dev.type == "mps":
-        return torch.mps.recommended_max_memory()
+        return mps_total_bytes()
     try:
         return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
     except (ValueError, OSError, AttributeError):

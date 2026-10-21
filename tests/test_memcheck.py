@@ -10,6 +10,7 @@ import sys
 
 import pytest
 import torch
+import types
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from chip_integrity import memcheck  # noqa: E402
@@ -163,3 +164,16 @@ def test_output_matches_official_ocp_schema(tmp_path):
     memcheck.main(BASE + ["--out", str(out)])
     for obj in strict_load(out):
         validator.validate(obj)
+
+
+def test_mps_total_bytes_falls_back_when_torch_cannot_report_it(monkeypatch):
+    """PyTorch 2.2.2, the last build for Intel Macs, has no torch.mps.recommended_max_memory."""
+    monkeypatch.delattr(torch.mps, "recommended_max_memory", raising=False)
+    import subprocess
+    fake = "Graphics/Displays:\n  Intel UHD Graphics 630:\n    VRAM (Dynamic, Max): 1536 MB\n  AMD Radeon Pro 5500M:\n    VRAM (Total): 8 GB\n"
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: types.SimpleNamespace(stdout=fake))
+    assert memcheck.mps_total_bytes() == 8 * 2 ** 30
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(OSError("no system_profiler")))
+    assert memcheck.mps_total_bytes() == 2 * 2 ** 30
+    monkeypatch.setattr(torch.mps, "recommended_max_memory", lambda: 12345, raising=False)
+    assert memcheck.mps_total_bytes() == 12345
