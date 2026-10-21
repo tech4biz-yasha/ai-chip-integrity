@@ -8,7 +8,7 @@ Results, one page per chip and the findings so far: [chipintegrity.org](https://
 
 It runs a fixed calculation on a GPU, NPU or CPU many times and proves, element by element, whether the chip returned the right answer every time. Results come out in the Open Compute Project Test and Validation format, so they drop straight into fleet tooling.
 
-**Status: early.** Seven probes so far, numbered as on the roadmap below: `screen.py` v0.3.4 (probe 1, matrix multiply across several shapes, four precisions and exact FP8), `memcheck.py` v0.1.1 (probe 2, a sweep of most of the device memory), `kernels.py` v0.2.3 (probe 3, softmax, layer norm, GELU, rotary embeddings and fused attention), `abft.py` v0.1.0 (probe 6, checksum-protected matrix multiply with proven thresholds), `soak.py` v0.1.0 (probe 7, hours under load, every result checked with the chip's temperature, clocks and power beside it), `patterns.py` v0.1.4 (probe 9, data patterns that drive the matrix multiply) and `counters.py` v0.1.1 (probe 11, the chip's own error counters, read around every run of the other six). One device at a time, seven measured chips. Read the limits section before relying on a PASS.
+**Status: early.** Eight probes so far, numbered as on the roadmap below: `screen.py` v0.3.4 (probe 1, matrix multiply across several shapes, four precisions and exact FP8), `memcheck.py` v0.1.1 (probe 2, a sweep of most of the device memory), `kernels.py` v0.2.3 (probe 3, softmax, layer norm, GELU, rotary embeddings and fused attention), `model.py` v0.1.0 (probe 4, a small language model run on the chip with every matrix multiply inside it checked against float64; built, first rows to come), `abft.py` v0.1.0 (probe 6, checksum-protected matrix multiply with proven thresholds), `soak.py` v0.1.0 (probe 7, hours under load, every result checked with the chip's temperature, clocks and power beside it), `patterns.py` v0.1.4 (probe 9, data patterns that drive the matrix multiply) and `counters.py` v0.1.1 (probe 11, the chip's own error counters, read around every run of the other seven). One device at a time, seven measured chips. Read the limits section before relying on a PASS.
 
 ## Quick start
 
@@ -230,6 +230,24 @@ A device that breaks any of them, or that substitutes the tanh approximation for
 
 Verdicts, the `--inject N` self-test and `--inject-model` are the same as the compute probe.
 
+## Probe 4: full model forward pass (`model.py`)
+
+A chip can pass every kernel on its own and still return a wrong token, because a model strings thousands of those kernels together with real weights and real activations, in shapes the probes above never use. This probe runs a small open language model on the chip (Qwen2.5-0.5B by default, downloaded from the Hugging Face Hub) with a float64 copy of the same model on the CPU as the reference, and checks it three ways. The matrix multiplies are where a wrong answer is made, and a bound carried through a whole model would be far too loose to catch anything, so every matrix multiply inside the model (the attention projections, the MLP and the output head, about 170 of them in the default model) is checked on its own: a hook sees the input the chip actually gave it, computes the float64 answer from that same input and the proven rounding bound from probe 1, and every output element has to sit inside the bound. The kernels between the multiplies (RMSNorm, SwiGLU, rotary embeddings, softmax) are covered by probe 3 with their own bounds. Second, after every run the weights are read back from the chip and compared bit for bit with what was loaded, because a flipped bit in a weight sitting in device memory is the simplest silent fault there is. Third, the whole run, every logit of the prompt and of each generated token, is repeated and compared bit for bit, as in probe 1.
+
+The decision figures against float64 are recorded as measurements, not verdicts: how many prompt positions pick a different token than float64 would, the smallest float64 margin at those positions (a near tie is a legitimate place for fp16 or bf16 to differ), the first generated token that diverges, and the largest logit difference at the decision position. Low precision can flip a near tie without any fault, so the verdict rests on the three checks above.
+
+| Verdict | Meaning |
+|---|---|
+| `no-silent-errors` | Every run bit-identical, every multiply inside its bound, every weight unchanged |
+| `silent-data-corruption` | Runs differed, or a weight came back changed from the chip: an intermittent fault or a memory fault |
+| `outside-error-bound` | Runs agree but a multiply sat outside its bound: a faulty unit, or an arithmetic model this chip does not follow |
+| `nondeterministic-kernel` | Runs differed but every multiply stayed inside its bound, so the bit-for-bit check cannot judge this chip and precision; reported as a finding |
+| `model-pinned`, `reference-computed` | Setup steps: the weights and tokenizer vocabulary are hashed into the file, and the float64 reference is computed on the CPU |
+
+The default prompt set is sixteen short English prompts built into the probe (scope stated: English, general knowledge, up to 64 tokens each, 8 tokens generated greedily after each); `--prompts FILE` replaces it with one prompt per line. Every step records the weights hash, so a row names exactly which weights it measured. The defaults run bf16, fp16 and fp32 on CUDA, fp16 and fp32 on Apple GPUs and fp32 on CPUs, three clean runs per precision. The default model needs about 9 GB of host memory (the checkpoint, its float64 copy and a copy in each tested precision) and a few minutes per precision; the float64 reference itself takes about a minute on a laptop CPU. `--inject N` adds N runs with a planted fault after the clean ones: one bit flipped in the output of one random multiply on the chip, and one bit flipped in one random weight on the chip (restored afterwards), alternating. Each must be caught by at least one of the three checks, and the file records whether the multiply check also localised it to the right layer; a flip in a low mantissa bit sits inside the rounding bound and is caught by the repeat check instead, exactly as in probe 1. `--model tiny` builds a two-layer model of the same family from the seed with no download, which is how the self-test runs on a CPU in CI.
+
+v0.1.0 covers one prompt at a time through the prefill and the cached decode path, and the attention projections, MLP and output head. Batched prompts, int8 and FP8 weights, an inference server path (vLLM class) and a larger prompt set come later.
+
 ## Probe 6: checksum-protected matrix multiply (`abft.py`)
 
 Huang and Abraham's algorithm-based fault tolerance (IEEE Transactions on Computers, 1984). A is extended with a row holding its column sums and B with a column holding its row sums, so one multiply on the device returns C together with C's own row sums and column sums, computed by the same hardware in the same pass:
@@ -320,7 +338,7 @@ Options for `chip-integrity run`:
 | `--quick` | off | small sizes: a smoke test, not a publishable row |
 | `--skip` | none | comma list of probes to leave out, from `screen`, `kernels`, `abft`, `patterns`, `memcheck` |
 
-The exit code is 0 when every step passes and 1 when any fails; a summary names each step and its file. `chip-integrity screen` (and `memcheck`, `kernels`, `abft`, `patterns`) runs one probe with its own options, listed below, and `chip-integrity --version` prints the suite version and every probe's version. `chip-integrity soak` runs probe 7 the same way; `run` leaves it out because it lasts as long as you ask.
+The exit code is 0 when every step passes and 1 when any fails; a summary names each step and its file. `chip-integrity screen` (and `memcheck`, `kernels`, `abft`, `patterns`) runs one probe with its own options, listed below, and `chip-integrity --version` prints the suite version and every probe's version. `chip-integrity soak` runs probe 7 and `chip-integrity model` runs probe 4 the same way; `run` leaves them out because the soak lasts as long as you ask and the model probe downloads a model.
 
 From a clone of the repository, the probes also run as scripts, with no install beyond the requirements:
 
@@ -339,7 +357,9 @@ python memcheck.py               # memory probe; 6 patterns over most of the dev
 python memcheck.py --inject 5    # memory self-test
 python soak.py                   # hours under load; 60 minutes by default, one precision per minute
 python soak.py --minutes 5 --inject 3   # soak self-test
-python -m pytest -q              # 241 tests on CPU; 7 more validate the output against OCP's schema
+python model.py                  # full model forward pass; downloads Qwen2.5-0.5B, 16 prompts, three runs per precision
+python model.py --model tiny --inject 2   # model self-test on a two-layer model built from the seed, no download
+python -m pytest -q              # 258 tests on CPU; 8 more validate the output against OCP's schema
 ```
 
 Options for `memcheck.py`:
@@ -425,6 +445,23 @@ Options for `soak.py`:
 | `--inject-model` | `mixed` | self-test faults: `bit`, `gpu-sdc` (shaped like Tung et al., DSN 2026) or `mixed`, which alternates them |
 | `--out` | `soak.jsonl` | OCP output file |
 
+Options for `model.py`:
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--device` | `auto` | `auto`, `cpu`, `mps`, `cuda` or `cuda:N` |
+| `--model` | `Qwen/Qwen2.5-0.5B` | Hugging Face model id, or `tiny` for a two-layer model built from the seed (no download) |
+| `--dtypes` | by device | comma list from `fp32`, `fp16`, `bf16` for the chip: `bf16,fp16,fp32` on CUDA, `fp16,fp32` on Apple GPUs, `fp32` on CPUs; the reference is always float64 on the CPU |
+| `--prompts` | built-in | text file, one prompt per line (default: the sixteen built-in prompts) |
+| `--max-prompts` | `16` | prompts to use from the set |
+| `--max-tokens` | `64` | prompt tokens kept per prompt |
+| `--new-tokens` | `8` | tokens generated greedily after each prompt |
+| `--runs` | `3` | clean runs per precision; runs after the first are compared bit for bit |
+| `--attention` | `sdpa` | attention implementation, `sdpa` or `eager` |
+| `--seed` | `1234` | random seed |
+| `--inject` | `0` | planted-fault runs per precision (self-test) |
+| `--out` | `model.jsonl` | OCP output file |
+
 Exit code is 0 for PASS and 1 for FAIL. A precision or shape the device does not support (for example int8 matmul on a device without it) is skipped and recorded as an error artifact.
 
 On CUDA, `screen.py` and `kernels.py` turn off TF32 and reduced precision reductions, set `CUBLAS_WORKSPACE_CONFIG`, and ask PyTorch for deterministic algorithms, so the bound and the repeat check both hold. `kernels.py` also limits fp16 and bf16 attention to the fused kernels and records which one ran; that control needs PyTorch 2.3 or later, and on older versions the device default runs.
@@ -442,9 +479,10 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 | `chip_integrity/counters.py` | Probe 11, the chip's error counters, read around every run of the other probes |
 | `chip_integrity/memcheck.py` | Probe 2, memory sweep |
 | `chip_integrity/soak.py` | Probe 7, hours under load: every result checked bit for bit, with temperature, clocks and power per window |
+| `chip_integrity/model.py` | Probe 4, full model forward pass: every matrix multiply inside a small language model checked against float64, weights read back, runs repeated bit for bit |
 | `chip_integrity/arith.py` | The arithmetic model every bound is derived from, with its id written into each result file |
 | `chip_integrity/cli.py` | The `chip-integrity` command: `run` executes every probe and its self-test, each in its own process, and writes the ten result files; `chip-integrity <probe>` runs one probe with its own options |
-| `screen.py`, `kernels.py`, `abft.py`, `patterns.py`, `memcheck.py`, `soak.py` | Small wrappers so `python screen.py` and the other probe commands keep working from a clone |
+| `screen.py`, `kernels.py`, `abft.py`, `patterns.py`, `memcheck.py`, `soak.py`, `model.py` | Small wrappers so `python screen.py` and the other probe commands keep working from a clone |
 | `pyproject.toml` | Package metadata for PyPI. The version lives in `chip_integrity/__init__.py` and must match `CITATION.cff` |
 | `Dockerfile` | The `ghcr.io/tech4biz-yasha/ai-chip-integrity` image: PyTorch 2.8.0 with CUDA 12.8, the same build the H100 rows were measured with, and `chip-integrity run` as its default command |
 | `.github/workflows/` | `ci.yml` runs every test, including the OCP schema checks, builds the package, and runs a quick pass and a few seconds of probe 7 inside the Docker image on every push; `release.yml` publishes the package to PyPI and the image to GitHub's container registry when a release is published |
@@ -468,6 +506,7 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 10. `tests/test_cli.py` (13): `chip-integrity run` executes exactly the ten probe commands in this README with the same file names and self-test strength, `--quick` only adds small sizes, `--skip` leaves whole probes out, a failing step fails the run without stopping the others, a quick run is never offered as a row, bad names and unknown probes are refused before anything runs, one probe runs with its own options, the old `python screen.py` paths still work, and a real quick run writes its files.
 11. `tests/test_gpu_sdc.py` (20): the `gpu-sdc` self-test fault pinned to Tung et al., DSN 2026: the outcome mix exactly as published, every plant changing at least one element even in an all-zero output, faults confined to one warp-aligned chunk of 32 at even spacing, outcome shares within 3 points of the measured 50.68% zeroed and 48.31% bit-flipped, single-bit flips under 40% with the low bits flipped more often, integer outputs only zeroed or bit-flipped, `mixed` alternating the two models, and the compute self-test catching every planted fault under each model.
 12. `tests/test_soak.py` (27): a clean soak passing every window with its totals adding up; the self-test catching every planted fault under each fault model and in exact int8; an intermittent fault failing only its own window; any difference in int8 counted as wrong; a kernel that wobbles by one ulp inside the bound reported as non-deterministic, not as corruption; a first result outside the bound and a kernel that does not repeat both left out at setup; precisions rotating one per window; an unsupported precision skipped while the rest are soaked; every window carrying temperature, clocks, power and named clock-event reasons, with the temperature of the first differing run; NVML read through a simulated library, with older call names and missing readings left out; Ctrl-C keeping every completed measurement; a real fault failing the self-test; bad options refused; the `chip-integrity soak` command and the `python soak.py` script; and the OCP schema.
+13. `tests/test_model.py` (17): on the two-layer tiny model, a clean run passing with every multiply inside its bound, the weights hashed the same way every time, the self-test catching every planted activation and weight flip, a weight changed on the chip or a run that differs failing as corruption, runs that agree but sit outside the bound reported as a faulty unit, a last-bit wobble inside the bound reported as non-deterministic rather than a fault, the self-test still failing on a real fault, a prompt file and a second precision, bad arguments rejected, the `chip-integrity model` subcommand and the script wrapper, and the output validated against the official OCP schema when `OCP_SCHEMA_DIR` is set.
 
 ## Output format
 
@@ -488,13 +527,15 @@ Every probe ends its run with a `device_error_counters` step from `counters.py`:
 
 `soak.py` writes one setup step per precision, named `soak_setup_<precision>`, with `precision`, `shape_mkn`, `exact_check`, `accumulation_factor` and `worst_error_over_bound_ratio` (float precisions), `first_result_outside_bound`, `repeat_runs`, `repeat_runs_differing` and `seconds`; then one step per window, named `soak_window_<number>_<precision>` (for example `soak_window_0007_fp32`), with `precision`, `runs`, `seconds`, `differing_runs` (validated to be zero), `differing_runs_checked_against_bound`, `differing_runs_outside_bound`, `telemetry_available`, the lowest and highest `temperature_c`, `sm_clock_mhz`, `memory_clock_mhz` and `power_w` read during the window, `clock_event_reasons`, `first_differing_run_temperature_c` when a run differed, and the self-test counts; and a final `soak_summary` step with the totals, the extremes over the whole soak and whether Ctrl-C ended it.
 
+`model.py` writes `model_load` (`model`, `weights_sha256`, `tokenizer_vocab_sha256`, `parameters`, `layers`, `hidden_size`, `vocab_size`, `checkpoint_dtype`, `attention`, `transformers_version`, `prompts`, `prompt_tokens`), `model_reference_float64`, then one step per precision named `model_forward_<precision>` with `repeat_runs_differing`, `linear_calls`, `linear_calls_outside_bound` and `weight_elements_changed` (all validated to be zero outside self-test), `worst_error_over_bound_ratio`, `linear_calls_nonfinite_input`, the decision measurements against float64 (`positions_compared_with_float64`, `positions_disagreeing_with_float64`, `prompts_disagreeing_with_float64`, `smallest_float64_margin_at_disagreement`, `max_logit_abs_diff_at_decision`, `prompts_with_generated_divergence`, `first_divergence_token_min`), one `<layer>_calls_outside_bound` and `<layer>_worst_error_over_bound_ratio` per layer and for the head, and in self-test `injected_runs`, `injected_runs_detected` (validated equal), `injected_runs_localised` and `injected_kinds`; then `model_summary`.
+
 `memcheck.py` writes one step per pass (`memory_sweep_pass1`, ...) with `bytes_tested`, `device_memory_bytes`, `coverage_fraction`, `dwell_seconds`, `seconds`, one `bad_words_<pattern>` per pattern (validated to be zero outside self-test), a warning log line per failing pattern with the first byte offsets and the bad-bit mask, and in self-test mode `injected_<pattern>` and `injected_detected_<pattern>`.
 
 ## Assumptions and limits
 
 1. Every bound follows from the arithmetic model in `arith.py`: FP32 scalar arithmetic rounds to nearest, matrix units accumulate faithfully in FP32 (truncation allowed), exp, divide and square roots stay within eight ulps, and erf within 2^-20 absolute. TF32 is switched off on CUDA. A device that accumulates below FP32 or breaks the model in another way shows up as `outside-error-bound` on every run, and the message says so. That was not the case on any chip measured above.
-2. These are seven probes. A PASS means "no silent error in these matrix multiplies, these checksums, these data patterns, these transformer kernels, this memory sweep and this soak, in these runs, on this device today". It is not a certificate of a healthy chip. The OSDI 2026 results above show that defects depend on the data, the kernel, temperature and age; this version sweeps shapes, precisions, five transformer kernels, memory and hours under load, but not the rest.
-3. Only probe 7 loads the chip for long; the other six run for seconds. Aging is not exercised by any of them, and the soak so far covers the matrix multiply only.
+2. These are eight probes. A PASS means "no silent error in these matrix multiplies, these checksums, these data patterns, these transformer kernels, this model on these prompts, this memory sweep and this soak, in these runs, on this device today". It is not a certificate of a healthy chip. The OSDI 2026 results above show that defects depend on the data, the kernel, temperature and age; this version sweeps shapes, precisions, five transformer kernels, memory and hours under load, but not the rest.
+3. Only probe 7 loads the chip for long; the others run for seconds to minutes. Aging is not exercised by any of them, and the soak so far covers the matrix multiply only.
 4. One device per run. Multi-device comparison is on the roadmap.
 5. The error counters are NVIDIA's volatile counts since the driver last loaded; on other devices probe 11 records that none are available. In the compute and kernel probes the injected faults are applied to the output on the CPU side, so they test the checker, not the chip. The memory probe injects into device memory itself.
 
@@ -509,7 +550,7 @@ Twelve probes, each aimed at one part of the chip. Seven are built: 1, 2, 3, 6, 
 1. **Matrix multiply** (`screen.py`). Done for fp32, fp16, bf16, int8 and FP8 (E4M3, exact, from v0.3.0). FP4 follows once a Blackwell card is measured.
 2. **Memory pattern sweep** (`memcheck.py`). Done for device memory. On-chip SRAM (shared memory and L2) is next, NVIDIA GPUs only.
 3. **Transformer kernels** (`kernels.py`). Done, with rotary embeddings (sin and cos) added in v0.2.0.
-4. **Full model forward pass.** A small LLM with every layer checked against a CPU float64 reference. Each layer is fed the device's own input to that layer, so its bound stays as tight as a single kernel's; one bound carried through the whole model would be too loose to catch anything.
+4. **Full model forward pass** (`model.py`). Built (v0.1.0): a small LLM run on the chip with every matrix multiply inside it checked against float64 from the chip's own input, so each bound stays as tight as a single kernel's, the weights read back bit for bit, and the whole run repeated bit for bit; first rows to come. Batched prompts, int8 and FP8 weights and an inference server path next.
 5. **Reductions, all-reduce and copy engines.** Sums across threads, blocks and then GPUs over NVLink and PCIe, checked with checksums that must agree at both ends, and host-to-device and device-to-device copies of known patterns.
 6. **Checksum-protected matrix multiply** (`abft.py`, algorithm-based fault tolerance, Huang and Abraham 1984). Done for fp32, fp16 and bf16: row and column checksums computed in the same multiply detect and locate a wrong element, with proven thresholds and the blind spot measured. int8 and FP8 checksums come later.
 7. **Hours under load** (`soak.py`). Done for the matrix multiply in every precision (v0.1.0): every result checked bit for bit against a verified first result, with temperature, clocks, power and clock-event reasons logged per window. The kernel, checksum and memory probes under load come next.

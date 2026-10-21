@@ -12,7 +12,7 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PKG = ROOT / "chip_integrity"
 README = (ROOT / "README.md").read_text()
-PROBES = ["screen.py", "memcheck.py", "kernels.py", "patterns.py", "abft.py", "soak.py"]
+PROBES = ["screen.py", "memcheck.py", "kernels.py", "patterns.py", "abft.py", "soak.py", "model.py"]
 VERSIONED = PROBES + ["counters.py"]
 
 
