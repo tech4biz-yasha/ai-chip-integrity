@@ -14,7 +14,7 @@ LABEL org.opencontainers.image.title="ai-chip-integrity" \
 WORKDIR /opt/ai-chip-integrity
 COPY pyproject.toml README.md LICENSE ./
 COPY chip_integrity ./chip_integrity
-RUN pip install --no-cache-dir . && chip-integrity --version
+RUN pip install --no-cache-dir ".[model]" && chip-integrity --version
 
 WORKDIR /results
 ENTRYPOINT ["chip-integrity"]
