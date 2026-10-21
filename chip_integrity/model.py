@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-model.py  -  AI Chip Integrity Suite, full model forward pass (probe 4) v0.1.0
+model.py  -  AI Chip Integrity Suite, full model forward pass (probe 4) v0.1.1
 
 Runs a small open language model on the chip and checks it three ways, with a float64 copy of the same model
 on the CPU as the reference. The matrix multiplies are where a wrong answer is made, and a bound carried through
@@ -58,11 +58,12 @@ from chip_integrity import arith  # noqa: E402
 from chip_integrity import counters  # noqa: E402
 from chip_integrity import screen  # noqa: E402
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 DEFAULT_MODEL = "Qwen/Qwen2.5-0.5B"
 TINY = "tiny"
 DEFAULT_DTYPES = {"cuda": "bf16,fp16,fp32", "mps": "fp16,fp32", "cpu": "fp32"}
 FLOAT_DTYPES = ("fp32", "fp16", "bf16")
+CHUNK_ROWS = 8192        # output rows of a weight cast to float64 at a time, so the 150k-row head never needs 4 GB
 _FAULT_HOOK = None       # tests only: callable(dtype_name, run, model) called before a run; may corrupt the model
 
 # A fixed English prompt set, scope stated: short general prompts of mixed length. --prompts replaces it.
@@ -154,6 +155,12 @@ def prompt_ids(tok, prompts, max_tokens, vocab, seed):
             for _ in prompts]
 
 
+def has_subnormal(t, tiny):
+    """Any element strictly between zero and the smallest normal number? An exact zero loses nothing to flushing."""
+    a = t.abs()
+    return bool(((a < tiny) & (a > 0)).any())
+
+
 def layer_label(module_name):
     parts = module_name.split(".")
     if "layers" in parts:
@@ -175,6 +182,10 @@ class LinearCheck:
         self.out_dtype = screen.DTYPES[name][1]
         self.u_out = screen.DTYPES[name][4]
         self.linears = [(n, m) for n, m in model.named_modules() if isinstance(m, torch.nn.Linear)]
+        # Weights do not change between calls (the read-back check watches them), so whether any weight is
+        # subnormal in the device dtype is decided once here; the flush allowance is only computed when one is.
+        tiny = arith.OUT[screen.DTYPES[name][0]][1]
+        self.subnormal_weights = {n: has_subnormal(m.weight.detach(), tiny) for n, m in self.linears}
         self.handles = [m.register_forward_hook(self._make_hook(n)) for n, m in self.linears]
         self.plant = None                    # (call index, rng) for the self-test
         self.reset()
@@ -206,22 +217,39 @@ class LinearCheck:
                 self.planted_at = (label, module_name)
             x = inputs[0].detach()
             x64 = x.to("cpu", torch.float64).reshape(-1, x.shape[-1])
-            w64 = module.weight.detach().to("cpu", torch.float64)
-            if not torch.isfinite(x64).all() or not torch.isfinite(w64).all():
+            w = module.weight.detach()
+            if not torch.isfinite(x64).all():
                 self.nonfinite_inputs += 1
                 return
             k = x64.shape[1]
-            ref = x64 @ w64.T
-            abs_ab = x64.abs() @ w64.abs().T
-            flush_ab = arith.flush_term(x64, x.dtype) @ w64.abs().T + x64.abs() @ arith.flush_term(w64, x.dtype).T
-            if module.bias is not None:
-                b64 = module.bias.detach().to("cpu", torch.float64)
-                ref = ref + b64
-                abs_ab = abs_ab + b64.abs()          # one more rounded term in the sum
-                k = k + 1
+            x_abs = x64.abs()
+            x_flush = arith.flush_term(x64, x.dtype) if has_subnormal(x64, arith.OUT[x.dtype][1]) else None
+            w_sub = self.subnormal_weights[module_name]
+            b64 = module.bias.detach().to("cpu", torch.float64) if module.bias is not None else None
+            if b64 is not None:
+                k = k + 1                            # one more rounded term in the sum
             g = screen.accumulation_factor(self.name, k, self.dev.type)
-            bound = screen.error_bound(ref, abs_ab, k, self.u_out, g=g, flush_ab=flush_ab,
-                                       out_floor=arith.subnormal_floor(self.out_dtype))
+            floor = arith.subnormal_floor(self.out_dtype)
+            rows, out = x64.shape[0], w.shape[0]
+            ref = torch.empty((rows, out), dtype=torch.float64)
+            bound = torch.empty((rows, out), dtype=torch.float64)
+            for c0 in range(0, out, CHUNK_ROWS):     # the weight goes to float64 one slice of rows at a time
+                wc = w[c0:c0 + CHUNK_ROWS].to("cpu", torch.float64)
+                wc_abs = wc.abs()
+                r = x64 @ wc.T
+                abs_ab = x_abs @ wc_abs.T
+                flush_ab = None                      # the allowance for subnormal inputs a flushing device may lose
+                if x_flush is not None:
+                    flush_ab = x_flush @ wc_abs.T
+                if w_sub:
+                    wf = x_abs @ arith.flush_term(wc, x.dtype).T
+                    flush_ab = wf if flush_ab is None else flush_ab + wf
+                if b64 is not None:
+                    r = r + b64[c0:c0 + CHUNK_ROWS]
+                    abs_ab = abs_ab + b64[c0:c0 + CHUNK_ROWS].abs()
+                ref[:, c0:c0 + CHUNK_ROWS] = r
+                bound[:, c0:c0 + CHUNK_ROWS] = screen.error_bound(r, abs_ab, k, self.u_out, g=g, flush_ab=flush_ab,
+                                                                  out_floor=floor)
             y64 = output.detach().to("cpu", torch.float64).reshape(ref.shape)
             err = (y64 - ref).abs()
             bad = (err > bound) | ~torch.isfinite(y64)
@@ -342,7 +370,10 @@ def forward_step(step, dev, name, cpu_model, prompts, refs, runs, new_tokens, in
             if _FAULT_HOOK is not None:
                 _FAULT_HOOK(name, r, model)
             run_outside, run_hash_diff, run_worst, run_layer = 0, False, 0.0, None
+            what = "clean" if planted is None else f"planted {planted['kind']}"
             for i, ids in enumerate(prompts):
+                print(f"\r    {name:7s} run {r + 1}/{runs + inject} ({what})  prompt {i + 1}/{len(prompts)}  "
+                      f"{time.monotonic() - t0:6.0f}s", end="", flush=True)
                 check.reset()
                 prefill, tokens, digest = forward_greedy(model, ids, new_tokens, dev)
                 check.plant = None                              # a planted flip lands in prompt 0 only
@@ -389,6 +420,7 @@ def forward_step(step, dev, name, cpu_model, prompts, refs, runs, new_tokens, in
                     restore_weights(model, pristine)
     finally:
         check.remove()
+        print("\r" + " " * 78 + "\r", end="", flush=True)
     secs = time.monotonic() - t0
 
     # verdict from the clean runs
