@@ -20,11 +20,20 @@ Self-test: every row is paired with an injection run that plants faults and must
 
 ## Measured so far
 
-One page per chip, generated from the result files:
-- Apple GPU (MPS) arm64: https://chipintegrity.org/chips/apple-gpu-mps-arm64.html (last tested 2026-10-10; 1,785 compute runs, 0 silent faults, 264 of 264 planted faults caught)
-- NVIDIA A100-SXM4-80GB: https://chipintegrity.org/chips/nvidia-a100-sxm4-80gb.html (last tested 2026-10-07; 600 compute runs, 0 silent faults, 90 of 90 planted faults caught)
-- NVIDIA B200: https://chipintegrity.org/chips/nvidia-b200.html (last tested 2026-10-19; 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught)
-- NVIDIA GeForce RTX 4090: https://chipintegrity.org/chips/nvidia-geforce-rtx-4090.html (last tested 2026-10-11; 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught)
-- NVIDIA H100 80GB HBM3: https://chipintegrity.org/chips/nvidia-h100-80gb-hbm3.html (last tested 2026-10-10; 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught)
-- NVIDIA H200: https://chipintegrity.org/chips/nvidia-h200.html (last tested 2026-10-08; 600 compute runs, 0 silent faults, 90 of 90 planted faults caught)
-- NVIDIA RTX A5000: https://chipintegrity.org/chips/nvidia-rtx-a5000.html (last tested 2026-10-11; 2,055 compute runs, 0 silent faults, 297 of 297 planted faults caught)
+One page per chip, generated from the result files. Silent faults are runs that differed from their own repeat, checksums that did not agree, memory words that came back wrong or results under load that differed from the verified first one; results outside the proven bound agreed with every repeat but sat outside the bound, which is a faulty unit or a software stack outside the arithmetic model:
+- AMD Radeon Pro 5500M (MPS) x86_64: https://chipintegrity.org/chips/amd-radeon-pro-5500m-mps-x86-64.html (last tested 2026-10-21; 1,190 compute runs, 0 silent faults, 140 results outside the proven bound, 186 of 186 planted faults caught)
+- Apple GPU (MPS) arm64: https://chipintegrity.org/chips/apple-gpu-mps-arm64.html (last tested 2026-10-10; 1,785 compute runs, 0 silent faults, 0 results outside the proven bound, 264 of 264 planted faults caught)
+- NVIDIA A100-SXM4-80GB: https://chipintegrity.org/chips/nvidia-a100-sxm4-80gb.html (last tested 2026-10-07; 600 compute runs, 0 silent faults, 0 results outside the proven bound, 90 of 90 planted faults caught)
+- NVIDIA B200: https://chipintegrity.org/chips/nvidia-b200.html (last tested 2026-10-19; 2,515 compute runs, 0 silent faults, 0 results outside the proven bound, 351 of 351 planted faults caught)
+- NVIDIA GeForce RTX 4090: https://chipintegrity.org/chips/nvidia-geforce-rtx-4090.html (last tested 2026-10-11; 2,515 compute runs, 0 silent faults, 0 results outside the proven bound, 351 of 351 planted faults caught)
+- NVIDIA H100 80GB HBM3: https://chipintegrity.org/chips/nvidia-h100-80gb-hbm3.html (last tested 2026-10-10; 2,515 compute runs, 0 silent faults, 0 results outside the proven bound, 351 of 351 planted faults caught)
+- NVIDIA H200: https://chipintegrity.org/chips/nvidia-h200.html (last tested 2026-10-08; 600 compute runs, 0 silent faults, 0 results outside the proven bound, 90 of 90 planted faults caught)
+- NVIDIA RTX A5000: https://chipintegrity.org/chips/nvidia-rtx-a5000.html (last tested 2026-10-11; 2,055 compute runs, 0 silent faults, 0 results outside the proven bound, 297 of 297 planted faults caught)
+
+## Findings
+
+What measuring real chips has turned up, each with its evidence:
+- 2026-10-21, Metal through PyTorch 2.2.2 sits outside the arithmetic model: https://chipintegrity.org/findings/metal-pytorch-2-2-2.html. On an AMD Radeon Pro 5500M, the backend's sin and cos measured 1.22e-4 against the model's 9.5e-7 allowance, and four more fp16 steps sat outside their bound while every run agreed with every other.
+- 2026-10-15, NVIDIA's own fault patterns, caught on a real GPU: https://chipintegrity.org/findings/nvidia-fault-patterns.html. The self-test now plants faults shaped like NVIDIA's gate-level measurements. On an RTX 4090 the reference check alone flagged all 294.
+- 2026-10-11, When ECC is off, the memory error counters cannot see anything: https://chipintegrity.org/findings/ecc-off.html. Two rented cards ran with ECC switched off, so their counters could not move. The tester now says so instead of calling them quiet.
+- 2026-10-10, BF16 matrix multiplies on Intel AMX treat tiny inputs as zero: https://chipintegrity.org/findings/intel-amx-bf16.html. Above 16 × 16 × 16, BF16 matrix multiplies on AMX CPUs treat subnormal inputs as zero, whatever set_flush_denormal says.

@@ -507,6 +507,12 @@ PROBE_INFO = [  # table, anchor, roadmap number, title, what the probe does
 
 
 CHIP_NOTES = {  # facts about a measured unit that its result files do not carry, with where each came from
+    "AMD Radeon Pro 5500M (MPS) x86_64": "The discrete GPU of a 2019 16-inch MacBook Pro (Intel Core i9-9980HK), driven "
+        "through Apple's Metal Performance Shaders by PyTorch 2.2.2, the last PyTorch built for Intel Macs; 8 GB of GPU "
+        "memory as system_profiler reports it. On this backend bf16, int8 and FP8 matrix multiplies do not exist and were "
+        "skipped. The results outside the bound are all repeatable, and for RoPE the probe measured the backend's own sin "
+        "and cos at 1.22e-4 absolute error against the model's 9.5e-7 allowance, so there the cause is the function library; "
+        "see the finding on Metal through PyTorch 2.2.2 for what was measured about the other steps.",
     "NVIDIA B200": "NVIDIA driver 580.126.09, read with nvidia-smi on the pod after the run; the files were written "
                    "by v0.4.2, which did not record the driver (v0.4.3 and later do). Power limit 1000 W, 183,359 MiB "
                    "total memory, as nvidia-smi reported them.",
@@ -539,11 +545,18 @@ def chip_stats(rows):
     injected = sum(r.get("injected", 0) for r in rows.values())
     caught = sum(r.get("caught", 0) for r in rows.values())
     words = rows["memory"].get("bytes", 0) // 4 if "memory" in rows else 0
-    faults = (sum(rows[k].get("ref_fail", 0) + rows[k].get("rep_fail", 0) for k in ("compute", "kernel", "pattern")
-                  if k in rows) + rows.get("checksum", {}).get("faults", 0) + rows.get("memory", {}).get("bad", 0)
+    # Two different kinds of failed check. A silent fault: a run that differed from its own repeat, a checksum
+    # that did not agree, a memory word that came back wrong, or a result under load that differed from the
+    # verified first one. Outside the bound: every run agreed with every other but sat outside the proven bound,
+    # which is either a faulty unit or a software stack that does not follow the arithmetic model (a function
+    # library less accurate than assumed, or intermediates below FP32); the chip page says which where it can.
+    faults = (sum(rows[k].get("rep_fail", 0) for k in ("compute", "kernel", "pattern") if k in rows)
+              + rows.get("checksum", {}).get("faults", 0) + rows.get("memory", {}).get("bad", 0)
               + rows.get("soak", {}).get("faults", 0))
+    outside = sum(rows[k].get("ref_fail", 0) for k in ("compute", "kernel", "pattern") if k in rows)
     soak_runs = rows["soak"].get("runs", 0) if "soak" in rows else 0
-    return {"runs": runs, "words": words, "faults": faults, "caught": caught, "injected": injected, "soak_runs": soak_runs}
+    return {"runs": runs, "words": words, "faults": faults, "outside": outside, "caught": caught, "injected": injected,
+            "soak_runs": soak_runs}
 
 
 def nice_date(d):
@@ -585,15 +598,23 @@ def step_table(run):
 
 
 def chip_summary(st):
-    if st["faults"] == 0:
+    if st["faults"] == 0 and st["outside"] == 0:
         first = (f'Across {st["runs"]:,} compute runs, every output element stayed inside its proven error bound and '
                  f'every repeat matched the first run bit for bit.') if st["runs"] else "No compute rows yet."
-        if st["words"]:
-            first += f' All {st["words"]:,} memory words read back correctly.'
-        if st["soak_runs"]:
-            first += f' Under sustained load, {st["soak_runs"]:,} more results came back bit-identical.'
+    elif st["faults"] == 0:
+        first = (f'Across {st["runs"]:,} compute runs, every repeat matched the first run bit for bit, and {st["outside"]} '
+                 f'results sat outside their proven bound while agreeing with every repeat, which is either a faulty unit '
+                 f'or a software stack outside the arithmetic model; the step tables below say which steps, and the note '
+                 f'under them what was measured about the cause.')
     else:
-        first = f'{st["faults"]} checks failed on this chip. The probe tables below show which steps and why.'
+        first = (f'{st["faults"]} silent faults on this chip: runs that differed from their repeat, checksums that did not '
+                 f'agree, or words that came back wrong.')
+        if st["outside"]:
+            first += f' {st["outside"]} more results sat outside their proven bound while agreeing with every repeat.'
+    if st["words"] and st["faults"] == 0:
+        first += f' All {st["words"]:,} memory words read back correctly.'
+    if st["soak_runs"] and st["faults"] == 0:
+        first += f' Under sustained load, {st["soak_runs"]:,} more results came back bit-identical.'
     return first + (f' The self-tests caught {st["caught"]} of the {st["injected"]} faults planted to prove the checks '
                     f'work.' if st["injected"] else "")
 
@@ -643,13 +664,19 @@ def die_svg(st):
         for j in range(6):
             cells.append(f'<rect x="{34 + i * 27}" y="{34 + j * 27}" width="21" height="21" class="cell" '
                          f'style="animation-delay:{(i * 6 + j) * 0.02:.2f}s"/>')
-    caption = f'{st["runs"]:,} runs, every output checked' if st["runs"] else "memory checked word by word"
-    verdict = "0 wrong answers" if st["faults"] == 0 else f'{st["faults"]} failed checks'
+    caption = ((f'{st["runs"]:,} runs, every output checked' if st["faults"] == 0 and st["outside"] == 0 else
+                f'{st["runs"]:,} runs checked') if st["runs"] else "memory checked word by word")
+    if st["faults"] == 0 and st["outside"] == 0:
+        verdict = "0 wrong answers"
+    elif st["faults"] == 0:
+        verdict = f'{st["outside"]} outside the bound'
+    else:
+        verdict = f'{st["faults"]} silent faults' + (f', {st["outside"]} outside' if st["outside"] else "")
     return (f'<svg class="chipfig" viewBox="0 0 440 260" role="img" aria-label="{caption}, {verdict}">'
             f'<rect x="20" y="20" width="400" height="190" class="frame"/>{"".join(cells)}'
             f'<rect x="20" y="20" width="3" height="190" class="scan"/>'
             f'<text x="20" y="236" class="cap">{caption.upper()}</text>'
-            f'<text x="420" y="236" text-anchor="end" class="cap {"good" if st["faults"] == 0 else "badtxt"}">'
+            f'<text x="420" y="236" text-anchor="end" class="cap {"good" if st["faults"] == 0 and st["outside"] == 0 else "badtxt"}">'
             f'{verdict.upper()}</text></svg>')
 
 
@@ -729,12 +756,14 @@ def chip_page(device, chip_map, runs_by_file, built):
         nsteps = sum(1 for s in run["steps"].values()) if run else 0
         meta = f'Tool v{esc(r["version"])}' + (f', PyTorch {esc(r["torch"])}' if r.get("torch") else "")
         meta += ", " + ", ".join(nice_date(d) for d in sorted(r["dates"]))
-        bad = r.get("ref_fail", 0) + r.get("rep_fail", 0) + r.get("faults", 0) + r.get("bad", 0)
+        bad = r.get("rep_fail", 0) + r.get("faults", 0) + r.get("bad", 0)
+        outside = r.get("ref_fail", 0)
         size = (f'{r.get("bytes", 0) // 4:,} memory words read back' if name == "memory"
                 else f'{r.get("runs", 0):,} runs in {r.get("windows", 0)} windows over {r.get("minutes", 0):.0f} minutes, '
                      f'{soak_conditions(r)}' if name == "soak"
                 else f'{r.get("runs", 0):,} runs across {r.get("steps", nsteps)} steps')
-        verdict = ("No silent faults." if bad == 0 else f"{bad} failed checks.")
+        verdict = ("No silent faults." if bad == 0 else f"{bad} silent faults.") + (
+            f" {outside} results outside the proven bound, every run repeatable." if outside else "")
         selftest = (f' The self-test caught {r["caught"]} of {r["injected"]} planted faults.' if r.get("injected") else "")
         links = " · ".join(x for x in [file_link(r["clean_file"], "Result file") if r.get("clean_file") else "",
                                        file_link(r["inject_file"], "Self-test file") if r.get("inject_file") else ""] if x)
@@ -751,15 +780,18 @@ def chip_page(device, chip_map, runs_by_file, built):
     stats = "".join(f'<div class="stat"><div class="n">{n}</div><div class="l">{l}</div></div>' for n, l in [
         (len(present), "probes run on this chip"), (f'{st["runs"]:,}', "compute runs checked element by element"),
         (f'{st["words"] / 1e9:.1f} billion' if st["words"] else "0", "memory words written and read back"),
-        (st["faults"], "silent faults found"), (f'{st["caught"]} of {st["injected"]}', "planted faults caught in self-tests")])
+        (st["faults"], "silent faults found")] + ([(st["outside"], "results outside the proven bound, all repeatable")]
+                                                   if st["outside"] else [])
+        + [(f'{st["caught"]} of {st["injected"]}', "planted faults caught in self-tests")])
     tiles = []
     for name, anchor, number, ptitle, _ in present:
         r = rows[name]
         size = (f'{r.get("bytes", 0) // 4 / 1e9:.1f} billion words' if name == "memory"
                 else f'{r.get("runs", 0):,} runs, {r.get("minutes", 0):.0f} min' if name == "soak"
                 else f'{r.get("runs", 0):,} runs')
-        bad = (r.get("ref_fail", 0) + r.get("rep_fail", 0) + r.get("faults", 0) + r.get("bad", 0))
-        state = "no silent faults" if bad == 0 else f"{bad} failed checks"
+        bad = r.get("rep_fail", 0) + r.get("faults", 0) + r.get("bad", 0)
+        outside = r.get("ref_fail", 0)
+        state = ("no silent faults" if bad == 0 else f"{bad} silent faults") + (f", {outside} outside the bound" if outside else "")
         tiles.append(f'<a class="stat" href="#{anchor}"><div class="n">{ptitle}</div><div class="l">Probe {number} · '
                      f'{size} · {state}</div></a>')
     others = "".join(chip_card(d, r, f"{chip_slug(d)}.html") for d, r in sorted(chip_map.items()) if d != device)
@@ -889,6 +921,9 @@ SITE_DIR = os.path.join(ROOT, "site")
 NAV = [("learn", "Learn"), ("method", "Method"), ("results", "Results"), ("chips/index", "Chips"),
        ("findings/index", "Findings"), ("run", "Run it"), ("about", "About")]
 FINDINGS = [  # newest first: slug, date, title, one-line summary
+    ("metal-pytorch-2-2-2", "2026-10-21", "Metal through PyTorch 2.2.2 sits outside the arithmetic model",
+     "On an AMD Radeon Pro 5500M, the backend's sin and cos measured 1.22e-4 against the model's 9.5e-7 allowance, "
+     "and four more fp16 steps sat outside their bound while every run agreed with every other."),
     ("nvidia-fault-patterns", "2026-10-15", "NVIDIA's own fault patterns, caught on a real GPU",
      "The self-test now plants faults shaped like NVIDIA's gate-level measurements. On an RTX 4090 the reference check "
      "alone flagged all 294."),
@@ -1089,11 +1124,18 @@ def sitemap(devices, built):
 
 
 def llms_measured(chip_map):
-    lines = ["## Measured so far", "", "One page per chip, generated from the result files:"]
+    lines = ["## Measured so far", "", "One page per chip, generated from the result files. Silent faults are runs that "
+             "differed from their own repeat, checksums that did not agree, memory words that came back wrong or results "
+             "under load that differed from the verified first one; results outside the proven bound agreed with every "
+             "repeat but sat outside the bound, which is a faulty unit or a software stack outside the arithmetic model:"]
     for d, rows in sorted(chip_map.items()):
         st = chip_stats(rows)
         lines.append(f'- {d}: {SITE}/chips/{chip_slug(d)}.html (last tested {chip_dates(rows)[-1]}; {st["runs"]:,} compute '
-                     f'runs, {st["faults"]} silent faults, {st["caught"]} of {st["injected"]} planted faults caught)')
+                     f'runs, {st["faults"]} silent faults, {st["outside"]} results outside the proven bound, '
+                     f'{st["caught"]} of {st["injected"]} planted faults caught)')
+    lines += ["", "## Findings", "", "What measuring real chips has turned up, each with its evidence:"]
+    for slug, date, title, summary in FINDINGS:
+        lines.append(f"- {date}, {title}: {SITE}/findings/{slug}.html. {summary}")
     return "\n".join(lines) + "\n"
 
 
@@ -1106,8 +1148,9 @@ def main():
     total_injected = sum(r.get("injected", 0) for r in compute + kernel + pattern + checksum + memory + soak)
     total_soak = sum(r.get("runs", 0) for r in soak)
     total_words = sum(r.get("bytes", 0) for r in memory) // 4
-    faults = (sum(r.get("ref_fail", 0) + r.get("rep_fail", 0) for r in compute + kernel + pattern) + sum(r.get("faults", 0) for r in checksum)
+    faults = (sum(r.get("rep_fail", 0) for r in compute + kernel + pattern) + sum(r.get("faults", 0) for r in checksum)
               + sum(r.get("bad", 0) for r in memory) + sum(r.get("faults", 0) for r in soak))
+    outside = sum(r.get("ref_fail", 0) for r in compute + kernel + pattern)
     built = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     chip_map = chip_rows({"compute": compute, "memory": memory, "kernel": kernel, "pattern": pattern,
@@ -1117,7 +1160,8 @@ def main():
     cards = "".join(chip_card(d, chip_map[d], f"chips/{chip_slug(d)}.html") for d in devices)
     fills = {
         "CHIPS": str(len(chips)), "CHIP_NAMES": ", ".join(devices), "RUNS": f"{total_runs:,}", "WORDS": f"{total_words / 1e9:.1f} billion",
-        "WORDS_NUM": f"{total_words / 1e9:.1f}", "FAULTS": str(faults), "CAUGHT": f"{total_caught} of {total_injected}",
+        "WORDS_NUM": f"{total_words / 1e9:.1f}", "FAULTS": str(faults), "OUTSIDE": str(outside),
+        "CAUGHT": f"{total_caught} of {total_injected}",
         "CAUGHT_NUM": str(total_caught), "CHIP_CARDS": cards, "CHIP_JSON": json.dumps(
             [dict(name=d, slug=chip_slug(d), **chip_stats(chip_map[d]),
                   budget=[[l, round(r, 4)] for r, l in chip_budget(chip_map[d], {r["file"]: r for r in runs})[0]])
@@ -1171,7 +1215,7 @@ def main():
     llms_path = os.path.join(ROOT, "docs", "llms.txt")
     with open(llms_path, encoding="utf-8") as f:
         llms = f.read()
-    llms = re.sub(r"## Measured so far.*?(?=\n## |\Z)", lambda m: llms_measured(chip_map), llms, flags=re.S)
+    llms = re.sub(r"## Measured so far.*?(?=\n## (?!Findings)|\Z)", lambda m: llms_measured(chip_map), llms, flags=re.S)
     with open(llms_path, "w", encoding="utf-8") as f:
         f.write(llms)
     print(f"wrote {os.path.relpath(OUT, ROOT)}: {len(chips)} chips, {total_runs:,} compute runs, {total_soak:,} runs under load, "

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Metal through PyTorch 2.2.2 sits outside the arithmetic model | Chip Integrity</title>
+<meta name="description" content="On an AMD Radeon Pro 5500M, the backend's sin and cos measured 1.22e-4 against the model's 9.5e-7 allowance, and four more fp16 steps sat outside their bound while every run agreed with every other.">
+<meta name="author" content="Yasha Khandelwal">
+<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
+<link rel="canonical" href="https://chipintegrity.org/findings/metal-pytorch-2-2-2.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Metal through PyTorch 2.2.2 sits outside the arithmetic model | Chip Integrity">
+<meta property="og:description" content="On an AMD Radeon Pro 5500M, the backend's sin and cos measured 1.22e-4 against the model's 9.5e-7 allowance, and four more fp16 steps sat outside their bound while every run agreed with every other.">
+<meta property="og:url" content="https://chipintegrity.org/findings/metal-pytorch-2-2-2.html">
+<link rel="stylesheet" href="../assets/site.css">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="alternate" type="application/atom+xml" title="Chip Integrity updates" href="../feed.xml">
+<meta property="og:image" content="https://chipintegrity.org/og/findings-metal-pytorch-2-2-2.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://chipintegrity.org/og/findings-metal-pytorch-2-2-2.png">
+
+</head>
+<body data-page="findings/index">
+<a class="skip" href="#content">Skip to content</a>
+<header class="top">
+<div class="topin">
+<a class="brand" href="../index.html"><img src="../assets/logo.svg" alt=""><span>chip<b>integrity</b>.org</span></a>
+<button class="menu" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+<nav id="nav" aria-label="Site">
+<a href="../learn.html">Learn</a>
+<a href="../method.html">Method</a>
+<a href="../results.html">Results</a>
+<a href="../chips/index.html">Chips</a>
+<a href="../findings/index.html" aria-current="page">Findings</a>
+<a href="../run.html">Run it</a>
+<a href="../about.html">About</a>
+</nav>
+<a class="gh" href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>
+</div>
+</header>
+<main id="content">
+<div class="wrap"><div class="pagehead"><div class="crumb"><a href="../index.html">chipintegrity.org</a> / <a href="index.html">findings</a> / metal-pytorch-2-2-2</div><div class="kicker">FINDING, 21 OCTOBER 2026</div><h1>Metal through PyTorch 2.2.2 sits outside the arithmetic model</h1><p class="lede">On an AMD Radeon Pro 5500M, the backend's sin and cos measured 1.22e-4 against the model's 9.5e-7 allowance, and four more fp16 steps sat outside their bound while every run agreed with every other.</p></div><section class="reveal"><article class="post"><h2>What was measured</h2>
+<p>On 21 October 2026 the full row ran on the AMD Radeon Pro 5500M of a 2019 16-inch MacBook Pro, driven through Apple's Metal Performance Shaders by PyTorch 2.2.2, the last PyTorch built for Intel Macs. Compute, checksum and memory were clean: 300 compute runs at three shapes in fp32 and fp16 inside their bounds and bit-identical, 80 checksum-protected runs with every checksum consistent, and 1,006,632,960 memory words read back correctly. Every self-test caught every planted fault: 30 of 30 in the compute probe, 12 of 12 located to their row and column in the checksum probe, 84 of 84 in the pattern probe, 30 of 30 flips located in memory, and 30 of 30 in the kernel probe. bf16, int8 and FP8 do not exist on this backend and were skipped.</p>
+<p>Six steps sat outside their proven bound, and in every one of them all runs agreed with every other, so the repeat check found nothing to report. From the result files:</p>
+<table>
+<thead><tr><th>Step</th><th>Runs outside the bound</th><th>Worst error over bound</th><th>What else the probe measured</th></tr></thead>
+<tbody>
+<tr><td><a class="term" href="../learn.html#g-rotary-embedding" data-def="The way most current language models tell the model where a token sits: each pair of values in an attention head is rotated by an angle proportional to the position, computed with sin and cos.">RoPE</a> fp32</td><td>25 of 25</td><td>120.6 times the bound</td><td>the backend's own sin and cos: 1.22e-4 absolute error, against the model's allowance of 9.5e-7 (2<sup>&minus;20</sup>)</td></tr>
+<tr><td>RoPE fp16</td><td>25 of 25</td><td>7.6 times</td><td>the same sin and cos measurement</td></tr>
+<tr><td>GELU fp16</td><td>25 of 25</td><td>2.05 times</td><td>the backend's own erf: 1.9e-7 absolute error, inside the allowance</td></tr>
+<tr><td>Layer norm fp16</td><td>25 of 25</td><td>1.85 times</td><td>layer norm fp32 on the same inputs: 0.0008 of its bound</td></tr>
+<tr><td>Matrix multiply fp16, wide-exponent inputs, 1024×1024×1024</td><td>20 of 20</td><td>1.15 times</td><td>the same inputs at 32×4096×11008: 0.18 of the bound; uniform inputs at 1024×1024×1024 in the compute probe: 0.43</td></tr>
+<tr><td>Matrix multiply fp16, sparse inputs, 1024×1024×1024</td><td>20 of 20</td><td>1.57 times</td><td>the same inputs at 32×4096×11008: 0.33 of the bound</td></tr>
+</tbody>
+</table>
+<h2>What that does and does not say</h2>
+<p>The verdict word for these steps, <code>outside-error-bound</code>, is defined on the method page as either a faulty unit or a device that does not follow the arithmetic model every bound is derived from. The model allows exp, divide and square roots eight ulps and erf, sin and cos 2<sup>&minus;20</sup> absolute, and assumes intermediates are kept in FP32.</p>
+<p>For RoPE the probe measured the cause directly: the backend's sin and cos are 128 times less accurate than the model allows, so the rotary embedding cannot land inside a bound built on that allowance, and the chip is not what the measurement is about. Metal's fast math is the likely reason, but the probe did not measure that; it measured the error of the functions as PyTorch exposes them.</p>
+<p>For GELU fp16 the erf was measured inside its allowance, so the excess is not the erf. For layer norm fp16, and for the two fp16 matrix multiplies, nothing was measured beyond the error itself. The pattern that the same fp16 inputs pass at the thin shape, that uniform inputs pass at the square shape, and that every fp32 matrix multiply, layer norm and GELU step passes, is consistent with those fp16 kernels keeping intermediates below FP32 on this backend, and is not consistent with a single faulty unit, which would not choose its shape. That is a reading of the evidence, not a measurement, and the finding stays open until a build of PyTorch newer than 2.2.2 can be run on the same GPU, which Intel Macs cannot do.</p>
+<h2>How the tester reports it</h2>
+<p>The home page and the chip page count these 140 results separately from silent faults, which are runs that differed from their own repeat, checksums that did not agree, memory words that came back wrong, or results under load that differed from the verified first one. Both counts are read from the result files, and the row stays in the table with its six failing steps visible, because a yardstick that dropped inconvenient rows would be worth nothing.</p>
+<h2>Where it stands</h2>
+<p>Recorded in <code>results/radeon5500m_kernels.jsonl</code> and <code>results/radeon5500m_patterns.jsonl</code>. This is the first published row on which the kernel probe's own measurement of the backend's function library has fired, and it did what it was built for: it separated the library from the chip.</p>
+</article></section></div>
+</main>
+<footer class="foot">
+<div class="footin">
+<div><div class="brand">chip<b>integrity</b>.org</div><p>Open tests for silent data corruption (SDC) in GPUs and AI chips. MIT licensed. Every number on this site is read from a public result file.</p></div>
+<div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="../index.html">Home</a><a href="../learn.html">Learn</a><a href="../method.html">Method</a><a href="../results.html">Results</a><a href="../chips/index.html">Chips</a><a href="../findings/index.html">Findings</a><a href="../run.html">Run it</a><a href="../about.html">About</a></nav></div>
+<div><div class="fh">CITE</div><p>Yasha Khandelwal, ai-chip-integrity, version 0.4.3, 2026, <a href="https://doi.org/10.5281/zenodo.23505677">https://doi.org/10.5281/zenodo.23505677</a></p></div>
+</div>
+<div class="footbase">Page generated from the result files on 2026-10-21. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>
+</footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

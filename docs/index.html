@@ -50,7 +50,7 @@
       "@type": "Dataset",
       "@id": "https://chipintegrity.org/#results",
       "name": "Chip Integrity measured results",
-      "description": "Silent data corruption (SDC) measurements for AI chips (Apple GPU (MPS) arm64, NVIDIA A100-SXM4-80GB, NVIDIA B200, NVIDIA GeForce RTX 4090, NVIDIA H100 80GB HBM3, NVIDIA H200, NVIDIA RTX A5000) from the compute, kernel, checksum, data pattern, memory and error counter probes, each row backed by an OCP Test and Validation result file.",
+      "description": "Silent data corruption (SDC) measurements for AI chips (AMD Radeon Pro 5500M (MPS) x86_64, Apple GPU (MPS) arm64, NVIDIA A100-SXM4-80GB, NVIDIA B200, NVIDIA GeForce RTX 4090, NVIDIA H100 80GB HBM3, NVIDIA H200, NVIDIA RTX A5000) from the compute, kernel, checksum, data pattern, memory and error counter probes, each row backed by an OCP Test and Validation result file.",
       "url": "https://chipintegrity.org/results.html",
       "identifier": "https://doi.org/10.5281/zenodo.23505677",
       "isAccessibleForFree": true,
@@ -121,11 +121,12 @@
 </div>
 </div>
 <div class="stats reveal">
-<div class="stat"><div class="n" data-to="7">7</div><div class="l">chips measured</div></div>
-<div class="stat"><div class="n" data-to="12,585">12,585</div><div class="l">compute runs checked element by element</div></div>
-<div class="stat"><div class="n" data-to="113.1">113.1 billion</div><div class="l">memory words written and read back</div></div>
+<div class="stat"><div class="n" data-to="8">8</div><div class="l">chips measured</div></div>
+<div class="stat"><div class="n" data-to="13,775">13,775</div><div class="l">compute runs checked element by element</div></div>
+<div class="stat"><div class="n" data-to="114.2">114.2 billion</div><div class="l">memory words written and read back</div></div>
 <div class="stat"><div class="n">0</div><div class="l">silent faults found so far</div></div>
-<div class="stat"><div class="n" data-to="1794">1794 of 1794</div><div class="l">planted faults caught in self-tests</div></div>
+<div class="stat"><div class="n">140</div><div class="l">results outside the proven bound, all repeatable, all on one backend</div></div>
+<div class="stat"><div class="n" data-to="1980">1980 of 1980</div><div class="l">planted faults caught in self-tests</div></div>
 </div>
 </div></div>
 
@@ -146,7 +147,7 @@
 <div class="kicker">EVIDENCE</div>
 <h2>Every chip measured</h2>
 <p class="lede">Each chip has its own page: how close every precision came to its proven error limit, proof that every planted fault was caught, and the raw result files.</p>
-<div class="grid3"><a class="panel chipcard" href="chips/apple-gpu-mps-arm64.html"><h3>Apple GPU (MPS) arm64</h3><p>Tested 10 October 2026. 1,785 compute runs, 0 silent faults, 264 of 264 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-a100-sxm4-80gb.html"><h3>NVIDIA A100-SXM4-80GB</h3><p>Tested 7 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-b200.html"><h3>NVIDIA B200</h3><p>Tested 19 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-geforce-rtx-4090.html"><h3>NVIDIA GeForce RTX 4090</h3><p>Tested 11 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-h100-80gb-hbm3.html"><h3>NVIDIA H100 80GB HBM3</h3><p>Tested 10 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-h200.html"><h3>NVIDIA H200</h3><p>Tested 8 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-rtx-a5000.html"><h3>NVIDIA RTX A5000</h3><p>Tested 11 October 2026. 2,055 compute runs, 0 silent faults, 297 of 297 planted faults caught.</p></a></div>
+<div class="grid3"><a class="panel chipcard" href="chips/amd-radeon-pro-5500m-mps-x86-64.html"><h3>AMD Radeon Pro 5500M (MPS) x86_64</h3><p>Tested 21 October 2026. 1,190 compute runs, 0 silent faults, 186 of 186 planted faults caught.</p></a><a class="panel chipcard" href="chips/apple-gpu-mps-arm64.html"><h3>Apple GPU (MPS) arm64</h3><p>Tested 10 October 2026. 1,785 compute runs, 0 silent faults, 264 of 264 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-a100-sxm4-80gb.html"><h3>NVIDIA A100-SXM4-80GB</h3><p>Tested 7 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-b200.html"><h3>NVIDIA B200</h3><p>Tested 19 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-geforce-rtx-4090.html"><h3>NVIDIA GeForce RTX 4090</h3><p>Tested 11 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-h100-80gb-hbm3.html"><h3>NVIDIA H100 80GB HBM3</h3><p>Tested 10 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-h200.html"><h3>NVIDIA H200</h3><p>Tested 8 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-rtx-a5000.html"><h3>NVIDIA RTX A5000</h3><p>Tested 11 October 2026. 2,055 compute runs, 0 silent faults, 297 of 297 planted faults caught.</p></a></div>
 <p><a href="chips/index.html">All chips on one page</a> · <a href="results.html">The full results tables</a></p>
 </div></section>
 

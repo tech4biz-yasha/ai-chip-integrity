@@ -51,7 +51,7 @@
 <div class="bxrow"><label for="cmpa">Chip</label><select id="cmpa"></select><label for="cmpb">against</label><select id="cmpb"></select></div>
 <div id="cmpout" aria-live="polite"></div>
 </div>
-<script type="application/json" id="chipdata">[{"name": "Apple GPU (MPS) arm64", "slug": "apple-gpu-mps-arm64", "runs": 1785, "words": 1476395008, "faults": 0, "caught": 264, "injected": 264, "soak_runs": 0, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["BF16 matrix multiply", 0.8694], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["FP16 matrix multiply", 0.5093], ["Attention BF16", 0.1866], ["GELU FP32", 0.1439], ["RoPE FP32", 0.1232], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0097], ["Softmax FP32", 0.0054], ["FP32 matrix multiply", 0.0053], ["Attention FP32", 0.0008], ["Layer norm FP32", 0.0008]]}, {"name": "NVIDIA A100-SXM4-80GB", "slug": "nvidia-a100-sxm4-80gb", "runs": 600, "words": 16911433728, "faults": 0, "caught": 90, "injected": 90, "soak_runs": 0, "budget": [["BF16 matrix multiply", 0.8694], ["FP16 matrix multiply", 0.5093], ["FP32 matrix multiply", 0.0014]]}, {"name": "NVIDIA B200", "slug": "nvidia-b200", "runs": 2515, "words": 38117834752, "faults": 0, "caught": 351, "injected": 351, "soak_runs": 1096120, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["BF16 matrix multiply", 0.6569], ["FP16 matrix multiply", 0.207], ["Attention BF16", 0.1889], ["GELU FP32", 0.1623], ["RoPE FP32", 0.1221], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0389], ["FP32 matrix multiply", 0.0053], ["Softmax FP32", 0.0053], ["Attention FP32", 0.0012], ["Layer norm FP32", 0.0008]]}, {"name": "NVIDIA GeForce RTX 4090", "slug": "nvidia-geforce-rtx-4090", "runs": 2515, "words": 4966055936, "faults": 0, "caught": 351, "injected": 351, "soak_runs": 0, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["BF16 matrix multiply", 0.6569], ["FP16 matrix multiply", 0.207], ["Attention BF16", 0.1889], ["GELU FP32", 0.1623], ["RoPE FP32", 0.1221], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0389], ["FP32 matrix multiply", 0.0053], ["Softmax FP32", 0.0053], ["Attention FP32", 0.0012], ["Layer norm FP32", 0.0008]]}, {"name": "NVIDIA H100 80GB HBM3", "slug": "nvidia-h100-80gb-hbm3", "runs": 2515, "words": 16844324864, "faults": 0, "caught": 351, "injected": 351, "soak_runs": 0, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["BF16 matrix multiply", 0.6569], ["FP16 matrix multiply", 0.207], ["Attention BF16", 0.1889], ["GELU FP32", 0.1623], ["RoPE FP32", 0.1221], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0389], ["FP32 matrix multiply", 0.0053], ["Softmax FP32", 0.0053], ["Attention FP32", 0.0012], ["Layer norm FP32", 0.0008]]}, {"name": "NVIDIA H200", "slug": "nvidia-h200", "runs": 600, "words": 29863444480, "faults": 0, "caught": 90, "injected": 90, "soak_runs": 0, "budget": [["BF16 matrix multiply", 0.8694], ["FP16 matrix multiply", 0.5093], ["FP32 matrix multiply", 0.0053]]}, {"name": "NVIDIA RTX A5000", "slug": "nvidia-rtx-a5000", "runs": 2055, "words": 4966055936, "faults": 0, "caught": 297, "injected": 297, "soak_runs": 0, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["BF16 matrix multiply", 0.6569], ["FP16 matrix multiply", 0.207], ["Attention BF16", 0.1889], ["GELU FP32", 0.1623], ["RoPE FP32", 0.1221], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0195], ["Softmax FP32", 0.0053], ["FP32 matrix multiply", 0.0024], ["Attention FP32", 0.0012], ["Layer norm FP32", 0.0008]]}]</script>
+<script type="application/json" id="chipdata">[{"name": "AMD Radeon Pro 5500M (MPS) x86_64", "slug": "amd-radeon-pro-5500m-mps-x86-64", "runs": 1190, "words": 1006632960, "faults": 0, "outside": 140, "caught": 186, "injected": 186, "soak_runs": 0, "budget": [["RoPE FP32", 120.5968], ["RoPE FP16", 7.5948], ["GELU FP16", 2.0527], ["Layer norm FP16", 1.8527], ["FP16 data patterns", 1.5667], ["Softmax FP16", 0.9993], ["Attention FP16", 0.5753], ["FP16 matrix multiply", 0.4333], ["GELU FP32", 0.228], ["FP32 data patterns", 0.0108], ["Softmax FP32", 0.0097], ["FP32 matrix multiply", 0.0012], ["Attention FP32", 0.001], ["Layer norm FP32", 0.0008]]}, {"name": "Apple GPU (MPS) arm64", "slug": "apple-gpu-mps-arm64", "runs": 1785, "words": 1476395008, "faults": 0, "outside": 0, "caught": 264, "injected": 264, "soak_runs": 0, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["BF16 matrix multiply", 0.8694], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["FP16 matrix multiply", 0.5093], ["Attention BF16", 0.1866], ["GELU FP32", 0.1439], ["RoPE FP32", 0.1232], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0097], ["Softmax FP32", 0.0054], ["FP32 matrix multiply", 0.0053], ["Attention FP32", 0.0008], ["Layer norm FP32", 0.0008]]}, {"name": "NVIDIA A100-SXM4-80GB", "slug": "nvidia-a100-sxm4-80gb", "runs": 600, "words": 16911433728, "faults": 0, "outside": 0, "caught": 90, "injected": 90, "soak_runs": 0, "budget": [["BF16 matrix multiply", 0.8694], ["FP16 matrix multiply", 0.5093], ["FP32 matrix multiply", 0.0014]]}, {"name": "NVIDIA B200", "slug": "nvidia-b200", "runs": 2515, "words": 38117834752, "faults": 0, "outside": 0, "caught": 351, "injected": 351, "soak_runs": 1096120, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["BF16 matrix multiply", 0.6569], ["FP16 matrix multiply", 0.207], ["Attention BF16", 0.1889], ["GELU FP32", 0.1623], ["RoPE FP32", 0.1221], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0389], ["FP32 matrix multiply", 0.0053], ["Softmax FP32", 0.0053], ["Attention FP32", 0.0012], ["Layer norm FP32", 0.0008]]}, {"name": "NVIDIA GeForce RTX 4090", "slug": "nvidia-geforce-rtx-4090", "runs": 2515, "words": 4966055936, "faults": 0, "outside": 0, "caught": 351, "injected": 351, "soak_runs": 0, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["BF16 matrix multiply", 0.6569], ["FP16 matrix multiply", 0.207], ["Attention BF16", 0.1889], ["GELU FP32", 0.1623], ["RoPE FP32", 0.1221], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0389], ["FP32 matrix multiply", 0.0053], ["Softmax FP32", 0.0053], ["Attention FP32", 0.0012], ["Layer norm FP32", 0.0008]]}, {"name": "NVIDIA H100 80GB HBM3", "slug": "nvidia-h100-80gb-hbm3", "runs": 2515, "words": 16844324864, "faults": 0, "outside": 0, "caught": 351, "injected": 351, "soak_runs": 0, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["BF16 matrix multiply", 0.6569], ["FP16 matrix multiply", 0.207], ["Attention BF16", 0.1889], ["GELU FP32", 0.1623], ["RoPE FP32", 0.1221], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0389], ["FP32 matrix multiply", 0.0053], ["Softmax FP32", 0.0053], ["Attention FP32", 0.0012], ["Layer norm FP32", 0.0008]]}, {"name": "NVIDIA H200", "slug": "nvidia-h200", "runs": 600, "words": 29863444480, "faults": 0, "outside": 0, "caught": 90, "injected": 90, "soak_runs": 0, "budget": [["BF16 matrix multiply", 0.8694], ["FP16 matrix multiply", 0.5093], ["FP32 matrix multiply", 0.0053]]}, {"name": "NVIDIA RTX A5000", "slug": "nvidia-rtx-a5000", "runs": 2055, "words": 4966055936, "faults": 0, "outside": 0, "caught": 297, "injected": 297, "soak_runs": 0, "budget": [["Softmax FP16", 0.9993], ["GELU FP16", 0.9917], ["GELU BF16", 0.9749], ["Layer norm BF16", 0.9434], ["Softmax BF16", 0.9362], ["BF16 data patterns", 0.935], ["RoPE BF16", 0.8238], ["RoPE FP16", 0.8074], ["Layer norm FP16", 0.7183], ["FP16 data patterns", 0.6591], ["BF16 matrix multiply", 0.6569], ["FP16 matrix multiply", 0.207], ["Attention BF16", 0.1889], ["GELU FP32", 0.1623], ["RoPE FP32", 0.1221], ["Attention FP16", 0.1123], ["FP32 data patterns", 0.0195], ["Softmax FP32", 0.0053], ["FP32 matrix multiply", 0.0024], ["Attention FP32", 0.0012], ["Layer norm FP32", 0.0008]]}]</script>
 <noscript><p class="note">The comparison needs JavaScript. Every number is also in the tables below and on each chip page.</p></noscript>
 </section>
 
@@ -61,7 +61,7 @@
 <p class="lede">Every row comes from a result file in the repository, and the tables are generated from those files. Nothing here is modelled or estimated.</p>
 <h3 id="chips">One page per chip</h3>
 <p class="note">Each chip has its own page with every step of every probe, the setup, the self-test and the result files. <a href="chips/index.html">All chips on one page</a>.</p>
-<div class="grid3"><a class="panel chipcard" href="chips/apple-gpu-mps-arm64.html"><h3>Apple GPU (MPS) arm64</h3><p>Tested 10 October 2026. 1,785 compute runs, 0 silent faults, 264 of 264 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-a100-sxm4-80gb.html"><h3>NVIDIA A100-SXM4-80GB</h3><p>Tested 7 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-b200.html"><h3>NVIDIA B200</h3><p>Tested 19 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-geforce-rtx-4090.html"><h3>NVIDIA GeForce RTX 4090</h3><p>Tested 11 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-h100-80gb-hbm3.html"><h3>NVIDIA H100 80GB HBM3</h3><p>Tested 10 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-h200.html"><h3>NVIDIA H200</h3><p>Tested 8 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-rtx-a5000.html"><h3>NVIDIA RTX A5000</h3><p>Tested 11 October 2026. 2,055 compute runs, 0 silent faults, 297 of 297 planted faults caught.</p></a></div>
+<div class="grid3"><a class="panel chipcard" href="chips/amd-radeon-pro-5500m-mps-x86-64.html"><h3>AMD Radeon Pro 5500M (MPS) x86_64</h3><p>Tested 21 October 2026. 1,190 compute runs, 0 silent faults, 186 of 186 planted faults caught.</p></a><a class="panel chipcard" href="chips/apple-gpu-mps-arm64.html"><h3>Apple GPU (MPS) arm64</h3><p>Tested 10 October 2026. 1,785 compute runs, 0 silent faults, 264 of 264 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-a100-sxm4-80gb.html"><h3>NVIDIA A100-SXM4-80GB</h3><p>Tested 7 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-b200.html"><h3>NVIDIA B200</h3><p>Tested 19 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-geforce-rtx-4090.html"><h3>NVIDIA GeForce RTX 4090</h3><p>Tested 11 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-h100-80gb-hbm3.html"><h3>NVIDIA H100 80GB HBM3</h3><p>Tested 10 October 2026. 2,515 compute runs, 0 silent faults, 351 of 351 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-h200.html"><h3>NVIDIA H200</h3><p>Tested 8 October 2026. 600 compute runs, 0 silent faults, 90 of 90 planted faults caught.</p></a><a class="panel chipcard" href="chips/nvidia-rtx-a5000.html"><h3>NVIDIA RTX A5000</h3><p>Tested 11 October 2026. 2,055 compute runs, 0 silent faults, 297 of 297 planted faults caught.</p></a></div>
 <div class="bxrow filter"><label for="rowfilter">Filter the tables</label><input id="rowfilter" type="text" placeholder="a chip, for example H100" autocomplete="off"></div>
 <h3>Compute probe</h3>
 <div class="tablewrap"><table>
@@ -133,6 +133,17 @@
 <td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_clean.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_inject.jsonl">self-test</a></td>
 </tr>
 <tr>
+<td>AMD Radeon Pro 5500M (MPS) x86_64<span class="sub">PyTorch 2.2.2 · tool v0.3.4 · no error counters</span></td>
+<td class="date">2026-10-21</td>
+<td>1024x1024x1024<br>4096x4096x4096<br>32x4096x11008</td>
+<td>fp32, fp16 (12 skipped)</td>
+<td>300</td>
+<td>0</td>
+<td>30 of 30</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/radeon5500m_clean.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/radeon5500m_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
 <td>Apple GPU (MPS) arm64<span class="sub">PyTorch 2.14.1 · tool v0.2.0</span></td>
 <td class="date">2026-10-07</td>
 <td>1024x1024x1024<br>4096x4096x4096<br>32x4096x11008</td>
@@ -194,6 +205,18 @@
 <td>45 of 45</td>
 <td class="ok">no-silent-errors</td>
 <td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_kernels.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_kernels_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>AMD Radeon Pro 5500M (MPS) x86_64<span class="sub">PyTorch 2.2.2 · tool v0.2.3 · no error counters</span></td>
+<td class="date">2026-10-21</td>
+<td>softmax, layernorm, gelu, rope, attention<span class="sub">4096×4096; rope 4096×128; attention 8×1024×128</span></td>
+<td>fp32, fp16 (5 skipped)</td>
+<td>250</td>
+<td>120.596</td>
+<td>100</td>
+<td>30 of 30</td>
+<td class="bad">no-silent-errors, outside-error-bound</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/radeon5500m_kernels.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/radeon5500m_kernels_inject.jsonl">self-test</a></td>
 </tr>
 <tr>
 <td>Apple GPU (MPS) arm64<span class="sub">PyTorch 2.14.1 · tool v0.2.0</span></td>
@@ -265,6 +288,19 @@
 <td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_abft.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_abft_inject.jsonl">self-test</a></td>
 </tr>
 <tr>
+<td>AMD Radeon Pro 5500M (MPS) x86_64<span class="sub">PyTorch 2.2.2 · tool v0.1.0 · no error counters</span></td>
+<td class="date">2026-10-21</td>
+<td>1024x1024x1024<br>32x4096x11008</td>
+<td>fp32, fp16 (2 skipped)</td>
+<td>80</td>
+<td>0</td>
+<td>0</td>
+<td>779.51</td>
+<td>12 of 12</td>
+<td class="ok">no-silent-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/radeon5500m_abft.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/radeon5500m_abft_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
 <td>Apple GPU (MPS) arm64<span class="sub">PyTorch 2.14.1 · tool v0.1.0 · no error counters</span></td>
 <td class="date">2026-10-10</td>
 <td>1024x1024x1024<br>32x4096x11008</td>
@@ -329,6 +365,18 @@
 <td>kept</td>
 <td class="ok">no-silent-errors</td>
 <td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_patterns.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_patterns_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>AMD Radeon Pro 5500M (MPS) x86_64<span class="sub">PyTorch 2.2.2 · tool v0.1.4 · no error counters</span></td>
+<td class="date">2026-10-21</td>
+<td>wide, mantissa, cancel, alternate, sparse, subnormal, near_max</td>
+<td>fp32, fp16 (28 skipped)</td>
+<td>560</td>
+<td>40</td>
+<td>84 of 84</td>
+<td>flushed: fp32</td>
+<td class="bad">no-silent-errors, outside-error-bound</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/radeon5500m_patterns.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/radeon5500m_patterns_inject.jsonl">self-test</a></td>
 </tr>
 <tr>
 <td>Apple GPU (MPS) arm64<span class="sub">PyTorch 2.14.1 · tool v0.1.0</span></td>
@@ -412,6 +460,17 @@
 <td>30 of 30</td>
 <td class="ok">no-memory-errors</td>
 <td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_memcheck.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/rtxa5000_memcheck_inject.jsonl">self-test</a></td>
+</tr>
+<tr>
+<td>AMD Radeon Pro 5500M (MPS) x86_64<span class="sub">tool v0.1.3 · no error counters</span></td>
+<td class="date">2026-10-21</td>
+<td>3.75 GiB of 8.00 GiB<span class="sub">1,006,632,960 words</span></td>
+<td>6</td>
+<td>2.0 s</td>
+<td>0</td>
+<td>30 of 30</td>
+<td class="ok">no-memory-errors</td>
+<td><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/radeon5500m_memcheck.jsonl">clean</a> · <a href="https://github.com/tech4biz-yasha/ai-chip-integrity/blob/main/results/radeon5500m_memcheck_inject.jsonl">self-test</a></td>
 </tr>
 <tr>
 <td>Apple GPU (MPS) arm64<span class="sub">tool v0.1.0</span></td>
