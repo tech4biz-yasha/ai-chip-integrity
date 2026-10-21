@@ -21,7 +21,7 @@
       "programmingLanguage": "Python",
       "license": "https://opensource.org/licenses/MIT",
       "author": {"@id": "https://chipintegrity.org/#person"},
-      "description": "Six probes for AI accelerators: a compute probe that checks matrix multiplies against a proven float64 error bound and bit-for-bit repeatability, a memory probe that writes six patterns into every word of most of device memory and reads them back, a kernel probe that checks softmax, layer norm, GELU, rotary embeddings and attention the same two ways, a data pattern probe that drives the matrix multiply with inputs built to reach particular bits, a checksum-protected matrix multiply that detects and locates a wrong element with proven thresholds, and an error counter cross-check that records whether the chip's own counters noticed. Output follows the OCP Test and Validation spec."
+      "description": "Seven probes for AI accelerators: a compute probe that checks matrix multiplies against a proven float64 error bound and bit-for-bit repeatability, a memory probe that writes six patterns into every word of most of device memory and reads them back, a kernel probe that checks softmax, layer norm, GELU, rotary embeddings and attention the same two ways, a data pattern probe that drives the matrix multiply with inputs built to reach particular bits, a checksum-protected matrix multiply that detects and locates a wrong element with proven thresholds, a soak probe that keeps the chip under load for hours and checks every result bit for bit with temperature, clocks and power recorded, and an error counter cross-check that records whether the chip's own counters noticed. Output follows the OCP Test and Validation spec."
     },
     {
       "@type": "Dataset",

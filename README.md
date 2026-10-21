@@ -168,7 +168,7 @@ For int8 the device returns int32 and the reference is computed exactly in int64
 
 **FP8.** From v0.3.0 the probe also runs the FP8 (E4M3) tensor-core path that inference engines use, through `torch._scaled_mm` with FP32 output, once with full accumulation (`fp8`) and once with fast accumulation (`fp8fast`). The inputs come from {-1, 0, 1}, so every product is exact and every partial sum is an integer no larger than K: with K up to 4096 that fits in 13 significant bits. Hopper's FP8 tensor cores are reported to keep 14 bits when they add (DeepSeek-V3 technical report, 2024), so the exact answer is the only correct one, even with fast accumulation, and any difference is a fault or an accumulator narrower than 13 bits. It needs an Ada, Hopper or Blackwell GPU; on an A100 or an Apple GPU these steps are skipped and recorded. Shapes with K above 4096 are skipped for FP8. FP4 follows once a Blackwell card is measured.
 
-**2. Repeat check.** Every run is compared bit for bit with the first run on the same device. A single flipped bit anywhere in the output fails this check, even when it is far too small to leave the reference bound.
+**2. Repeat check.** Every run is compared bit for bit with the first run on the same device. A single flipped bit anywhere in the output fails this check, even when it is far too small to leave the reference bound. The same comparison has since been validated on CPUs at fleet scale: Vavelidou et al. (ITHICA, MICRO 2026, [arXiv:2605.15638](https://arxiv.org/abs/2605.15638)) found that the defects most likely to escape manufacturing test produce different outputs from the same instruction and inputs depending on the context it runs in, and that checks built on that comparison detected 39% more defective servers than the final-output checks they were added to.
 
 **Verdict per precision**
 
@@ -493,8 +493,8 @@ Every probe ends its run with a `device_error_counters` step from `counters.py`:
 ## Assumptions and limits
 
 1. Every bound follows from the arithmetic model in `arith.py`: FP32 scalar arithmetic rounds to nearest, matrix units accumulate faithfully in FP32 (truncation allowed), exp, divide and square roots stay within eight ulps, and erf within 2^-20 absolute. TF32 is switched off on CUDA. A device that accumulates below FP32 or breaks the model in another way shows up as `outside-error-bound` on every run, and the message says so. That was not the case on any chip measured above.
-2. These are six probes. A PASS means "no silent error in these matrix multiplies, these checksums, these data patterns, these transformer kernels and this memory sweep, in these runs, on this device today". It is not a certificate of a healthy chip. The OSDI 2026 results above show that defects depend on the data, the kernel, temperature and age; this version sweeps shapes, precisions, five transformer kernels and memory, but not the rest.
-3. Runs take seconds, not hours, so thermal and aging effects are not exercised.
+2. These are seven probes. A PASS means "no silent error in these matrix multiplies, these checksums, these data patterns, these transformer kernels, this memory sweep and this soak, in these runs, on this device today". It is not a certificate of a healthy chip. The OSDI 2026 results above show that defects depend on the data, the kernel, temperature and age; this version sweeps shapes, precisions, five transformer kernels, memory and hours under load, but not the rest.
+3. Only probe 7 loads the chip for long; the other six run for seconds. Aging is not exercised by any of them, and the soak so far covers the matrix multiply only.
 4. One device per run. Multi-device comparison is on the roadmap.
 5. The error counters are NVIDIA's volatile counts since the driver last loaded; on other devices probe 11 records that none are available. In the compute and kernel probes the injected faults are applied to the output on the CPU side, so they test the checker, not the chip. The memory probe injects into device memory itself.
 
@@ -545,7 +545,7 @@ Nothing is claimed that was not measured on real hardware; the result files are 
 
 ## Contributing a row
 
-Run `chip-integrity run --name NAME` on your device, or the ten probe commands in Run it, then open a pull request with the ten result files (`NAME_clean.jsonl`, `NAME_inject.jsonl`, `NAME_kernels.jsonl`, `NAME_kernels_inject.jsonl`, `NAME_abft.jsonl`, `NAME_abft_inject.jsonl`, `NAME_patterns.jsonl`, `NAME_patterns_inject.jsonl`, `NAME_memcheck.jsonl` and `NAME_memcheck_inject.jsonl`), the device name, driver version and PyTorch version. Rows are added only from attached result files.
+Run `chip-integrity run --name NAME` on your device, or the ten probe commands in Run it, then open a pull request with the ten result files (`NAME_clean.jsonl`, `NAME_inject.jsonl`, `NAME_kernels.jsonl`, `NAME_kernels_inject.jsonl`, `NAME_abft.jsonl`, `NAME_abft_inject.jsonl`, `NAME_patterns.jsonl`, `NAME_patterns_inject.jsonl`, `NAME_memcheck.jsonl` and `NAME_memcheck_inject.jsonl`), the device name, driver version and PyTorch version. A soak row (`NAME_soak.jsonl` from `chip-integrity soak --minutes 60 --out NAME_soak.jsonl`) is welcome alongside them. Rows are added only from attached result files.
 
 ## Citing
 

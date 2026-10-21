@@ -44,7 +44,7 @@
       "programmingLanguage": "Python",
       "license": "https://opensource.org/licenses/MIT",
       "author": {"@id": "https://chipintegrity.org/#person"},
-      "description": "Six probes for AI accelerators: a compute probe that checks matrix multiplies against a proven float64 error bound and bit-for-bit repeatability, a memory probe that writes six patterns into every word of most of device memory and reads them back, a kernel probe that checks softmax, layer norm, GELU, rotary embeddings and attention the same two ways, a data pattern probe that drives the matrix multiply with inputs built to reach particular bits, a checksum-protected matrix multiply that detects and locates a wrong element with proven thresholds, and an error counter cross-check that records whether the chip's own counters noticed. Output follows the OCP Test and Validation spec."
+      "description": "Seven probes for AI accelerators: a compute probe that checks matrix multiplies against a proven float64 error bound and bit-for-bit repeatability, a memory probe that writes six patterns into every word of most of device memory and reads them back, a kernel probe that checks softmax, layer norm, GELU, rotary embeddings and attention the same two ways, a data pattern probe that drives the matrix multiply with inputs built to reach particular bits, a checksum-protected matrix multiply that detects and locates a wrong element with proven thresholds, a soak probe that keeps the chip under load for hours and checks every result bit for bit with temperature, clocks and power recorded, and an error counter cross-check that records whether the chip's own counters noticed. Output follows the OCP Test and Validation spec."
     },
     {
       "@type": "Dataset",
@@ -137,7 +137,7 @@
 <div class="cols3">
 <div><div class="num">01</div><h3>Run real AI maths, many times</h3><p>Matrix multiplies in every precision, the kernels inside a transformer, data patterns built to reach particular bits, and a sweep of the device memory. Every step runs dozens of times.</p></div>
 <div><div class="num">02</div><h3>Check every answer two ways</h3><p>Each output is compared with an exact or float64 reference under a proven rounding-error bound, and with the first run bit for bit. A wrong answer has to get past both.</p></div>
-<div><div class="num">03</div><h3>Prove the checks work, then publish</h3><p>Next to every clean run, a self-test plants faults on purpose and every one must be caught. Everything is written in the <a class="term" href="learn.html#g-ocp-test-and-validation" data-def="The Open Compute Project's open format for hardware diagnostic output, used by cloud operators so that any test's results can be read by any fleet tool. All six probes write it.">OCP Test and Validation</a> format and published with the result.</p></div>
+<div><div class="num">03</div><h3>Prove the checks work, then publish</h3><p>Next to every clean run, a self-test plants faults on purpose and every one must be caught. Everything is written in the <a class="term" href="learn.html#g-ocp-test-and-validation" data-def="The Open Compute Project's open format for hardware diagnostic output, used by cloud operators so that any test's results can be read by any fleet tool. All seven probes write it.">OCP Test and Validation</a> format and published with the result.</p></div>
 </div>
 <p><a href="method.html">Read the full method</a></p>
 </div></section>

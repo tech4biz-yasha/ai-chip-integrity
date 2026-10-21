@@ -2,7 +2,7 @@
 <section id="method">
 <div class="kicker">LEARN, PART 3 OF 5</div>
 <h2>How a chip is tested here</h2>
-<p class="lede">Six probes have measured rows so far, numbered as on the roadmap; probe 7, hours under load, is built and its first rows come next. Probe 1 makes the chip multiply matrices and judges every output element. Probe 2 fills the chip's memory with known values and reads every one back. Probe 3 checks the other kernels inside a transformer the same way as probe 1. Probe 6 has the chip compute checksums inside the same multiply, so a wrong element can be caught and located without any reference. Probe 9 feeds the matrix multiply inputs built to reach particular bits. Probe 11 reads the chip's own error counters around every run and asks whether the hardware noticed. The compute, kernel and pattern probes run two independent checks on every output, and the checksum probe adds a third, so a fault has to hide from all of them.</p>
+<p class="lede">Seven probes have measured rows so far, numbered as on the roadmap. Probe 1 makes the chip multiply matrices and judges every output element. Probe 2 fills the chip's memory with known values and reads every one back. Probe 3 checks the other kernels inside a transformer the same way as probe 1. Probe 6 has the chip compute checksums inside the same multiply, so a wrong element can be caught and located without any reference. Probe 7 keeps the chip busy for as long as asked and checks every result it produces, with the chip's temperature, clocks and power recorded beside each minute. Probe 9 feeds the matrix multiply inputs built to reach particular bits. Probe 11 reads the chip's own error counters around every run and asks whether the hardware noticed. The compute, kernel and pattern probes run two independent checks on every output, and the checksum probe adds a third, so a fault has to hide from all of them.</p>
 
 <h3>Probe 1: compute</h3>
 <p>The chip multiplies two fixed matrices, A and B, fifty times at each of three shapes and four precisions, plus FP8. Two checks run on every output.</p>
@@ -31,7 +31,7 @@
 </div>
 <div class="panel">
 <h3>The repeat check, in plain words</h3>
-<p>The same inputs through the same chip should give the same bits every time. Run 0 is kept, and every later run is compared bit for bit. This catches an intermittent fault far too small to leave the bound, because the two runs simply no longer match. On the chips measured so far every run matched, which is itself a useful fact: the matrix kernels on these chips are deterministic.</p>
+<p>The same inputs through the same chip should give the same bits every time. Run 0 is kept, and every later run is compared bit for bit. This catches an intermittent fault far too small to leave the bound, because the two runs simply no longer match. On the chips measured so far every run matched, which is itself a useful fact: the matrix kernels on these chips are deterministic. The same idea has now been validated on CPUs at fleet scale: Vavelidou et al. (ITHICA, MICRO 2026, <a href="https://arxiv.org/abs/2605.15638">arXiv:2605.15638</a>) found that the defects most likely to escape manufacturing test show up as the same instruction, given the same inputs, returning different outputs depending on the context it runs in, and that checks built on that comparison found 39% more defective servers than the final-output checks they were added to.</p>
 </div>
 </div>
 
@@ -71,6 +71,9 @@
 <p>Huang and Abraham showed in 1984 that a multiply can check itself. Append to A a row holding its column sums, append to B a column holding its row sums, and one multiply returns C together with C's own row sums and column sums, computed by the same hardware in the same pass. A wrong element breaks exactly one row check and one column check, and where they cross is the element. No reference answer is needed, so the check can run inside real work for the cost of one extra row and column, and it is the design that later becomes a block in silicon.</p>
 <div class="formula">A' = [ A ; 2⁻ˢ·(column sums of A) ]<br>B' = [ B , 2⁻ˢ·(row sums of B) ]<br>A'·B' = [ C , 2⁻ˢ·(row sums of C) ;<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2⁻ˢ·(column sums of C) , … ]</div>
 <p>In floating point, rounding makes a correct row sum differ slightly from its checksum, so everything depends on the threshold. Here each threshold is derived element by element from the same arithmetic model as every other bound, and the host removes the known rounding of the checksums exactly, so a correct chip can never cross it. The power of two 2⁻ˢ keeps the checksums from overflowing near the top of the range. The probe also measures its own blind spot: a rectangle of four errors that cancel in every row and column sum is invisible to checksums, so any run the reference check fails while the checksums hold is counted, never passed.</p>
+<h3>Probe 7: hours under load</h3>
+<p>Some faults only appear once a chip has been hot for a while, has lowered its clocks or sits at its power limit, so a run of seconds can pass a chip that fails in production. This probe keeps the chip busy for as long as asked and checks every result it produces. One fixed matrix multiply runs back to back, one precision at a time in rotation, and every result is compared bit for bit with the first one. That first result is checked against the proven bound before the soak begins (for int8 and FP8, against the exact answer) and repeated three times to make sure the kernel gives the same bits, so any result that differs later is a fault, not a quirk of the kernel.</p>
+<p>The soak is cut into windows, one minute and one precision each, and every window is one step in the result file with the chip's state beside its verdict: temperature, SM and memory clock, power, and the reasons the driver gives for running below full clock, such as a power cap or a thermal slowdown. If a result differs, the temperature at that moment is recorded with it, so every failure carries the conditions it happened in. The first row, an NVIDIA B200, ran ten minutes at its 1,000 W power cap with the driver reporting the cap in every window, and all 1,096,120 results came back bit-identical.</p>
 <h3>Probe 9: data patterns</h3>
 <p>Some faults only fire on particular bit patterns, and uniform random inputs almost never produce them. The data pattern probe runs the same matrix multiply, with the same two checks and the same proven or exact reference, on inputs built to reach specific parts of the arithmetic. Every input set is scaled by a power of two where needed, so no partial sum in any order can overflow.</p>
 <div class="verdict">
@@ -98,6 +101,14 @@
 <div class="v bad">silent-data-corruption</div><div>Some runs differ from run 0. An intermittent fault, the kind a fleet scanner exists to find.</div>
 <div class="v bad">outside-error-bound</div><div>All runs agree with each other but sit outside the proven bound. A faulty unit, a device accumulating below FP32, or for the kernel probe an exp, erf or GELU that is less accurate than assumed.</div>
 <div class="v warn">nondeterministic-kernel</div><div>Many runs differ, yet all stay inside the bound. The kernel is not repeatable on that device and precision, so the repeat check cannot be used there. Reported as a finding, not a fault.</div>
+</div>
+<h3>Hours under load probe</h3>
+<div class="verdict">
+<div class="v">no-silent-errors</div><div>Every run in the window was bit-identical to the verified first result.</div>
+<div class="v bad">silent-data-corruption</div><div>Runs differed from the verified first result. For int8 and FP8, whose answer is exact, any difference is a wrong answer.</div>
+<div class="v warn">nondeterministic-kernel</div><div>Many runs differed but every one checked stayed inside the bound, so this kernel does not repeat itself exactly on this device and the bit-for-bit check cannot judge it.</div>
+<div class="v">first-result-verified</div><div>Setup step: the first result is inside the bound, or exact, and its three repeats match it bit for bit.</div>
+<div class="v bad">outside-error-bound</div><div>Setup step: the first result sits outside the bound, so it cannot serve as the reference and that precision is left out of the soak.</div>
 </div>
 <h3>Error counters, every run</h3>
 <div class="verdict">
