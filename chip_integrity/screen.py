@@ -99,6 +99,16 @@ def device_label(dev):
     if dev.type == "cuda":
         return torch.cuda.get_device_name(dev)
     if dev.type == "mps":
+        if platform.machine() == "x86_64":           # an Intel Mac: Metal runs on its AMD or Intel GPU, not an Apple one
+            try:
+                import subprocess
+                out = subprocess.run(["system_profiler", "SPDisplaysDataType"], capture_output=True, text=True,
+                                     timeout=20).stdout
+                chips = [line.split(":", 1)[1].strip() for line in out.splitlines() if "Chipset Model:" in line]
+                if chips:
+                    return chips[-1] + " (MPS) x86_64"      # the last listed is the discrete GPU when there is one
+            except Exception:
+                pass
         return "Apple GPU (MPS) " + platform.machine()
     return "CPU " + (platform.processor() or platform.machine())
 

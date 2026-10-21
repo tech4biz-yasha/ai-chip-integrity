@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-reduce.py  -  AI Chip Integrity Suite, reductions (probe 5) v0.1.0
+reduce.py  -  AI Chip Integrity Suite, reductions (probe 5) v0.1.1
 
 Checks whether the chip adds numbers up correctly. Adding is everywhere in AI: every matrix multiply is a
 chain of additions, every softmax adds up a row, every norm adds up squares, and training adds gradients
@@ -53,7 +53,7 @@ from chip_integrity import arith  # noqa: E402
 from chip_integrity import counters  # noqa: E402
 from chip_integrity import screen  # noqa: E402
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 DTYPES = ("fp32", "fp16", "bf16")
 DEFAULT_DTYPES = {"cuda": "fp32,fp16,bf16", "mps": "fp16,fp32", "cpu": "fp32"}
 DEFAULT_N = {"cuda": 1 << 23, "mps": 1 << 22, "cpu": 1 << 20}          # vector length, a power of two
@@ -126,7 +126,7 @@ class Case:
                 + self.u_out * self.ref.abs()
         else:
             self.bound = sum_bound(self.ref, abs_sum, terms, self.u_out, self.out_dtype)
-        self.x = x64.to(self.dtype).to(dev)
+        self.x = x64.to(self.dtype).contiguous().to(dev)       # cast on the CPU first: Metal has no float64
         self.first = None
 
     def run(self):
@@ -145,7 +145,7 @@ class Case:
 
     def check(self, y):
         """(elements outside the bound or not exact, worst error over bound, index of the worst element)."""
-        y64 = y.detach().to("cpu", torch.float64).reshape(self.ref.shape)
+        y64 = y.detach().cpu().to(torch.float64).reshape(self.ref.shape)   # move first, then cast
         err = (y64 - self.ref).abs()
         if self.kind == "exact":
             bad = (err > 0) | ~torch.isfinite(y64)
@@ -164,7 +164,7 @@ class Case:
         e = rng.randrange(flat.numel())
         delta = 1.0 if self.kind == "exact" else 8.0 * float(self.bound.reshape(-1)[e])
         wrong = float(self.ref.reshape(-1)[e]) + delta
-        flat[e] = torch.tensor(wrong, dtype=flat.dtype)
+        flat[e] = torch.tensor(wrong, dtype=flat.dtype, device=flat.device)
         return e
 
 

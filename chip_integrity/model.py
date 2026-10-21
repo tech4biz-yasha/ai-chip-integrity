@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-model.py  -  AI Chip Integrity Suite, full model forward pass (probe 4) v0.1.2
+model.py  -  AI Chip Integrity Suite, full model forward pass (probe 4) v0.1.3
 
 Runs a small open language model on the chip and checks it three ways, with a float64 copy of the same model
 on the CPU as the reference. The matrix multiplies are where a wrong answer is made, and a bound carried through
@@ -60,7 +60,7 @@ from chip_integrity import arith  # noqa: E402
 from chip_integrity import counters  # noqa: E402
 from chip_integrity import screen  # noqa: E402
 
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 DEFAULT_MODEL = "Qwen/Qwen2.5-0.5B"
 TINY = "tiny"
 DEFAULT_DTYPES = {"cuda": "bf16,fp16,fp32", "mps": "fp16,fp32", "cpu": "fp32"}
@@ -212,7 +212,7 @@ class LinearCheck:
             idx = self.call_index
             self.call_index += 1
             x = inputs[0].detach()
-            x64 = x.to("cpu", torch.float64).reshape(-1, x.shape[-1])
+            x64 = x.cpu().to(torch.float64).reshape(-1, x.shape[-1])          # move first, then cast: Metal has no float64
             w = module.weight.detach()
             if not torch.isfinite(x64).all():
                 self.nonfinite_inputs += 1
@@ -221,7 +221,7 @@ class LinearCheck:
             x_abs = x64.abs()
             x_flush = arith.flush_term(x64, x.dtype) if has_subnormal(x64, arith.OUT[x.dtype][1]) else None
             w_sub = self.subnormal_weights[module_name]
-            b64 = module.bias.detach().to("cpu", torch.float64) if module.bias is not None else None
+            b64 = module.bias.detach().cpu().to(torch.float64) if module.bias is not None else None
             if b64 is not None:
                 k = k + 1                            # one more rounded term in the sum
             g = screen.accumulation_factor(self.name, k, self.dev.type)
@@ -230,7 +230,7 @@ class LinearCheck:
             ref = torch.empty((rows, out), dtype=torch.float64)
             bound = torch.empty((rows, out), dtype=torch.float64)
             for c0 in range(0, out, CHUNK_ROWS):     # the weight goes to float64 one slice of rows at a time
-                wc = w[c0:c0 + CHUNK_ROWS].to("cpu", torch.float64)
+                wc = w[c0:c0 + CHUNK_ROWS].cpu().to(torch.float64)
                 wc_abs = wc.abs()
                 r = x64 @ wc.T
                 abs_ab = x_abs @ wc_abs.T
@@ -251,9 +251,9 @@ class LinearCheck:
                 flat = output.detach().reshape(-1)
                 e = self.plant[1].randrange(flat.numel())
                 wrong = ref.reshape(-1)[e] + 8.0 * bound.reshape(-1)[e]
-                flat[e] = wrong.to(flat.dtype)
+                flat[e] = torch.tensor(float(wrong), dtype=flat.dtype, device=flat.device)
                 self.planted_at = (label, module_name)
-            y64 = output.detach().to("cpu", torch.float64).reshape(ref.shape)
+            y64 = output.detach().cpu().to(torch.float64).reshape(ref.shape)
             err = (y64 - ref).abs()
             bad = (err > bound) | ~torch.isfinite(y64)
             outside = int(bad.sum())
