@@ -86,13 +86,13 @@ def test_weights_are_hashed_the_same_way_every_time(tmp_path):
     assert a["model_load"]["m"]["weights_sha256"] == b["model_load"]["m"]["weights_sha256"]
 
 
-@pytest.mark.parametrize("planted", ["2", "4"])
-def test_self_test_catches_every_planted_fault(tmp_path, planted):
-    code, st, _ = run_model(tmp_path, "--inject", planted)
+@pytest.mark.parametrize("planted,seed", [("2", "1234"), ("4", "1234"), ("2", "7"), ("2", "99"), ("4", "2026")])
+def test_self_test_catches_every_planted_fault(tmp_path, planted, seed):
+    code, st, _ = run_model(tmp_path, "--inject", planted, "--seed", seed, prompts="16")
     assert code == 0
     fwd = st["model_forward_fp32"]
     assert fwd["verdict"] == "injection-self-test-pass"
-    assert fwd["m"]["injected_runs"] == int(planted) == fwd["m"]["injected_runs_detected"]
+    assert fwd["m"]["injected_runs"] == int(planted) == fwd["m"]["injected_runs_detected"] == fwd["m"]["injected_runs_localised"]
     assert fwd["m"]["injected_kinds"].split(",") == ["activation", "weight"] * (int(planted) // 2)
     assert fwd["m"]["repeat_runs_differing"] == 0             # planted runs never count as clean evidence
     assert fwd["m"]["weight_elements_changed"] == 0           # the flipped weight was restored

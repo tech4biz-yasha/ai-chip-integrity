@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-model.py  -  AI Chip Integrity Suite, full model forward pass (probe 4) v0.1.1
+model.py  -  AI Chip Integrity Suite, full model forward pass (probe 4) v0.1.2
 
 Runs a small open language model on the chip and checks it three ways, with a float64 copy of the same model
 on the CPU as the reference. The matrix multiplies are where a wrong answer is made, and a bound carried through
@@ -27,10 +27,12 @@ rests on the three checks above.
   nondeterministic-kernel   runs differed but every multiply stayed inside its bound, so the bit-for-bit check
                             cannot judge this chip and precision; reported as a finding
 
---inject N adds N runs with a planted fault after the clean ones: one bit flipped in the output of one random
-matrix multiply, and one bit flipped in one random weight on the chip (restored afterwards), alternating. Each
-must be caught by at least one of the three checks, and the file records whether the multiply check also
-localised it to the right layer.
+--inject N adds N runs with a planted fault after the clean ones, alternating between two kinds: one output
+element of one random matrix multiply is moved eight bounds away from its float64 answer on the chip, which the
+multiply check must catch at that very multiply; and one bit of one random weight is flipped on the chip
+(restored afterwards), which the read-back must catch. A random single-bit flip in an intermediate value is not
+used, because rounding further down the model can absorb it so that nothing changes at the output: that is a
+masked fault, not a missed one, and a self-test has to be deterministic.
 
 --model tiny builds a two-layer model of the same family from a seed, with no download, so the self-test runs
 on a CPU in CI. The default model is downloaded from the Hugging Face Hub (pip install ai-chip-integrity[model]).
@@ -58,7 +60,7 @@ from chip_integrity import arith  # noqa: E402
 from chip_integrity import counters  # noqa: E402
 from chip_integrity import screen  # noqa: E402
 
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 DEFAULT_MODEL = "Qwen/Qwen2.5-0.5B"
 TINY = "tiny"
 DEFAULT_DTYPES = {"cuda": "bf16,fp16,fp32", "mps": "fp16,fp32", "cpu": "fp32"}
@@ -209,12 +211,6 @@ class LinearCheck:
         def hook(module, inputs, output):
             idx = self.call_index
             self.call_index += 1
-            if self.plant is not None and self.plant[0] == idx:
-                c = output.detach().to("cpu").clone()
-                int_view, bits = screen.DTYPES[self.name][2], screen.DTYPES[self.name][3]
-                screen.flip_bit(c, int_view, bits, self.plant[1])
-                output.detach().copy_(c.to(output.device))
-                self.planted_at = (label, module_name)
             x = inputs[0].detach()
             x64 = x.to("cpu", torch.float64).reshape(-1, x.shape[-1])
             w = module.weight.detach()
@@ -250,6 +246,13 @@ class LinearCheck:
                 ref[:, c0:c0 + CHUNK_ROWS] = r
                 bound[:, c0:c0 + CHUNK_ROWS] = screen.error_bound(r, abs_ab, k, self.u_out, g=g, flush_ab=flush_ab,
                                                                   out_floor=floor)
+            if self.plant is not None and self.plant[0] == idx:
+                # self-test: move one output element eight bounds away from its float64 answer, on the chip
+                flat = output.detach().reshape(-1)
+                e = self.plant[1].randrange(flat.numel())
+                wrong = ref.reshape(-1)[e] + 8.0 * bound.reshape(-1)[e]
+                flat[e] = wrong.to(flat.dtype)
+                self.planted_at = (label, module_name)
             y64 = output.detach().to("cpu", torch.float64).reshape(ref.shape)
             err = (y64 - ref).abs()
             bad = (err > bound) | ~torch.isfinite(y64)
@@ -383,7 +386,8 @@ def forward_step(step, dev, name, cpu_model, prompts, refs, runs, new_tokens, in
                     planted_layer_outside = check.by_layer.get(run_layer, {}).get("outside", 0) if run_layer else 0
                 run_outside += check.outside
                 run_worst = max(run_worst, check.worst)
-                nonfinite += check.nonfinite_inputs
+                if planted is None:
+                    nonfinite += check.nonfinite_inputs
                 if r == 0:
                     run0[i] = digest
                     d = compare_to_reference(prefill, tokens, refs[i])
@@ -444,8 +448,9 @@ def forward_step(step, dev, name, cpu_model, prompts, refs, runs, new_tokens, in
     if nonfinite:
         msg += f"; {nonfinite} multiply call(s) had non-finite inputs and were not judged"
     caught = sum(1 for j in injected if j["caught"])
+    localised = sum(1 for j in injected if j["localised"])
     if inject:
-        ok = ok and caught == len(injected)
+        ok = ok and caught == len(injected) == localised
         verdict = "injection-self-test-pass" if ok else "injection-self-test-fail"
         msg += f"; planted {len(injected)}, caught {caught}, localised {sum(1 for j in injected if j['localised'])}"
 
@@ -478,7 +483,8 @@ def forward_step(step, dev, name, cpu_model, prompts, refs, runs, new_tokens, in
         m(name="injected_runs", value=len(injected), hardware_info=hw)
         m(name="injected_runs_detected", value=caught,
           validators=[tv.Validator(type=tv.ValidatorType.EQUAL, value=len(injected))], hardware_info=hw)
-        m(name="injected_runs_localised", value=sum(1 for j in injected if j["localised"]), hardware_info=hw)
+        m(name="injected_runs_localised", value=sum(1 for j in injected if j["localised"]),
+          validators=[tv.Validator(type=tv.ValidatorType.EQUAL, value=len(injected))], hardware_info=hw)
         m(name="injected_kinds", value=",".join(j["kind"] for j in injected), hardware_info=hw)
     step.add_diagnosis(tv.DiagnosisType.PASS if ok else tv.DiagnosisType.FAIL, verdict=verdict, message=msg,
                        hardware_info=hw)
