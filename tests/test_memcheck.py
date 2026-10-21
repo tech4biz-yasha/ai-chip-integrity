@@ -177,3 +177,15 @@ def test_mps_total_bytes_falls_back_when_torch_cannot_report_it(monkeypatch):
     assert memcheck.mps_total_bytes() == 2 * 2 ** 30
     monkeypatch.setattr(torch.mps, "recommended_max_memory", lambda: 12345, raising=False)
     assert memcheck.mps_total_bytes() == 12345
+
+
+def test_pattern_values_do_not_depend_on_bit_shifts():
+    """The hash patterns are written with floor divisions so older MPS backends can run them; same values as shifts."""
+    for start in (0, 12345, 2 ** 32 + 7, 2 ** 40 - 3):
+        idx = torch.arange(start, start + 4096, dtype=torch.int64)
+        h = ((idx % 2 ** 32) * 1664525 + (idx >> 32) * 22695477 + 1013904223 + 77 * 40503) % 2 ** 32
+        h = h ^ (h >> 13)
+        h = (h * 1664525 + 1013904223) % 2 ** 32
+        h = h ^ (h >> 16)
+        assert torch.equal(memcheck.expected("hash", start, 4096, torch.device("cpu"), 77), memcheck.to_i32(h))
+        assert torch.equal(memcheck.expected("hash_inv", start, 4096, torch.device("cpu"), 77), memcheck.to_i32((2 ** 32 - 1) - h))

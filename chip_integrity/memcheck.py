@@ -34,7 +34,7 @@ from chip_integrity import counters  # noqa: E402
 
 from chip_integrity.screen import FileWriter, pick_device, device_label, add_software_infos
 
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 WORD = 4
 MAX_RECORD = 1000
 PATTERNS = ["zeros", "ones", "aaaa", "5555", "hash", "hash_inv"]
@@ -53,11 +53,13 @@ def expected(pattern, start_word, n, dev, seed):
         return torch.full((n,), int(to_i32(torch.tensor([SOLID[pattern]], dtype=torch.int64))[0]),
                           dtype=torch.int32, device=dev)
     idx = torch.arange(start_word, start_word + n, dtype=torch.int64, device=dev)
-    # LCG-style mixing with multipliers below 2^21, so every product stays inside int64
-    h = ((idx % 2 ** 32) * 1664525 + (idx >> 32) * 22695477 + 1013904223 + seed * 40503) % 2 ** 32
-    h = h ^ (h >> 13)
+    # LCG-style mixing with multipliers below 2^21, so every product stays inside int64. The shifts are written as
+    # floor divisions by powers of two (identical for these non-negative values) because the MPS backend of older
+    # PyTorch builds has no right shift.
+    h = ((idx % 2 ** 32) * 1664525 + (idx // 2 ** 32) * 22695477 + 1013904223 + seed * 40503) % 2 ** 32
+    h = h ^ (h // 2 ** 13)
     h = (h * 1664525 + 1013904223) % 2 ** 32
-    h = h ^ (h >> 16)
+    h = h ^ (h // 2 ** 16)
     if pattern == "hash_inv":
         h = (2 ** 32 - 1) - h
     return to_i32(h)
