@@ -3,7 +3,7 @@ message: "If you use this software, please cite it as below."
 title: "ai-chip-integrity: an open tester for silent computation errors in AI chips"
 version: 0.5.0
 date-released: 2026-10-24
-doi: 10.5281/zenodo.23505677
+doi: 10.5281/zenodo.23613283
 license: MIT
 repository-code: "https://github.com/tech4biz-yasha/ai-chip-integrity"
 authors:

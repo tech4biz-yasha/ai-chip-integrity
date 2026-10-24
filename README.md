@@ -1,6 +1,6 @@
 # ai-chip-integrity
 
-[![CI](https://github.com/tech4biz-yasha/ai-chip-integrity/actions/workflows/ci.yml/badge.svg)](https://github.com/tech4biz-yasha/ai-chip-integrity/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/ai-chip-integrity)](https://pypi.org/project/ai-chip-integrity/) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23505677.svg)](https://doi.org/10.5281/zenodo.23505677)
+[![CI](https://github.com/tech4biz-yasha/ai-chip-integrity/actions/workflows/ci.yml/badge.svg)](https://github.com/tech4biz-yasha/ai-chip-integrity/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/ai-chip-integrity)](https://pypi.org/project/ai-chip-integrity/) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23613283.svg)](https://doi.org/10.5281/zenodo.23613283)
 
 An open tester for silent data corruption (SDC) in GPUs and AI chips: wrong answers that come back with no error raised.
 
@@ -702,7 +702,7 @@ If you use this in research, please cite it as
 
 ```
 Yasha Khandelwal. ai-chip-integrity: an open tester for silent computation errors in AI chips. Version 0.5.0, 2026.
-https://doi.org/10.5281/zenodo.23505677
+https://doi.org/10.5281/zenodo.23613283
 https://github.com/tech4biz-yasha/ai-chip-integrity
 ```
 
