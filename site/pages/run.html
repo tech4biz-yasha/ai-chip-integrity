@@ -14,11 +14,11 @@ chip-integrity run --quick
 chip-integrity run --name NAME
 
 <span class="c"># or, on an NVIDIA GPU host with Docker, with nothing else installed</span>
-docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.4.2 run --name NAME --out-dir /results</pre>
+docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.5.0 run --name NAME --out-dir /results</pre>
 <p class="note">On many Macs the built-in <code>python3</code> is version 3.9, which pip skips. Install a newer Python from python.org or with Homebrew first, then create the environment with its versioned command, for example <code>python3.12 -m venv chip-env</code>.</p>
 <p class="note">The same ten files come from running each probe by hand from a clone of the repository, for example <code>python screen.py --out NAME_clean.jsonl</code> and then <code>python screen.py --inject 5 --out NAME_inject.jsonl</code> for its self-test. The README lists all ten commands.</p>
 <ol class="steps">
-<li><b>Open a pull request</b> with the ten files, the device name, driver version and PyTorch version.</li>
+<li><b>Send the files.</b> Either <a href="submit.html">fill in the form</a> and drag them in, or open a pull request with the ten files, the device name, driver version and PyTorch version.</li>
 <li><b>Rows are added only from attached files.</b> The table is regenerated from them, so a row cannot say more than its file does.</li>
 <li><b>Found a fault?</b> Open an issue with the file. A real finding on real hardware is the most useful thing anyone can contribute.</li>
 </ol>

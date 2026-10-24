@@ -391,7 +391,7 @@ python model.py                  # full model forward pass; downloads Qwen2.5-0.
 python model.py --model tiny --inject 2   # model self-test on a two-layer model built from the seed, no download
 python reduce.py                 # reductions: sum, running sum, mean, row and column sums, exact and bounded, per precision
 python reduce.py --inject 2      # reduction self-test
-python -m pytest -q              # 305 tests on CPU; 9 more validate the output against OCP's schema
+python -m pytest -q              # 319 tests on CPU; 9 more validate the output against OCP's schema
 ```
 
 Options for `memcheck.py`:
@@ -596,7 +596,7 @@ A run that cannot complete fails the build whatever `fail-on-fault` says, so a b
 
 ## Tests
 
-`python -m pytest -q` runs 305 tests on the CPU in about a minute; 9 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set. On CPUs whose matrix multiply ignores flush-to-zero, such as Apple silicon, the two flushing tests in `tests/test_patterns.py` skip themselves, giving 303 passed.
+`python -m pytest -q` runs 319 tests on the CPU in about a minute; 9 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set. On CPUs whose matrix multiply ignores flush-to-zero, such as Apple silicon, the two flushing tests in `tests/test_patterns.py` skip themselves, giving 317 passed.
 
 1. `tests/test_screen.py` (37): every verdict path, every bit position caught by the self-test, NaN handling, int8 and FP8 off-by-one, FP8 inputs exact and K above 4096 skipped, rectangular shapes, bound tightness.
 2. `tests/test_kernels.py` (23): all kernels and precisions, the self-test on six seeds, intermittent and systematic faults, a one-ulp change, internal fp16 arithmetic and tanh-GELU both caught as outside the bound, NaN handling, fp32 bound tightness, a sin that is off by 1e-4 caught in RoPE, RoPE angles reaching every position, the device's own exp, erf, sin and cos measured, and the CUDA attention path forced onto the CPU: a batch dimension added with the same shape and values back, the kernel that ran recorded, fused kernels only for fp16 and bf16, and a loud refusal when no kernel fits.
@@ -613,6 +613,7 @@ A run that cannot complete fails the build whatever `fail-on-fault` says, so a b
 13. `tests/test_model.py` (20): on the two-layer tiny model, a clean run passing with every multiply inside its bound, the weights hashed the same way every time, the self-test catching and localising every planted wrong element and weight flip across several seeds, a weight changed on the chip or a run that differs failing as corruption, runs that agree but sit outside the bound reported as a faulty unit, a last-bit wobble inside the bound reported as non-deterministic rather than a fault, the self-test still failing on a real fault, a prompt file and a second precision, bad arguments rejected, the `chip-integrity model` subcommand and the script wrapper, and the output validated against the official OCP schema when `OCP_SCHEMA_DIR` is set.
 14. `tests/test_reduce.py` (23): every step passing in fp32, fp16 and bf16 at small sizes; the exact inputs representable, with every prefix, in all three precisions; the bound holding for five different summation orders including one at a time; the self-test catching and locating every planted fault across four seeds and two precisions; a differing wrong result failing as corruption, the same wrong answer every run as a faulty unit, a last-bit wobble inside the bound as non-deterministic, the self-test still failing on a real fault, operations selectable, bad arguments rejected, the gamma limit at 2^23 terms, the `chip-integrity reduce` subcommand and the script wrapper, and the output validated against the official OCP schema when `OCP_SCHEMA_DIR` is set.
 15. `tests/test_action.py` (12): the GitHub Action is composite, every step names a shell or another action, every input it references exists, hyphenated inputs use the bracket form so `out-dir` is not read as a subtraction, every output points at a real step that writes it, the README input table and `action.yml` agree on every name and default, `skip` names only the probes `run` executes, the README snippets pin a released tag and pass only real inputs, and a run that cannot complete fails the build whatever `fail-on-fault` says.
+16. `tests/test_submit.py` (14): the submission route holds together. The issue form is a valid GitHub issue form, every field it needs is required, the files field names all ten result files, the confirmations refuse a `--quick` run and edited files, the dropdown offers every way the README says to run the suite, the Submit a row page and the form link each other, the README and the home and Run it pages point at them, the page is in the nav and the sitemap, every link on it opens a real built file, and no page pins the Docker image at an old version.
 
 ## Output format
 
@@ -694,7 +695,7 @@ Nothing is claimed that was not measured on real hardware; the result files are 
 
 ## Contributing a row
 
-Run `chip-integrity run --name NAME` on your device, or the ten probe commands in Run it, then open a pull request with the ten result files (`NAME_clean.jsonl`, `NAME_inject.jsonl`, `NAME_kernels.jsonl`, `NAME_kernels_inject.jsonl`, `NAME_abft.jsonl`, `NAME_abft_inject.jsonl`, `NAME_patterns.jsonl`, `NAME_patterns_inject.jsonl`, `NAME_memcheck.jsonl` and `NAME_memcheck_inject.jsonl`), the device name, driver version and PyTorch version. A soak row (`NAME_soak.jsonl` from `chip-integrity soak --minutes 60 --out NAME_soak.jsonl`) is welcome alongside them. Rows are added only from attached result files.
+Run `chip-integrity run --name NAME` on your device, or the ten probe commands in Run it, then open a pull request with the ten result files (`NAME_clean.jsonl`, `NAME_inject.jsonl`, `NAME_kernels.jsonl`, `NAME_kernels_inject.jsonl`, `NAME_abft.jsonl`, `NAME_abft_inject.jsonl`, `NAME_patterns.jsonl`, `NAME_patterns_inject.jsonl`, `NAME_memcheck.jsonl` and `NAME_memcheck_inject.jsonl`), the device name, driver version and PyTorch version. A soak row (`NAME_soak.jsonl` from `chip-integrity soak --minutes 60 --out NAME_soak.jsonl`) is welcome alongside them. Rows are added only from attached result files. If you would rather not open a pull request, [the submission form](https://github.com/tech4biz-yasha/ai-chip-integrity/issues/new?template=submit-a-row.yml) takes the same files as an issue, and [chipintegrity.org/submit.html](https://chipintegrity.org/submit.html) says what is published and what is not.
 
 ## Citing
 

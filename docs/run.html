@@ -36,6 +36,7 @@
 <a href="chips/index.html">Chips</a>
 <a href="findings/index.html">Findings</a>
 <a href="run.html" aria-current="page">Run it</a>
+<a href="submit.html">Submit</a>
 <a href="about.html">About</a>
 </nav>
 <a class="gh" href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>
@@ -58,11 +59,11 @@ chip-integrity run --quick
 chip-integrity run --name NAME
 
 <span class="c"># or, on an NVIDIA GPU host with Docker, with nothing else installed</span>
-docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.4.2 run --name NAME --out-dir /results</pre>
+docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.5.0 run --name NAME --out-dir /results</pre>
 <p class="note">On many Macs the built-in <code>python3</code> is version 3.9, which pip skips. Install a newer Python from python.org or with Homebrew first, then create the environment with its versioned command, for example <code>python3.12 -m venv chip-env</code>.</p>
 <p class="note">The same ten files come from running each probe by hand from a clone of the repository, for example <code>python screen.py --out NAME_clean.jsonl</code> and then <code>python screen.py --inject 5 --out NAME_inject.jsonl</code> for its self-test. The README lists all ten commands.</p>
 <ol class="steps">
-<li><b>Open a pull request</b> with the ten files, the device name, driver version and PyTorch version.</li>
+<li><b>Send the files.</b> Either <a href="submit.html">fill in the form</a> and drag them in, or open a pull request with the ten files, the device name, driver version and PyTorch version.</li>
 <li><b>Rows are added only from attached files.</b> The table is regenerated from them, so a row cannot say more than its file does.</li>
 <li><b>Found a fault?</b> Open an issue with the file. A real finding on real hardware is the most useful thing anyone can contribute.</li>
 </ol>
@@ -102,7 +103,7 @@ docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-int
 <footer class="foot">
 <div class="footin">
 <div><div class="brand">chip<b>integrity</b>.org</div><p>Open tests for silent data corruption (SDC) in GPUs and AI chips. MIT licensed. Every number on this site is read from a public result file.</p></div>
-<div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="index.html">Home</a><a href="learn.html">Learn</a><a href="method.html">Method</a><a href="results.html">Results</a><a href="chips/index.html">Chips</a><a href="findings/index.html">Findings</a><a href="run.html">Run it</a><a href="about.html">About</a></nav></div>
+<div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="index.html">Home</a><a href="learn.html">Learn</a><a href="method.html">Method</a><a href="results.html">Results</a><a href="chips/index.html">Chips</a><a href="findings/index.html">Findings</a><a href="run.html">Run it</a><a href="submit.html">Submit</a><a href="about.html">About</a></nav></div>
 <div><div class="fh">CITE</div><p>Yasha Khandelwal, ai-chip-integrity, version 0.5.0, 2026, <a href="https://doi.org/10.5281/zenodo.23613283">https://doi.org/10.5281/zenodo.23613283</a></p></div>
 </div>
 <div class="footbase">Page generated from the result files on 2026-10-24. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>

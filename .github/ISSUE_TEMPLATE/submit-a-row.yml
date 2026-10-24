@@ -1,0 +1,96 @@
+name: Submit a row
+description: Publish a measured result for your chip on chipintegrity.org
+title: "Row: "
+labels: ["row"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Run `chip-integrity run --name NAME` on your chip, then attach the result files here.
+        Rows are added only from attached files, so a row never says more than its files do.
+        Everything below is published as given, including the chip name and the files themselves.
+
+  - type: input
+    id: chip
+    attributes:
+      label: Chip
+      description: As you would want it to read in the table.
+      placeholder: NVIDIA H100 80GB HBM3 (SXM)
+    validations:
+      required: true
+
+  - type: textarea
+    id: files
+    attributes:
+      label: Result files
+      description: >-
+        Drag the files from your results folder into this box. A full run writes ten:
+        NAME_clean.jsonl, NAME_inject.jsonl, NAME_kernels.jsonl, NAME_kernels_inject.jsonl,
+        NAME_abft.jsonl, NAME_abft_inject.jsonl, NAME_patterns.jsonl, NAME_patterns_inject.jsonl,
+        NAME_memcheck.jsonl and NAME_memcheck_inject.jsonl. A soak file is welcome too.
+        GitHub does not accept .jsonl directly, so put them in a zip.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: how
+    attributes:
+      label: How it was run
+      options:
+        - pip install ai-chip-integrity
+        - Docker image
+        - A clone of the repository
+        - The GitHub Action
+    validations:
+      required: true
+
+  - type: input
+    id: suite-version
+    attributes:
+      label: Suite version
+      description: The output of `chip-integrity --version`.
+      placeholder: ai-chip-integrity 0.5.0 (screen 0.3.4, ...)
+    validations:
+      required: true
+
+  - type: input
+    id: software
+    attributes:
+      label: PyTorch, CUDA and driver
+      description: >-
+        The PyTorch version, and on NVIDIA the CUDA runtime and driver version.
+        Every result file records these, so this is only to make the row easier to read.
+      placeholder: PyTorch 2.8.0+cu128, CUDA 12.8, driver 580.126.09
+    validations:
+      required: true
+
+  - type: input
+    id: host
+    attributes:
+      label: Where it ran
+      description: Bare metal, a rented pod, a laptop, a cloud instance type. Say if ECC was off.
+      placeholder: Rented pod, one GPU, ECC on
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything the row should be read with
+      description: >-
+        Optional. A step that was skipped, a precision the device does not support, anything unusual
+        during the run. If a probe reported a fault, say what you saw.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Before you submit
+      options:
+        - label: This was a full run, not `--quick`. Quick runs are a smoke test and never become a row.
+          required: true
+        - label: The files are exactly as the tool wrote them, with nothing edited or removed.
+          required: true
+        - label: I am happy for the chip name, the files and these details to be published.
+          required: true

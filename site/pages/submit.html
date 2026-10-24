@@ -1,0 +1,46 @@
+{{INTRO}}
+<section id="how">
+<div class="kicker">TAKE PART</div>
+<h2>Send a chip, get a row</h2>
+<p class="lede">Run the suite on your chip and the result goes on this site with its own page, under your chip's name, with every file you sent next to it.</p>
+<pre><span class="c"># install once, in its own virtual environment (Python 3.10 or newer)</span>
+python3 -m venv chip-env &amp;&amp; source chip-env/bin/activate
+pip install ai-chip-integrity
+
+<span class="c"># the full run: every probe and its self-test, ten OCP result files</span>
+chip-integrity run --name NAME</pre>
+<p>Then open the form and drag the files in. No account beyond GitHub, no pull request, nothing to install for the submission itself.</p>
+<p><a href="https://github.com/tech4biz-yasha/ai-chip-integrity/issues/new?template=submit-a-row.yml">Submit a row</a> · <a href="run.html">The longer instructions</a></p>
+<p class="note">A run on a rented GPU costs about a dollar and takes under an hour on most cards. On an Apple or AMD laptop GPU it runs on the machine you already have.</p>
+</section>
+
+<section id="published">
+<div class="kicker">WHAT HAPPENS TO IT</div>
+<h2>What gets published</h2>
+<ol class="steps">
+<li><b>The chip name, as you write it.</b> Make it the name you want in the table.</li>
+<li><b>The result files themselves,</b> unchanged, in the repository, so anyone can check the row against them.</li>
+<li><b>Everything the files record:</b> the probe versions, PyTorch, CUDA and driver versions, the shapes, the precisions, the error counters and the verdicts.</li>
+<li><b>A page for the chip,</b> generated from those files, showing how close each precision came to its proven error limit.</li>
+</ol>
+<h2>What does not</h2>
+<ol class="steps">
+<li><b>Your name or your company,</b> unless you ask for it. The row is about the chip.</li>
+<li><b>Anything not in the files.</b> The tables are regenerated from the result files, so a row cannot claim more than its evidence.</li>
+<li><b>Nothing is edited to look better.</b> A result outside its bound is published as that, with the reason where the probe measured one.</li>
+</ol>
+<p class="note">If you would rather not post in public, run it, keep the files, and read your own verdicts. The tool is MIT licensed and needs nothing from this site.</p>
+</section>
+
+<section id="rules">
+<div class="kicker">THE RULES</div>
+<h2>What makes a row</h2>
+<ol class="steps">
+<li><b>A full run, not <code>--quick</code>.</b> Quick mode uses tiny sizes to check the wiring, and never becomes a row.</li>
+<li><b>The self-tests must be there too.</b> Half the files plant faults on purpose, and a clean result only means something next to proof that the checks fire.</li>
+<li><b>Files as the tool wrote them.</b> Nothing edited, nothing removed.</li>
+<li><b>One chip per row.</b> If a host has several cards, run each one and send them separately.</li>
+<li><b>A fault is more useful than a pass.</b> If a probe found something, send it with whatever you know about the card. That is the whole point of the project.</li>
+</ol>
+<p class="note">Submissions are measured work by whoever sent them, not re-measured here, and each row says which version of the suite wrote it.</p>
+</section>

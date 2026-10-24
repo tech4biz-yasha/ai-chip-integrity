@@ -921,7 +921,7 @@ def feed(built):
 
 SITE_DIR = os.path.join(ROOT, "site")
 NAV = [("learn", "Learn"), ("method", "Method"), ("results", "Results"), ("chips/index", "Chips"),
-       ("findings/index", "Findings"), ("run", "Run it"), ("about", "About")]
+       ("findings/index", "Findings"), ("run", "Run it"), ("submit", "Submit"), ("about", "About")]
 FINDINGS = [  # newest first: slug, date, title, one-line summary
     ("metal-pytorch-2-2-2", "2026-10-21", "Metal through PyTorch 2.2.2 sits outside the arithmetic model",
      "On an AMD Radeon Pro 5500M, the backend's sin and cos measured 1.22e-4 against the model's 9.5e-7 allowance, "
@@ -966,6 +966,13 @@ PAGES = {
                       "install and run them, and what is planned next.",
                 learn=["How to install the tester and run every probe on your own chip",
                        "What is planned next on the roadmap"]),
+    "submit": dict(kicker="TAKE PART", h1="Submit a row for your chip",
+                   title="Submit a row | Chip Integrity",
+                   intro="Any chip measured with the suite can go on this site, with its own page and its result files "
+                         "next to it. This page says how to send one, what gets published and what does not, and the "
+                         "rules a submission has to meet.",
+                   learn=["How to run the suite and send the files", "What is published, and what is not",
+                          "What makes a row, and what does not"]),
     "about": dict(kicker="ABOUT", h1="Research, standards and how to cite",
                   title="Research, standards and how to cite | Chip Integrity",
                   intro="The checks build on published work in numerical analysis and hardware reliability, and write their "

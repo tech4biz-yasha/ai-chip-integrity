@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: How a chip is tested
+    url: https://chipintegrity.org/method.html
+    about: The probes, the references and the bounds behind every verdict.
+  - name: What gets published, and what does not
+    url: https://chipintegrity.org/submit.html
+    about: Read this before submitting a row.
