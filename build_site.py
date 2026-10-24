@@ -936,7 +936,8 @@ FINDINGS = [  # newest first: slug, date, title, one-line summary
      "Above 16 × 16 × 16, BF16 matrix multiplies on AMX CPUs treat subnormal inputs as zero, whatever "
      "set_flush_denormal says."),
 ]
-RELEASES = [("0.4.3", "2026-10-19", "Probe 7, hours under load, the B200 row, and the driver version in every result file"),
+RELEASES = [("0.5.0", "2026-10-24", "Probes 4 and 5, the AMD Radeon Pro 5500M row, and a GitHub Action that runs the suite in CI"),
+            ("0.4.3", "2026-10-19", "Probe 7, hours under load, the B200 row, and the driver version in every result file"),
             ("0.4.2", "2026-10-15", "Self-test faults shaped like NVIDIA's gate-level measurements"),
             ("0.4.1", "2026-10-11", "The ecc-off verdict, faster exact references, and the RTX 4090 and RTX A5000 rows"),
             ("0.4.0", "2026-10-10", "Six probes, one command, OCP Test and Validation output")]

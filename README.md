@@ -26,7 +26,7 @@ On many Macs the built-in `python3` is version 3.9, and pip then reports "No mat
 On an NVIDIA GPU host with Docker and the NVIDIA container toolkit, with nothing else installed:
 
 ```
-docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.4.3
+docker run --rm --gpus all -v "$PWD:/results" ghcr.io/tech4biz-yasha/ai-chip-integrity:0.5.0
 ```
 
 ## Why this exists
@@ -531,7 +531,7 @@ jobs:
   check:
     runs-on: [self-hosted, gpu]
     steps:
-      - uses: tech4biz-yasha/ai-chip-integrity@v0.4.3
+      - uses: tech4biz-yasha/ai-chip-integrity@v0.5.0
         with:
           device: cuda
           name: h100-node-01
@@ -544,7 +544,7 @@ A one-minute smoke test on a hosted runner, which proves the wiring without a GP
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: tech4biz-yasha/ai-chip-integrity@v0.4.3
+      - uses: tech4biz-yasha/ai-chip-integrity@v0.5.0
         with:
           device: cpu
           quick: "true"
@@ -701,7 +701,7 @@ Run `chip-integrity run --name NAME` on your device, or the ten probe commands i
 If you use this in research, please cite it as
 
 ```
-Yasha Khandelwal. ai-chip-integrity: an open tester for silent computation errors in AI chips. Version 0.4.3, 2026.
+Yasha Khandelwal. ai-chip-integrity: an open tester for silent computation errors in AI chips. Version 0.5.0, 2026.
 https://doi.org/10.5281/zenodo.23505677
 https://github.com/tech4biz-yasha/ai-chip-integrity
 ```
