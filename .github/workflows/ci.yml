@@ -52,3 +52,21 @@ jobs:
         run: |
           docker run --rm chip-integrity:ci soak --device cpu --minutes 0.1 --window-s 2 --out /tmp/soak.jsonl
           docker run --rm chip-integrity:ci soak --device cpu --minutes 0.1 --window-s 2 --inject 3 --out /tmp/soak_inject.jsonl
+
+  action:
+    name: The GitHub Action, quick run on CPU
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install CPU PyTorch, so the Action does not pull the CUDA build onto a CPU runner
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - name: The Action in this checkout, against the released package
+        uses: ./
+        with:
+          device: cpu
+          quick: "true"
+          name: ci-action
+          artifact-name: chip-integrity-action-smoke

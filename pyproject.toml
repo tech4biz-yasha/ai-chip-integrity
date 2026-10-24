@@ -42,7 +42,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=8", "numpy", "jsonschema", "transformers>=4.45"]
+test = ["pytest>=8", "numpy", "jsonschema", "pyyaml", "transformers>=4.45"]
 model = ["transformers>=4.45"]
 
 [project.scripts]

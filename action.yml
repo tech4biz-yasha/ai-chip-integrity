@@ -1,0 +1,157 @@
+name: AI chip integrity check
+description: Run the open silent data corruption tests on this runner's chip and fail the build when a wrong answer comes back.
+author: Yasha Khandelwal
+
+branding:
+  icon: cpu
+  color: blue
+
+inputs:
+  device:
+    description: "Which device to test: auto, cpu, mps, cuda or cuda:N."
+    required: false
+    default: auto
+  name:
+    description: Prefix for the result file names, usually the chip or the node.
+    required: false
+    default: chip
+  out-dir:
+    description: Folder the result files are written to.
+    required: false
+    default: chip-integrity-results
+  quick:
+    description: true runs small sizes, about a minute. A smoke test, not a publishable row.
+    required: false
+    default: "false"
+  skip:
+    description: Comma list of probes to leave out, from screen,kernels,abft,patterns,memcheck.
+    required: false
+    default: ""
+  version:
+    description: Version of ai-chip-integrity to install from PyPI. Empty installs the newest.
+    required: false
+    default: ""
+  torch-index-url:
+    description: >-
+      Extra pip index for PyTorch, for example https://download.pytorch.org/whl/cu128.
+      Leave empty to keep the torch already on the runner.
+    required: false
+    default: ""
+  install:
+    description: true installs the package with pip. false uses the chip-integrity already on PATH.
+    required: false
+    default: "true"
+  upload-results:
+    description: true uploads the result files as a build artifact.
+    required: false
+    default: "true"
+  artifact-name:
+    description: Name of that artifact.
+    required: false
+    default: chip-integrity-results
+  fail-on-fault:
+    description: >-
+      true fails the build when a probe finds a fault. false reports the fault and lets the build pass.
+      A run error always fails the build, so a broken run is never read as a clean chip.
+    required: false
+    default: "true"
+
+outputs:
+  result:
+    description: clean, fault or error.
+    value: ${{ steps.run.outputs.result }}
+  exit-code:
+    description: The chip-integrity exit code. 0 clean, 1 fault found, 2 run error.
+    value: ${{ steps.run.outputs.exit-code }}
+  out-dir:
+    description: Folder holding the OCP Test and Validation result files.
+    value: ${{ steps.run.outputs.out-dir }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install PyTorch from the index this runner needs
+      if: inputs.install == 'true' && inputs['torch-index-url'] != ''
+      shell: bash
+      env:
+        TORCH_INDEX_URL: ${{ inputs['torch-index-url'] }}
+      run: python -m pip install --upgrade "torch>=2.2" --index-url "$TORCH_INDEX_URL"
+
+    - name: Install ai-chip-integrity
+      if: inputs.install == 'true'
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        python -m pip install --upgrade pip
+        if [ -n "$VERSION" ]; then
+          python -m pip install "ai-chip-integrity==$VERSION"
+        else
+          python -m pip install --upgrade ai-chip-integrity
+        fi
+
+    - name: Suite and probe versions
+      shell: bash
+      run: chip-integrity --version
+
+    - name: Every probe and its self-test
+      id: run
+      shell: bash
+      env:
+        DEVICE: ${{ inputs.device }}
+        NAME: ${{ inputs.name }}
+        OUT_DIR: ${{ inputs['out-dir'] }}
+        QUICK: ${{ inputs.quick }}
+        SKIP: ${{ inputs.skip }}
+      run: |
+        args=(run --device "$DEVICE" --name "$NAME" --out-dir "$OUT_DIR")
+        if [ "$QUICK" = "true" ]; then args+=(--quick); fi
+        if [ -n "$SKIP" ]; then args+=(--skip "$SKIP"); fi
+        set +e
+        chip-integrity "${args[@]}"
+        code=$?
+        set -e
+        case "$code" in
+          0) result=clean ;;
+          1) result=fault ;;
+          *) result=error ;;
+        esac
+        {
+          echo "exit-code=$code"
+          echo "result=$result"
+          echo "out-dir=$OUT_DIR"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Upload the result files
+      if: always() && inputs['upload-results'] == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs['artifact-name'] }}
+        path: ${{ inputs['out-dir'] }}
+        if-no-files-found: warn
+
+    - name: Read the verdict
+      shell: bash
+      env:
+        CODE: ${{ steps.run.outputs.exit-code }}
+        RESULT: ${{ steps.run.outputs.result }}
+        FAIL_ON_FAULT: ${{ inputs['fail-on-fault'] }}
+        OUT_DIR: ${{ inputs['out-dir'] }}
+      run: |
+        case "$RESULT" in
+          clean)
+            echo "Every probe passed and every planted fault was caught." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+            ;;
+          fault)
+            echo "::error::A probe found a fault on this chip. The result files in $OUT_DIR say which check fired and where."
+            echo "A probe found a fault on this chip. See the $OUT_DIR artifact." >> "$GITHUB_STEP_SUMMARY"
+            if [ "$FAIL_ON_FAULT" = "true" ]; then exit 1; fi
+            exit 0
+            ;;
+          *)
+            echo "::error::chip-integrity could not complete the run (exit code $CODE). This is not a clean result."
+            echo "The run did not complete (exit code $CODE), so this chip is unmeasured." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+            ;;
+        esac

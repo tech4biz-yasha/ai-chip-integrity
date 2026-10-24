@@ -391,7 +391,7 @@ python model.py                  # full model forward pass; downloads Qwen2.5-0.
 python model.py --model tiny --inject 2   # model self-test on a two-layer model built from the seed, no download
 python reduce.py                 # reductions: sum, running sum, mean, row and column sums, exact and bounded, per precision
 python reduce.py --inject 2      # reduction self-test
-python -m pytest -q              # 286 tests on CPU; 9 more validate the output against OCP's schema
+python -m pytest -q              # 305 tests on CPU; 9 more validate the output against OCP's schema
 ```
 
 Options for `memcheck.py`:
@@ -514,6 +514,62 @@ On CUDA, `screen.py` and `kernels.py` turn off TF32 and reduced precision reduct
 
 To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproject/ocp-diag-core) and set `OCP_SCHEMA_DIR` to its `json_spec/output` folder.
 
+## Run it in CI
+
+`action.yml` in this repository is a GitHub Action, so a fleet can screen a card on a schedule and fail the build when a wrong answer comes back. The runner needs Python 3.10 or newer on `PATH`.
+
+On a self-hosted runner that has the GPU:
+
+```yaml
+name: Chip integrity
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: [self-hosted, gpu]
+    steps:
+      - uses: tech4biz-yasha/ai-chip-integrity@v0.4.3
+        with:
+          device: cuda
+          name: h100-node-01
+          torch-index-url: https://download.pytorch.org/whl/cu128
+```
+
+A one-minute smoke test on a hosted runner, which proves the wiring without a GPU:
+
+```yaml
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: tech4biz-yasha/ai-chip-integrity@v0.4.3
+        with:
+          device: cpu
+          quick: "true"
+```
+
+Inputs:
+
+| Input | Default | What it does |
+|---|---|---|
+| `device` | `auto` | `auto`, `cpu`, `mps`, `cuda` or `cuda:N` |
+| `name` | `chip` | prefix for the result file names, usually the chip or the node |
+| `out-dir` | `chip-integrity-results` | folder the result files are written to |
+| `quick` | `false` | `true` runs small sizes: a smoke test, not a publishable row |
+| `skip` | empty | comma list of probes to leave out, from `screen,kernels,abft,patterns,memcheck` |
+| `version` | empty | version to install from PyPI; empty installs the newest |
+| `torch-index-url` | empty | extra pip index for PyTorch; empty keeps the torch already on the runner |
+| `install` | `true` | `false` uses the `chip-integrity` already on `PATH` |
+| `upload-results` | `true` | upload the result files as a build artifact |
+| `artifact-name` | `chip-integrity-results` | name of that artifact |
+| `fail-on-fault` | `true` | `false` reports a fault and lets the build pass; a run error always fails |
+
+Outputs: `result` (`clean`, `fault` or `error`), `exit-code` and `out-dir`.
+
+A run that cannot complete fails the build whatever `fail-on-fault` says, so a broken run is never read as a clean chip.
+
 ## Files
 
 | Path | What it is |
@@ -532,6 +588,7 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 | `screen.py`, `kernels.py`, `abft.py`, `patterns.py`, `memcheck.py`, `soak.py`, `model.py`, `reduce.py` | Small wrappers so `python screen.py` and the other probe commands keep working from a clone |
 | `pyproject.toml` | Package metadata for PyPI. The version lives in `chip_integrity/__init__.py` and must match `CITATION.cff` |
 | `Dockerfile` | The `ghcr.io/tech4biz-yasha/ai-chip-integrity` image: PyTorch 2.8.0 with CUDA 12.8, the same build the H100 rows were measured with, the `transformers` extra so `chip-integrity model` runs from the image, and `chip-integrity run` as its default command |
+| `action.yml` | The GitHub Action: one CI step that installs the package, runs every probe and its self-test on the runner's chip, uploads the result files and fails the build when a wrong answer comes back |
 | `.github/workflows/` | `ci.yml` runs every test, including the OCP schema checks, builds the package, and runs a quick pass and a few seconds of probe 7 inside the Docker image on every push; `release.yml` publishes the package to PyPI and the image to GitHub's container registry when a release is published |
 | `build_site.py` | Builds chipintegrity.org into `docs/` from the sources in `site/` (one layout, a style sheet, a script, the page and findings sources, the self-hosted IBM Plex fonts under the SIL Open Font License, and the logo), including the share images in `docs/og/` and the updates feed `docs/feed.xml`, and every file in `results/`, so the published tables can never say more than the files do. One row per device and probe; a newer tool version replaces the older row. Run `python build_site.py` after adding result files It also writes one page per chip at `docs/chips/<chip>.html` with an index at `docs/chips/index.html`, every link relative so the site works from its folder or on any host, `docs/sitemap.xml` and the measured section of `docs/llms.txt`, all from the same files. |
 | `results/` | Every published result file, in OCP format |
@@ -539,7 +596,7 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 
 ## Tests
 
-`python -m pytest -q` runs 241 tests on the CPU in about a minute; 7 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set. On CPUs whose matrix multiply ignores flush-to-zero, such as Apple silicon, the two flushing tests in `tests/test_patterns.py` skip themselves, giving 239 passed.
+`python -m pytest -q` runs 305 tests on the CPU in about a minute; 9 more validate every probe's output against the official OCP schema when `OCP_SCHEMA_DIR` is set. On CPUs whose matrix multiply ignores flush-to-zero, such as Apple silicon, the two flushing tests in `tests/test_patterns.py` skip themselves, giving 303 passed.
 
 1. `tests/test_screen.py` (37): every verdict path, every bit position caught by the self-test, NaN handling, int8 and FP8 off-by-one, FP8 inputs exact and K above 4096 skipped, rectangular shapes, bound tightness.
 2. `tests/test_kernels.py` (23): all kernels and precisions, the self-test on six seeds, intermittent and systematic faults, a one-ulp change, internal fp16 arithmetic and tanh-GELU both caught as outside the bound, NaN handling, fp32 bound tightness, a sin that is off by 1e-4 caught in RoPE, RoPE angles reaching every position, the device's own exp, erf, sin and cos measured, and the CUDA attention path forced onto the CPU: a batch dimension added with the same shape and values back, the kernel that ran recorded, fused kernels only for fp16 and bf16, and a loud refusal when no kernel fits.
@@ -555,6 +612,7 @@ To run the schema test, clone [ocp-diag-core](https://github.com/opencomputeproj
 12. `tests/test_soak.py` (27): a clean soak passing every window with its totals adding up; the self-test catching every planted fault under each fault model and in exact int8; an intermittent fault failing only its own window; any difference in int8 counted as wrong; a kernel that wobbles by one ulp inside the bound reported as non-deterministic, not as corruption; a first result outside the bound and a kernel that does not repeat both left out at setup; precisions rotating one per window; an unsupported precision skipped while the rest are soaked; every window carrying temperature, clocks, power and named clock-event reasons, with the temperature of the first differing run; NVML read through a simulated library, with older call names and missing readings left out; Ctrl-C keeping every completed measurement; a real fault failing the self-test; bad options refused; the `chip-integrity soak` command and the `python soak.py` script; and the OCP schema.
 13. `tests/test_model.py` (20): on the two-layer tiny model, a clean run passing with every multiply inside its bound, the weights hashed the same way every time, the self-test catching and localising every planted wrong element and weight flip across several seeds, a weight changed on the chip or a run that differs failing as corruption, runs that agree but sit outside the bound reported as a faulty unit, a last-bit wobble inside the bound reported as non-deterministic rather than a fault, the self-test still failing on a real fault, a prompt file and a second precision, bad arguments rejected, the `chip-integrity model` subcommand and the script wrapper, and the output validated against the official OCP schema when `OCP_SCHEMA_DIR` is set.
 14. `tests/test_reduce.py` (23): every step passing in fp32, fp16 and bf16 at small sizes; the exact inputs representable, with every prefix, in all three precisions; the bound holding for five different summation orders including one at a time; the self-test catching and locating every planted fault across four seeds and two precisions; a differing wrong result failing as corruption, the same wrong answer every run as a faulty unit, a last-bit wobble inside the bound as non-deterministic, the self-test still failing on a real fault, operations selectable, bad arguments rejected, the gamma limit at 2^23 terms, the `chip-integrity reduce` subcommand and the script wrapper, and the output validated against the official OCP schema when `OCP_SCHEMA_DIR` is set.
+15. `tests/test_action.py` (12): the GitHub Action is composite, every step names a shell or another action, every input it references exists, hyphenated inputs use the bracket form so `out-dir` is not read as a subtraction, every output points at a real step that writes it, the README input table and `action.yml` agree on every name and default, `skip` names only the probes `run` executes, the README snippets pin a released tag and pass only real inputs, and a run that cannot complete fails the build whatever `fail-on-fault` says.
 
 ## Output format
 
