@@ -163,7 +163,7 @@
 <div class="v warn">corrected-during-run</div><div>Every answer was right, but the hardware corrected errors during the run. Worth watching on a healthy chip.</div>
 <div class="v bad">uncorrected-during-run</div><div>The hardware recorded uncorrected errors. A fault even if the answers held.</div>
 <div class="v warn">ecc-off</div><div><a class="term" href="learn.html#g-ecc" data-def="Error-correcting code. Extra bits stored with memory that let the hardware detect and usually correct a single flipped bit. ECC covers memory, not the arithmetic units, and not every chip has it on all memory.">ECC</a> is switched off on the device, so its memory error counters cannot move and their silence proves nothing. The probes' own checks still stand.</div>
-<div class="v">counters-unavailable</div><div>The device has no error counters to read, such as an Apple GPU or a CPU. Never fails a run.</div>
+<div class="v">counters-unavailable</div><div>No error counters were read on this device. Either it exposes none, as an Apple GPU or a CPU does, or it keeps them somewhere this probe does not look: it reads the NVIDIA management library only, so an AMD card's RAS and ECC blocks go unread even when they are enabled. Never fails a run.</div>
 </div>
 <h3>Memory probe</h3>
 <div class="verdict">
@@ -209,7 +209,7 @@
 <div><div class="fh">THE SITE</div><nav aria-label="Footer"><a href="index.html">Home</a><a href="learn.html">Learn</a><a href="method.html">Method</a><a href="results.html">Results</a><a href="chips/index.html">Chips</a><a href="findings/index.html">Findings</a><a href="run.html">Run it</a><a href="submit.html">Submit</a><a href="about.html">About</a></nav></div>
 <div><div class="fh">CITE</div><p>Yasha Khandelwal, ai-chip-integrity, version 0.5.0, 2026, <a href="https://doi.org/10.5281/zenodo.23613283">https://doi.org/10.5281/zenodo.23613283</a></p></div>
 </div>
-<div class="footbase">Page generated from the result files on 2026-10-24. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>
+<div class="footbase">Page generated from the result files on 2026-11-24. Source on <a href="https://github.com/tech4biz-yasha/ai-chip-integrity">GitHub</a>.</div>
 </footer>
 <script src="assets/site.js"></script>
 </body>

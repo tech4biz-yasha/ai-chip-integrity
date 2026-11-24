@@ -69,7 +69,7 @@ COUNTER_NOTES = {
     "uncorrected-during-run": "uncorrected hardware errors during the run",
     "silent-error-confirmed": "error counters stayed quiet while answers were wrong",
     "hardware-noticed": "error counters moved with the wrong answers",
-    "counters-unavailable": "no error counters",
+    "counters-unavailable": "not read on this device",
     "ecc-off": "ECC off, so the error counters cannot see memory errors",
 }
 
@@ -515,6 +515,20 @@ CHIP_NOTES = {  # facts about a measured unit that its result files do not carry
         "see the finding on Metal through PyTorch 2.2.2 for what was measured about the other steps. The full-model probe "
         "also ran on this GPU: fp32 clean through all 36,504 multiplies of Qwen2.5-0.5B, fp16 outside the bound on 750 "
         "of them with every run bit-identical; its file is in results/evidence until that probe joins the row.",
+    "AMD Instinct MI300X VF": "A single-VF SR-IOV partition of an AMD Instinct MI300X (gfx942, 304 compute units, "
+        "196,288 MB of Micron HBM on a 2048-bit bus, firmware AMD MI300X_HW_SRIOV_CVS_1VF), rented on the AMD "
+        "Developer Cloud and measured on 14 November 2026 with amdgpu driver 6.19.14.31400000, host ROCm 10.1.0, "
+        "amd-smi 27.1.0 and PyTorch 2.14.0+rocm10.1.0; the driver version comes from an amd-smi dump taken on the "
+        "droplet, because the suite reads a driver version through nvidia-smi only. FP8 and FP8-fast matrix "
+        "multiplies were skipped at every shape and in every module, each returning HIPBLAS_STATUS_NOT_SUPPORTED "
+        "from this ROCm build, so the FP8 path on this card is untested here; AMD documents Matrix FP8 on the MI300 "
+        "series, so what was refused is the path PyTorch takes through hipBLAS, not the silicon. Fused attention ran "
+        "on the flash backend in fp16 and bf16 and on the memory-efficient backend in fp32, as each step's file "
+        "records; cuDNN attention is not built into this ROCm PyTorch. The card does expose error "
+        "counters: the same amd-smi dump reports ECC enabled on the UMC, SDMA, GFX and MMHUB blocks, with poison "
+        "enabled and a bad-page count of zero. Probe 11 reads the NVIDIA management library only, so it read none of "
+        "them here, and every step on this page records its counter verdict as not read rather than as a quiet "
+        "counter.",
     "NVIDIA B200": "NVIDIA driver 580.126.09, read with nvidia-smi on the pod after the run; the files were written "
                    "by v0.4.2, which did not record the driver (v0.4.3 and later do). Power limit 1000 W, 183,359 MiB "
                    "total memory, as nvidia-smi reported them.",

@@ -21,6 +21,7 @@ Self-test: every row is paired with an injection run that plants faults and must
 ## Measured so far
 
 One page per chip, generated from the result files. Silent faults are runs that differed from their own repeat, checksums that did not agree, memory words that came back wrong or results under load that differed from the verified first one; results outside the proven bound agreed with every repeat but sat outside the bound, which is a faulty unit or a software stack outside the arithmetic model:
+- AMD Instinct MI300X VF: https://chipintegrity.org/chips/amd-instinct-mi300x-vf.html (last tested 2026-11-14; 2,055 compute runs, 0 silent faults, 0 results outside the proven bound, 297 of 297 planted faults caught)
 - AMD Radeon Pro 5500M (MPS) x86_64: https://chipintegrity.org/chips/amd-radeon-pro-5500m-mps-x86-64.html (last tested 2026-10-21; 1,190 compute runs, 0 silent faults, 140 results outside the proven bound, 186 of 186 planted faults caught)
 - Apple GPU (MPS) arm64: https://chipintegrity.org/chips/apple-gpu-mps-arm64.html (last tested 2026-10-10; 1,785 compute runs, 0 silent faults, 0 results outside the proven bound, 264 of 264 planted faults caught)
 - NVIDIA A100-SXM4-80GB: https://chipintegrity.org/chips/nvidia-a100-sxm4-80gb.html (last tested 2026-10-07; 600 compute runs, 0 silent faults, 0 results outside the proven bound, 90 of 90 planted faults caught)

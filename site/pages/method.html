@@ -118,7 +118,7 @@
 <div class="v warn">corrected-during-run</div><div>Every answer was right, but the hardware corrected errors during the run. Worth watching on a healthy chip.</div>
 <div class="v bad">uncorrected-during-run</div><div>The hardware recorded uncorrected errors. A fault even if the answers held.</div>
 <div class="v warn">ecc-off</div><div>ECC is switched off on the device, so its memory error counters cannot move and their silence proves nothing. The probes' own checks still stand.</div>
-<div class="v">counters-unavailable</div><div>The device has no error counters to read, such as an Apple GPU or a CPU. Never fails a run.</div>
+<div class="v">counters-unavailable</div><div>No error counters were read on this device. Either it exposes none, as an Apple GPU or a CPU does, or it keeps them somewhere this probe does not look: it reads the NVIDIA management library only, so an AMD card's RAS and ECC blocks go unread even when they are enabled. Never fails a run.</div>
 </div>
 <h3>Memory probe</h3>
 <div class="verdict">
