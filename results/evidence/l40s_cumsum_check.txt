@@ -1,0 +1,11 @@
+torch 2.8.0+cu129 | device: NVIDIA L40S
+fp16 n=      16: cpu!=dev at       12 elements, first at index 4; cpu!=dev(dtype=fp32) at 0
+fp16 n=    1024: cpu!=dev at      986 elements, first at index 4; cpu!=dev(dtype=fp32) at 0
+fp16 n= 8388608: cpu!=dev at  7428249 elements, first at index 4; cpu!=dev(dtype=fp32) at 131533
+fp16 element 15: true 0.00665283 | cpu 0.00665283 | dev 0.00732422
+fp16 first 16 inputs: [-0.088318, 0.342041, 0.411133, 1.004883, -0.111755, -0.598633, -0.098206, -0.351074, 0.720703, -0.216919, -1.042969, 0.244751, -0.98877, -0.519531, 0.658691, 0.640625]
+bf16 n=      16: cpu!=dev at        5 elements, first at index 9; cpu!=dev(dtype=fp32) at 0
+bf16 n=    1024: cpu!=dev at      900 elements, first at index 9; cpu!=dev(dtype=fp32) at 0
+bf16 n= 8388608: cpu!=dev at  6622527 elements, first at index 9; cpu!=dev(dtype=fp32) at 13085
+bf16 element 15: true 0.01904297 | cpu 0.01904297 | dev 0.01953125
+bf16 first 16 inputs: [-0.088379, 0.341797, 0.412109, 1.007812, -0.111816, -0.597656, -0.098145, -0.351562, 0.722656, -0.216797, -1.039062, 0.245117, -0.988281, -0.519531, 0.660156, 0.640625]
