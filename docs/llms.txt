@@ -34,6 +34,7 @@ One page per chip, generated from the result files. Silent faults are runs that 
 ## Findings
 
 What measuring real chips has turned up, each with its evidence:
+- 2026-11-26, Half-precision running sums differ between GPU and CPU in PyTorch: https://chipintegrity.org/findings/cumsum-half-precision.html. torch.cumsum on fp16 and bf16 data sat up to 79 times outside the proven bound on two GPUs from two vendors, identically on every repeat, while the CPU passed at the same length.
 - 2026-10-21, Metal through PyTorch 2.2.2 sits outside the arithmetic model: https://chipintegrity.org/findings/metal-pytorch-2-2-2.html. On an AMD Radeon Pro 5500M, the backend's sin and cos measured 1.22e-4 against the model's 9.5e-7 allowance, and four more fp16 steps sat outside their bound while every run agreed with every other.
 - 2026-10-15, NVIDIA's own fault patterns, caught on a real GPU: https://chipintegrity.org/findings/nvidia-fault-patterns.html. The self-test now plants faults shaped like NVIDIA's gate-level measurements. On an RTX 4090 the reference check alone flagged all 294.
 - 2026-10-11, When ECC is off, the memory error counters cannot see anything: https://chipintegrity.org/findings/ecc-off.html. Two rented cards ran with ECC switched off, so their counters could not move. The tester now says so instead of calling them quiet.

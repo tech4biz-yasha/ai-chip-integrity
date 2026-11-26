@@ -10,6 +10,7 @@
   <url><loc>https://chipintegrity.org/chips/index.html</loc><lastmod>2026-11-26</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>
   <url><loc>https://chipintegrity.org/findings/index.html</loc><lastmod>2026-11-26</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>
   <url><loc>https://chipintegrity.org/llms.txt</loc><lastmod>2026-11-26</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://chipintegrity.org/findings/cumsum-half-precision.html</loc><lastmod>2026-11-26</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://chipintegrity.org/findings/metal-pytorch-2-2-2.html</loc><lastmod>2026-11-26</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://chipintegrity.org/findings/nvidia-fault-patterns.html</loc><lastmod>2026-11-26</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://chipintegrity.org/findings/ecc-off.html</loc><lastmod>2026-11-26</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>

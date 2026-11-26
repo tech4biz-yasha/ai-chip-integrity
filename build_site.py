@@ -937,6 +937,9 @@ SITE_DIR = os.path.join(ROOT, "site")
 NAV = [("learn", "Learn"), ("method", "Method"), ("results", "Results"), ("chips/index", "Chips"),
        ("findings/index", "Findings"), ("run", "Run it"), ("submit", "Submit"), ("about", "About")]
 FINDINGS = [  # newest first: slug, date, title, one-line summary
+    ("cumsum-half-precision", "2026-11-26", "Half-precision running sums differ between GPU and CPU in PyTorch",
+     "torch.cumsum on fp16 and bf16 data sat up to 79 times outside the proven bound on two GPUs from two vendors, "
+     "identically on every repeat, while the CPU passed at the same length."),
     ("metal-pytorch-2-2-2", "2026-10-21", "Metal through PyTorch 2.2.2 sits outside the arithmetic model",
      "On an AMD Radeon Pro 5500M, the backend's sin and cos measured 1.22e-4 against the model's 9.5e-7 allowance, "
      "and four more fp16 steps sat outside their bound while every run agreed with every other."),
