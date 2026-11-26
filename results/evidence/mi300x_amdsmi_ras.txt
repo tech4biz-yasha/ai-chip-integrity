@@ -1,0 +1,50 @@
+GPU: 0
+    RAS:
+        EEPROM_VERSION: 0x0
+        BAD_PAGE_THRESHOLD: N/A
+        BAD_PAGE_THRESHOLD_EXCEEDED: N/A
+        PARITY_SCHEMA: DISABLED
+        SINGLE_BIT_SCHEMA: DISABLED
+        DOUBLE_BIT_SCHEMA: DISABLED
+        POISON_SCHEMA: ENABLED
+        ECC_BLOCK_STATE:
+            UMC: ENABLED
+            SDMA: ENABLED
+            GFX: ENABLED
+            MMHUB: ENABLED
+            ATHUB: ENABLED
+            PCIE_BIF: ENABLED
+            HDP: ENABLED
+            XGMI_WAFL: ENABLED
+            DF: ENABLED
+            SMN: ENABLED
+            SEM: DISABLED
+            MP0: ENABLED
+            MP1: ENABLED
+            FUSE: DISABLED
+            MCA: ENABLED
+            VCN: DISABLED
+            JPEG: DISABLED
+            IH: ENABLED
+            MPIO: ENABLED
+            MMSCH: DISABLED
+            MP5: DISABLED
+            ATU: DISABLED
+            DACC_BE: DISABLED
+            ECLR: DISABLED
+            KPX_SERDES: DISABLED
+            LSDMA: DISABLED
+            MPART: DISABLED
+            MPIFOE: DISABLED
+            MPRAS: DISABLED
+            NBIF: DISABLED
+            NBIO: DISABLED
+            OXRP: ENABLED
+            PCIE_PL: DISABLED
+            PCS_XGMI: DISABLED
+            PIE: DISABLED
+            CS: DISABLED
+            SHUB: DISABLED
+            SSBDCI: DISABLED
+            UCIE_PCS: DISABLED
+

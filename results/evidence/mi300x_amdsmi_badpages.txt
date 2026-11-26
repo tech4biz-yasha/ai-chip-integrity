@@ -1,0 +1,1 @@
+Command 'bad-pages' is not supported on the system. Run '--help' for more info. Error code: 200 [COMMAND_NOT_SUPPORTED]
