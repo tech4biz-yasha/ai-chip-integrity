@@ -526,7 +526,7 @@ CHIP_NOTES = {  # facts about a measured unit that its result files do not carry
         "on the flash backend in fp16 and bf16 and on the memory-efficient backend in fp32, as each step's file "
         "records; cuDNN attention is not built into this ROCm PyTorch. The card does expose error "
         "counters: the same amd-smi dump reports ECC enabled on the UMC, SDMA, GFX and MMHUB blocks, with poison "
-        "enabled and a bad-page count of zero. Probe 11 reads the NVIDIA management library only, so it read none of "
+        "enabled and a bad-page threshold of 0, not exceeded. Probe 11 reads the NVIDIA management library only, so it read none of "
         "them here, and every step on this page records its counter verdict as not read rather than as a quiet "
         "counter.",
     "NVIDIA B200": "NVIDIA driver 580.126.09, read with nvidia-smi on the pod after the run; the files were written "
